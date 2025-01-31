@@ -28,10 +28,21 @@ async def get_earnings_calendar(ticker: str, api_key: str = AV_API_KEY) -> dict:
     return {"data": data}
 
 
-async def get_news_sentiment(ticker: str, api_key: str = AV_API_KEY) -> dict:
+async def get_news_sentiment(
+    ticker: str, limit: int = 5, api_key: str = AV_API_KEY
+) -> list[dict]:
     """Fetches sentiment analysis on financial news related to the ticker."""
     url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={api_key}"
-    return requests.get(url, timeout=30).json().get("articles", [])[:5]
+    response = requests.get(url, timeout=30).json().get("feed", [])[:limit]
+    fields = [
+        "time_published",
+        "title",
+        "summary",
+        "topics",
+        "overall_sentiment_score",
+        "overall_sentiment_label",
+    ]
+    return [{field: article[field] for field in fields} for article in response]
 
 
 async def get_daily_price(ticker: str, api_key: str = AV_API_KEY) -> dict[str, Any]:
