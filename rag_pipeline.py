@@ -12,15 +12,15 @@ from magentic import (
     FunctionCall,
     UserMessage,
 )
-
-AV_API_KEY = os.getenv("AV_API_KEY")
+from datetime import date
+FMP_API_KEY = os.getenv("FMPREPKEY")
 
 app = FastAPI()
 
-
-async def get_earnings_calendar(ticker: str, api_key: str = AV_API_KEY) -> dict:
+# try to migrate the other tot his
+async def get_earnings_calendar(ticker: str, api_key: str = FMP_API_KEY) -> dict:
     """Fetches upcoming earnings dates for a given ticker."""
-    url = f"https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&symbol={ticker}&horizon=12month&apikey={api_key}"
+    url = f"https://financialmodelingprep.com/api/v3/earning_calendar?from=2024-10-10&to=2025-01-10&apikey={api_key}"
     response = requests.get(url, timeout=30)
     decoded_content = response.content.decode("utf-8")
     cr = csv.reader(decoded_content.splitlines(), delimiter=",")
@@ -29,10 +29,10 @@ async def get_earnings_calendar(ticker: str, api_key: str = AV_API_KEY) -> dict:
 
 
 async def get_news_sentiment(
-    ticker: str, limit: int = 5, api_key: str = AV_API_KEY
+    ticker: str, limit: int = 5, api_key: str = FMP_API_KEY
 ) -> list[dict]:
     """Fetches sentiment analysis on financial news related to the ticker."""
-    url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={api_key}"
+    url = f"https://financialmodelingprep.com/stable/grades-consensus?symbol={ticker}&apikey={api_key}"
     response = requests.get(url, timeout=30).json().get("feed", [])[:limit]
     fields = [
         "time_published",
@@ -45,24 +45,24 @@ async def get_news_sentiment(
     return [{field: article[field] for field in fields} for article in response]
 
 
-async def get_daily_price(ticker: str, api_key: str = AV_API_KEY) -> dict[str, Any]:
+async def get_daily_price(ticker: str, api_key: str = FMP_API_KEY) -> dict[str, Any]:
     """Fetches daily price data for a given stock ticker."""
-    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={ticker}&apikey={api_key}"
+    url = f"https://financialmodelingprep.com/stable/quote?symbol={ticker}&&apikey={api_key}"
     response = requests.get(url, timeout=30).json()
-    return response.get("Time Series (Daily)", {})
+    return response[0]
 
 
 async def get_company_overview(
-    ticker: str, api_key: str = AV_API_KEY
+    ticker: str, api_key: str = FMP_API_KEY
 ) -> dict[str, Any]:
     """Fetches fundamental company data like market cap, P/E ratio, and sector."""
-    url = f"https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={api_key}"
+    url = f"https://financialmodelingprep.com/stable/profile?symbol={ticker}&apikey={api_key}"
     return requests.get(url, timeout=30).json()
 
 
-async def get_sector_performance(api_key: str = AV_API_KEY) -> dict[str, Any]:
+async def get_sector_performance(api_key: str = FMP_API_KEY) -> dict[str, Any]:
     """Fetches market-wide sector performance data."""
-    url = f"https://www.alphavantage.co/query?function=SECTOR&apikey={api_key}"
+    url = f"https://financialmodelingprep.com/stable/sector-performance-snapshot?date={date.today().strftime('%Y-%-%d')}&{api_key}"
     return requests.get(url, timeout=30).json()
 
 
