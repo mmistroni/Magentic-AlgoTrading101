@@ -10,6 +10,7 @@ from langchain.tools import Tool
 # Your existing LLM setup
 llm = ChatOpenAI(temperature=0)
 memory = ConversationBufferMemory(return_messages=True)
+# Sample here https://sethhobson.com/2024/03/building-an-agentic-stock-analysis-tool-with-langchain-openbb-and-claude-3-opus/
 
 
 # Update your prompt template to include the new tools
