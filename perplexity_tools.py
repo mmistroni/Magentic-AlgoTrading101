@@ -59,5 +59,8 @@ agent = LLMSingleActionAgent(
 agent_executor = AgentExecutor.from_agent_and_tools(
     agent=agent,
     tools=[search_tool],  # Pass your actual tools here (e.g., [search_tool])
-    verbose=True  # Optional: shows execution steps
+    verbose=True , # Optional: shows execution steps,
+    max_iterations=5,
+    early_stopping_method="force"
+
 )

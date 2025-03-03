@@ -6,7 +6,7 @@ from pydantic import BaseModel
 app = FastAPI()
 
 # Initialize OpenAI LLM
-llm = OpenAI(model_name="text-davinci-003")
+llm = OpenAI(model_name="text-davinci-003", temperature = 0)
 qa_chain = LLMChain(llm=llm)
 
 class Question(BaseModel):
