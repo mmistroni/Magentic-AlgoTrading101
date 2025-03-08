@@ -79,6 +79,7 @@ openbb-equity==1.4.0
 openbb-etf==1.4.0
 openbb-federal-reserve==1.4.0
 openbb-fixedincome==1.4.1
+openbb-finviz
 openbb-fmp==1.4.0
 openbb-fred==1.4.0
 openbb-imf==1.1.0

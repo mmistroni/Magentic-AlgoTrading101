@@ -7,16 +7,36 @@ from langchain.agents import AgentOutputParser
 from langchain.prompts import StringPromptTemplate
 from langchain.schema import AgentAction, AgentFinish
 from langchain.agents import AgentExecutor
+import os
+import requests
+import logging
+
 
 # replace wtih fmp
 # Define a tool
 def search_api(query: str) -> str:
     return "Results for query"
 
+def get_quote(query):
+
+    ticker = 'MO'
+    logging.info('Querying for {ticker}')
+
+    url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={os.environ['FMP_KEY']}"
+    response = requests.get(url).json()[0]['price'] 
+    logging.info(f'We got {response}')
+    return response
+
 search_tool = Tool(
     name="Search",
     func=search_api,
     description="Useful for answering questions",
+)
+
+quote_tool = Tool(
+        name='Quote',
+        func=get_quote,
+        description="Useful for getting stock quote"
 )
 
 
@@ -31,7 +51,10 @@ class CustomOutputParser(AgentOutputParser):
             )
         else:
             # Extract tool name and input from LLM response
-            tool_name = "Search"  # Replace with your logic
+            if 'quote' in text:
+                tool_name='Quote'
+            else:
+                tool_name = "Search"  # Replace with your logic
             tool_input = {"query": text.strip()}
             return AgentAction(tool=tool_name, tool_input=tool_input, log=text)
 
@@ -52,15 +75,15 @@ llm_chain = LLMChain(llm=llm, prompt=prompt)
 agent = LLMSingleActionAgent(
     llm_chain=llm_chain,
     stop=["\nObservation:"],
-    allowed_tools=[search_tool.name],
+    allowed_tools=[search_tool.name, quote_tool.name],
     output_parser=CustomOutputParser()  # Use default parser
 )
 
 agent_executor = AgentExecutor.from_agent_and_tools(
     agent=agent,
-    tools=[search_tool],  # Pass your actual tools here (e.g., [search_tool])
+    tools=[search_tool, quote_tool],  # Pass your actual tools here (e.g., [search_tool])
     verbose=True , # Optional: shows execution steps,
-    max_iterations=5,
+    max_iterations=3,
     early_stopping_method="force"
 
 )

@@ -18,7 +18,7 @@ def get_api_key(api_key: str = Depends(api_key_header)):
     return api_key
 
 @app.post("/query", response_model=QueryOutput)
-async def query_endpoint(input_data: QueryInput, api_key: str = Depends(get_api_key)):
+async def query_endpoint(input_data: QueryInput):##, api_key: str = Depends(get_api_key)):
     
     async def event_generator():
         async for chunk in agent_executor.astream({'input': input_data.input, 'agent_scratchpad': ''}):
@@ -26,11 +26,6 @@ async def query_endpoint(input_data: QueryInput, api_key: str = Depends(get_api_
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
     
-    #response = agent_executor.invoke({'input': input_data.input, 'agent_scratchpad' : ''})
-
-
-
-
     # It should be a streaming respo
     return QueryOutput(response=response)
 
