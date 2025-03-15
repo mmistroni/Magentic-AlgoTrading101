@@ -1,29 +1,41 @@
 from openbb import obb
 from langchain.tools import Tool
+import reticker
 
-def get_stock_price(ticker: str) -> str:
+def get_ticker_from_query(query):
+    extractor = reticker.TickerExtractor(deduplicate=True)
+    tickers = extractor.extract(query)
+    if len(tickers) > 1:
+        return ','.join(tickers)
+    return tickers[0] 
+
+
+def get_stock_price(query: str) -> str:
     """Get the current stock price for a given ticker."""
     try:
-        data = obb.equity.price.quote(symbol=ticker)
+        ticker = get_ticker_from_query(query)
+        data = obb.equity.price.quote(symbol=ticker).to_df().to_dict('records')[0]
         return f"The current price of {ticker} is ${data['Price']:.2f}"
     except Exception as e:
         return f"Error fetching stock price for {ticker}: {str(e)}"
 
-def get_company_overview(ticker: str) -> str:
+def get_company_overview(query: str) -> str:
     """Get an overview of a company for a given ticker."""
     try:
-        data = obb.equity.profile(symbol=ticker)
-        return f"Overview of {ticker}:\n" \
-               f"Sector: {data['Sector']}\n" \
-               f"Industry: {data['Industry']}\n" \
-               f"Market Cap: ${data['MarketCapitalization']:,}\n" \
-               f"52-Week High: ${data['52WeekHigh']:.2f}\n" \
-               f"52-Week Low: ${data['52WeekLow']:.2f}"
+        ticker = get_ticker_from_query(query)
+        data = obb.equity.profile(symbol=ticker).to_df().to_dict('records')[0]
+        return f'''Overview of {ticker}
+                 Description:{data['long_description']}
+                 Sector: {data['sector']}
+                 Industry: {data['industry_category']}
+                 Market Cap: ${data['market_cap']}
+                 Institutional Ownership {data['institutional_ownership']}
+                 Short Interest: {data['short_interest']}'''
     except Exception as e:
         return f"Error fetching company overview for {ticker}: {str(e)}"
 
 # Create LangChain tools
-tools = [
+obb_tools = [
     Tool(
         name="StockPrice",
         func=get_stock_price,

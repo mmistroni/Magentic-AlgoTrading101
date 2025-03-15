@@ -15,6 +15,7 @@ from langchain.agents import AgentExecutor
 from typing import List
 from langchain.prompts import StringPromptTemplate
 from langchain.tools import Tool
+from openbb_functions import obb_tools
 import os
 import requests
 import logging
@@ -93,11 +94,15 @@ from langchain.prompts import StringPromptTemplate
 from langchain.tools import Tool
 
 class CustomPromptTemplate(StringPromptTemplate):
+
+    tools: list = []  
+
     def __init__(self, **kwargs):
         # Store tools as an attribute
         # Pass input variables to the parent class
         super().__init__(input_variables=["input", "agent_scratchpad"], **kwargs)
         self.tools = []
+        
 
     def set_tools(self, tools):
         self.tools = tools
@@ -116,12 +121,11 @@ class CustomPromptTemplate(StringPromptTemplate):
         Thought: {kwargs['agent_scratchpad']}
         """
 
-tools = [search_tool, quote_tool]
+tools = [search_tool, quote_tool] + obb_tools
 llm = ChatOpenAI(temperature=0)
 prompt = CustomPromptTemplate()#
 prompt.set_tools(tools)
 llm_chain = LLMChain(llm=llm, prompt=prompt)
-
 
 
 agent = LLMSingleActionAgent(
