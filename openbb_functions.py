@@ -15,7 +15,7 @@ def get_stock_price(query: str) -> str:
     try:
         ticker = get_ticker_from_query(query)
         data = obb.equity.price.quote(symbol=ticker).to_df().to_dict('records')[0]
-        return f"The current price of {ticker} is ${data['Price']:.2f}"
+        return f"The current price of {ticker} is ${data['close']:.2f}"
     except Exception as e:
         return f"Error fetching stock price for {ticker}: {str(e)}"
 
