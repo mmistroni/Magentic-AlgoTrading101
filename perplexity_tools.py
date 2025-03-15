@@ -15,7 +15,7 @@ from langchain.agents import AgentExecutor
 from typing import List
 from langchain.prompts import StringPromptTemplate
 from langchain.tools import Tool
-from openbb_functions import obb_tools
+from openbb_functions import obb_tools, get_ticker_from_query
 import os
 import requests
 import logging
@@ -29,9 +29,8 @@ def search_api(query: str) -> str:
 
 def get_quote(query):
 
-    ticker = 'MO'
+    ticker = get_ticker_from_query(query)
     logging.info('Querying for {ticker}')
-
     url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={os.environ['FMP_KEY']}"
     response = requests.get(url).json()
     logging.info(f'We got {response}')
@@ -64,7 +63,7 @@ Respond with just the name of the tool, nothing else.
 
 
 
-@prompt(get_tool_prompt([search_tool, quote_tool]))
+@prompt(get_tool_prompt([search_tool, quote_tool] + obb_tools))
 def select_tool(query: str) -> str:
     """Select the most appropriate tool based on the query."""
     pass
