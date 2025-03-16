@@ -20,12 +20,12 @@ def get_stock_price(query: str) -> str:
                 f"open:{data['open']:.2f}\n" \
                 f"high:{data['high']:.2f}\n" \
                 f"low:{data['low']:.2f}\n" \
-                f"close:{data['close']:.2f}\n" \
+                f"close:{data['last_price']:.2f}\n" \
                 f"volume:{data['volume']:.2f}\n" \
                 f"year_high:{data['year_high']:.2f}\n" \
                 f"ma_50d:{data['ma_50d']:.2f}\n" 
 
-        return f"The current price of {ticker} is ${data['close']:.2f}"
+        return res
     except Exception as e:
         return f"Error fetching stock price for {ticker}: {str(e)}"
 
