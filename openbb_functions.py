@@ -15,6 +15,16 @@ def get_stock_price(query: str) -> str:
     try:
         ticker = get_ticker_from_query(query)
         data = obb.equity.price.quote(symbol=ticker).to_df().to_dict('records')[0]
+
+        res = f"Latest Quote for {ticker}\n" \
+                f"open:{data['open']:.2f}\n" \
+                f"high:{data['high']:.2f}\n" \
+                f"low:{data['low']:.2f}\n" \
+                f"close:{data['close']:.2f}\n" \
+                f"volume:{data['volume']:.2f}\n" \
+                f"year_high:{data['year_high']:.2f}\n" \
+                f"ma_50d:{data['ma_50d']:.2f}\n" 
+
         return f"The current price of {ticker} is ${data['close']:.2f}"
     except Exception as e:
         return f"Error fetching stock price for {ticker}: {str(e)}"
@@ -23,8 +33,18 @@ def get_company_overview(query: str) -> str:
     """Get an overview of a company for a given ticker."""
     try:
         ticker = get_ticker_from_query(query)
-        data = obb.equity.profile(symbol=ticker)
-        return f"Latest Overview for {ticker} are that i don thave anything "
+        data = obb.equity.profile(symbol=ticker).to_df().to_dict('records')[0]
+
+        result =  f"Company Overview for {ticker} "\
+                  f"Sector: {data['sector']} \n "\
+                  f"Industry: {data['industry_category']} \n "\
+                  f"MarketCap:{data['market_cap']} \n "\
+                  f"Inst. Ownership:{data['institutional_ownership']} \n "\
+                  f"Short Interest: {data['short_interest']} \n "\
+                  f"Beta: {data['beta']} \n "\
+                  f"Profile {data['long_description']} \n "
+
+        return result
     except Exception as e:
         return f"Error fetching company overview for {ticker}: {str(e)}"
 
