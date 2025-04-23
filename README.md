@@ -1,3 +1,2 @@
 # Magentic-AlgoTrading101
-
-The article will be linked here upon publishing.
+Writing AI Agents using different frameworks
