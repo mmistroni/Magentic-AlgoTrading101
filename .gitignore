@@ -1,4 +1,5 @@
 **/myenv**
 **/**.cpython**
 **/**env**
-**/**__pycache**
+**/**__pycache__**
+**/tests/**/__pycache__*/
