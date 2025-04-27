@@ -1,3 +1,4 @@
 **/myenv*
-**/.cpython*
-/**env*
+**/**.cpython*
+**/**env*
+**/**__pycache**
