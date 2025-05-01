@@ -1,0 +1,18 @@
+[
+  {
+    "name": "casea6d623",
+    "data": [
+      {
+        "query": "yesteday i went ot the market abd bought lots of things my family was happy",
+        "expected_tool_use": [],
+        "expected_intermediate_agent_responses": [],
+        "reference": "Original Character Count: 67\nNew Character Count: 56\nNew message: Yesterday I went to the market and bought lots of things. My family was happy.\n"
+      }
+    ],
+    "initial_session": {
+      "state": {},
+      "app_name": "adk_short_bot",
+      "user_id": "user"
+    }
+  }
+]
