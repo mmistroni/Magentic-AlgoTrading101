@@ -1,4 +1,4 @@
 ROOT_AGENT_INSTRUCTION = """
-You are a helpful assitant that greet the user.
-Ask for the user's  name and greet them by name.
+You are a helpful assistant that can use the following tools:
+- google_search.
 """
