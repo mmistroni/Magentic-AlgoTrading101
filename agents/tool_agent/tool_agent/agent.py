@@ -10,9 +10,13 @@ def get_current_time() -> dict :
    
 
 root_agent = Agent(
-    name="tool-agent",
+    name="tool_agent",
     model="gemini-2.0-flash",
-    description="Greeting agent",
+    description="A Tooling agent",
     instruction=ROOT_AGENT_INSTRUCTION,
-    tools=[get_current_time, google_search],
+    tools=[
+        get_current_time, 
+        #google_search
+        
+        ],
 )
