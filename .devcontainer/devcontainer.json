@@ -1,3 +1,32 @@
 {
-    "postCreateCommand": "source myenv/bin/activate "
+    "name": "Magentic Algo Trading Environment",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-vscode.go",
+                "eamodio.gitlens"
+            ],
+            "settings": {
+                // Point VS Code to your virtual environment's Python interpreter
+                "python.defaultInterpreterPath": "./.venv/bin/python",
+                // This setting tells the Python extension to activate the environment
+                // when a new terminal is opened.
+                "python.terminal.activateEnvInCurrentTerminal": true,
+                // Ensure bash is the default shell for terminals if it's not already
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash"
+                    }
+                }
+            }
+        }
+    },
+    "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt\"",
+    "remoteUser": "vscode"
 }
