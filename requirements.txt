@@ -1,3 +1,4 @@
+adk==0.0.5
 aiohappyeyeballs==2.6.1
 aiohttp==3.11.18
 aiohttp-client-cache==0.11.1
@@ -50,12 +51,14 @@ finvizfinance==1.1.0
 frozendict==2.4.6
 frozenlist==1.6.0
 fsspec==2025.3.2
+google==3.0.0
 google-adk==0.5.0
-google-ai-generativelanguage>=0.6.15
+google-ai-generativelanguage==0.6.15
 google-api-core==2.24.2
 google-api-python-client==2.169.0
 google-auth==2.40.1
 google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.2
 google-cloud-aiplatform==1.93.0
 google-cloud-bigquery==3.32.0
 google-cloud-core==2.4.3
@@ -109,13 +112,14 @@ langchain==0.3.25
 langchain-community==0.3.24
 langchain-core==0.3.60
 langchain-google-community==2.0.7
-langchain-google-genai
+langchain-google-genai==2.0.10
 langchain-google-vertexai==2.0.24
 langchain-openai==0.3.17
 langchain-text-splitters==0.3.8
 langsmith==0.3.42
 litellm==1.70.0
 lxml==5.4.0
+lxml_html_clean==0.4.2
 MarkupSafe==3.0.2
 marshmallow==3.26.1
 matplotlib-inline==0.1.7
@@ -129,6 +133,7 @@ mypy_extensions==1.1.0
 nest-asyncio==1.6.0
 numexpr==2.10.2
 numpy==2.2.5
+oauthlib==3.2.2
 openai==1.75.0
 openbb==4.4.4
 openbb-benzinga==1.4.1
@@ -210,6 +215,7 @@ referencing==0.36.2
 regex==2024.11.6
 requests==2.32.3
 requests-cache==1.2.1
+requests-oauthlib==2.0.0
 requests-toolbelt==1.0.0
 rpds-py==0.25.0
 rsa==4.9.1
