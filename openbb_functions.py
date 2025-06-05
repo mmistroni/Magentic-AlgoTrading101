@@ -2,6 +2,8 @@ from openbb import obb
 from langchain.tools import Tool
 import reticker
 
+
+
 def get_ticker_from_query(query):
     extractor = reticker.TickerExtractor(deduplicate=True)
     tickers = extractor.extract(query)
