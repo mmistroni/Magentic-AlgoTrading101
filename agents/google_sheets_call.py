@@ -4,7 +4,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import os
 import json
-
 credentials_json_str = os.getenv('GOOGLE_SHEET_CREDENTIALS')
 
 credentials_info = json.loads(credentials_json_str)
