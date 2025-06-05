@@ -2,9 +2,14 @@ import google.auth
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import os
+import json
 
-# Path to your downloaded service account key file
-SERVICE_ACCOUNT_FILE = 'path/to/your/service_account_key.json' # <<< IMPORTANT: Update this path!
+credentials_json_str = os.getenv('GOOGLE_SHEET_CREDENTIALS')
+
+credentials_info = json.loads(credentials_json_str)
+
+
 
 # Define the API scopes (permissions) your agent needs
 # For read/write access to Google Sheets:
@@ -13,12 +18,15 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 # SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 
+
+
+
 def get_sheets_service_with_service_account():
     """Authenticates using a service account and returns a Google Sheets API service object."""
     try:
         # Create credentials from the service account key file
-        creds = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        creds = service_account.Credentials.from_service_account_info(
+            credentials_info, scopes=SCOPES)
 
         # Build the Sheets API service object
         service = build('sheets', 'v4', credentials=creds)
@@ -39,13 +47,17 @@ if __name__ == "__main__":
         # Replace with the actual ID of your Google Spreadsheet
         # You can find this in the spreadsheet's URL:
         # https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit
-        SPREADSHEET_ID = "YOUR_SPREADSHEET_ID" # <<< IMPORTANT: Update this ID!
+        #https://docs.google.com/spreadsheets/d/1uVb4olpIX_9jzF0hn-rdUoOh9XRU4Wnc/edit?gid=1137654152#gid=1137654152
+        SPREADSHEET_ID = "1hGkQHbYKtDfsQvAsgTT6eZe9sPjuxA3MrTVZV1O7RLE" # <<< IMPORTANT: Update this ID!
         RANGE_NAME = "Sheet1!A1:D5" # Example range
 
         try:
             # Read data from the spreadsheet
             result = service.spreadsheets().values().get(
                 spreadsheetId=SPREADSHEET_ID, range=RANGE_NAME).execute()
+            
+            
+            
             values = result.get("values", [])
 
             if not values:
