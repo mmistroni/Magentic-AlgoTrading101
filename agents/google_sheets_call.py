@@ -105,14 +105,24 @@ if __name__ == "__main__":
 
             print('Writing values.......')
             # Example of writing data (if you used the full 'spreadsheets' scope)
-            values_to_write = [['07/06/2025', 'Food', 33.22], 
-                               ['08/06/2025', 'Lunch', 15.12]]
+            values_to_write = [['2025-06-07', 'Food', 33.22], 
+                               ['2025-06-08', 'Lunch', 15.12]]
             body = {'values': values_to_write}
-            result = service.spreadsheets().values().update(
-                 spreadsheetId=SPREADSHEET_ID, range="Sheet1!E1",
-                 valueInputOption="RAW", body=body).execute()
-            print(f"\n{result.get('updatedCells')} cells updated.")
+            # result = service.spreadsheets().values().update(
+            #      spreadsheetId=SPREADSHEET_ID, range="Sheet1!E1",
+            #      valueInputOption="RAW", body=body).execute()
+            # print(f"\n{result.get('updatedCells')} cells updated.")
 
+            HEADER_ROW_NUMBER = 6 # <<< CONFIRM THIS IN YOUR SPREADSHEET
+            START_ROW_FOR_APPEND = HEADER_ROW_NUMBER + 1
+            append_row_after_headers(SPREADSHEET_ID, 'Sheet1', START_ROW_FOR_APPEND, values_to_write)
+        
+            values_to_write2 = [['2025-06-08', 'Food', 13.22], 
+                               ['2025-06-08', 'Lunch', 125.12]]
+            
+            append_row_after_headers(SPREADSHEET_ID, 'Sheet1', START_ROW_FOR_APPEND, values_to_write2)
+        
+        
         except HttpError as err:
             print(f"Failed to interact with spreadsheet: {err}")
         except Exception as e:
