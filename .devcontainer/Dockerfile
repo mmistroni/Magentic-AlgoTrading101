@@ -1,45 +1,45 @@
-# Use the official Python 3.12 slim image based on Debian Bookworm
-# 'slim' images are smaller than the full images, but still include common build tools.
-# 'bookworm' is the codename for Debian 12, which is the current stable release.
-FROM python:3.12-slim-bookworm
+# Use a base image that includes Python.
+# You can choose a specific Python version if needed, e.g., python:3.10-slim-bookworm
+FROM python:3.11-slim-bookworm
 
-# Set the working directory in the container
-# Use a specific path for consistency within the devcontainer
-WORKDIR /workspaces/Magentic-AlgoTrading101 
-
-# Create a non-root user (good practice for security)
-# Add a user and set working directory (this part is already there in your logs)
-RUN addgroup --gid 1000 vscode \
-    && adduser --uid 1000 --gid 1000 --disabled-password --shell /bin/bash vscode \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends git iproute2 procps \
+# Add necessary packages for user creation (sudo, git, openssh-client are common for dev containers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo \
+    git \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspaces/Magentic-AlgoTrading101
+# Create the 'vscode' user and group with UID/GID 1000 (standard for dev containers)
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
 
-# Change ownership of the workspace directory to the vscode user
-RUN chown -R vscode:vscode /workspaces/Magentic-AlgoTrading101
+# Create the group and user, add to sudoers, and install libffi-dev (often needed for Python packages)
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd -s /bin/bash -u $USER_UID -g $USER_GID -m $USERNAME \
+    && apt-get update \
+    && apt-get install -y libffi-dev \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && rm -rf /var/lib/apt/lists/*
 
-# Switch to the non-root user
-USER vscode
+# Set environment variables for Poetry
+ENV POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    PATH="$POETRY_HOME/bin:$PATH"
 
-# Copy requirements.txt from the repository root to the current working directory in the container
-# The `COPY ../requirements.txt .` means "copy `requirements.txt` from the parent directory
-# of the current Dockerfile context (`.devcontainer`) to the current directory (`WORKDIR`)
-# inside the container."
-COPY ../requirements.txt .
+# Install Poetry
+# Ensure curl is installed before using it for the Poetry script, then clean up.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && curl -sSL https://install.python-poetry.org | python - \
+    && apt-get purge -y --auto-remove curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create a virtual environment and install dependencies
-# This is done during the Docker image build time, leveraging caching.
-#RUN python3 -m venv .venv && \
-#    . ./.venv/bin/activate && \
-#    pip install --no-cache-dir -r requirements.txt
+# Switch to the newly created 'vscode' user for subsequent commands and the default shell
+USER $USERNAME
 
-# Add the virtual environment's bin directory to the PATH
-# This ensures that `python` and `pip` automatically refer to the venv's executables
-# when a terminal is opened in the Codespace.
-ENV PATH="/workspaces/Magentic-AlgoTrading101/.venv/bin:$PATH" 
+# Set the working directory for your project inside the Codespace
+WORKDIR /workspaces/${CODESPACE_NAME}
 
-
-
-RUN  echo "Finished"
+# Command to keep the container running
+CMD ["bash"]

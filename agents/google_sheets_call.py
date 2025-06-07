@@ -17,9 +17,6 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 # SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 
-
-
-
 def get_sheets_service_with_service_account():
     """Authenticates using a service account and returns a Google Sheets API service object."""
     try:
@@ -37,6 +34,46 @@ def get_sheets_service_with_service_account():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return None
+
+def append_row_after_headers(spreadsheet_id, sheet_name, start_row_for_append, data_to_append):
+    """
+    Appends a row to a Google Sheet after a specific header row.
+
+    Args:
+        spreadsheet_id: The ID of the spreadsheet.
+        sheet_name: The name of the sheet within the spreadsheet (e.g., "Sheet1").
+        start_row_for_append: The row number *after* which you want to append.
+                              For example, if headers are in row 3, use 4.
+        data_to_append: A list of lists representing the rows to append.
+                        Example: [['2025-06-07', 'Groceries', 150]]
+    """
+    try:
+        service = get_sheets_service_with_service_account()
+
+        # The range where data will be appended.
+        # This tells the API to find the next empty row starting from `start_row_for_append`.
+        range_name = f'{sheet_name}!A{start_row_for_append}:Z'
+
+        body = {
+            'values': data_to_append
+        }
+
+        result = service.spreadsheets().values().append(
+            spreadsheetId=spreadsheet_id,
+            range=range_name,
+            valueInputOption='USER_ENTERED', # Use 'USER_ENTERED' if you have formulas or dates
+            insertDataOption='INSERT_ROWS', # This is important to ensure new rows are inserted
+            body=body
+        ).execute()
+
+        print(f"{result.get('updates').get('updatedCells')} cells appended.")
+        print(f"Updated range: {result.get('updates').get('updatedRange')}")
+
+    except Exception as err:
+        print(f"An error occurred: {err}")
+
+
+
 
 # --- Example Usage ---
 if __name__ == "__main__":
@@ -66,13 +103,15 @@ if __name__ == "__main__":
                 for row in values:
                     print(row)
 
+            print('Writing values.......')
             # Example of writing data (if you used the full 'spreadsheets' scope)
-            # values_to_write = [['Hello', 'World'], ['From', 'Agent']]
-            # body = {'values': values_to_write}
-            # result = service.spreadsheets().values().update(
-            #     spreadsheetId=SPREADSHEET_ID, range="Sheet1!E1",
-            #     valueInputOption="RAW", body=body).execute()
-            # print(f"\n{result.get('updatedCells')} cells updated.")
+            values_to_write = [['07/06/2025', 'Food', 33.22], 
+                               ['08/06/2025', 'Lunch', 15.12]]
+            body = {'values': values_to_write}
+            result = service.spreadsheets().values().update(
+                 spreadsheetId=SPREADSHEET_ID, range="Sheet1!E1",
+                 valueInputOption="RAW", body=body).execute()
+            print(f"\n{result.get('updatedCells')} cells updated.")
 
         except HttpError as err:
             print(f"Failed to interact with spreadsheet: {err}")
