@@ -15,3 +15,7 @@ https://medium.com/google-cloud/evaluate-and-deploy-an-llm-agent-with-adk-on-goo
 
 
 # ADK Course: https://youtu.be/P4VFL9nIaIA
+
+
+
+# adk agent remote  https://youtu.be/bPtKnDIVEsg?si=SnmmOfJtuCay3aeF
