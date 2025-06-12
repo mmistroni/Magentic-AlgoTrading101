@@ -49,7 +49,7 @@ if __name__ == "__main__":
         session = remote_agent.create_session(user_id=current_user_id)
         # The session object itself might hold the session ID internally,
         # or expose it via a property like session.session_id if you need the string.
-        print(f"Session created. Session ID: {dir(session)}")
+        print(f"Session created. Session ID: {dir(session['id'])}")
 
         # --- Step 3: Send Messages within the Session ---
         # Now, you'll use the 'query' or 'stream_query' method directly on the session object.
@@ -60,61 +60,13 @@ if __name__ == "__main__":
         print(f"\n--- Sending First Query within session ---")
         print(f"Query: '{user_query_1}'")
 
-        stream_response_1 = session.stream_query(
+        for event in remote_agent.stream_query(
+            user_id=current_user_id,
+            session_id=session["id"],
             message=user_query_1,
-            # user_id is typically not needed again here if it was passed in create_session
-            # enable_tracing=True # Uncomment for verbose debugging
-        )
+        ):
+            print(f'----- Received {event}')
 
-        # --- Step 4: Process the Streaming Response ---
-        full_response_text_1 = ""
-        for event in stream_response_1:
-            if "messages" in event:
-                for message_content in event["messages"]:
-                    if "text" in message_content:
-                        text_chunk = message_content["text"]
-                        full_response_text_1 += text_chunk
-                        print(f"Agent Text Chunk: {text_chunk}", end='', flush=True)
-            elif "output" in event:
-                output_data = event["output"]
-                if "text" in output_data:
-                    final_text = output_data["text"]
-                    full_response_text_1 += final_text
-                    print(f"\nFinal Agent Output Text (from 'output' key): {final_text}")
-                else:
-                    print(f"\nAgent Final Structured Output: {json.dumps(output_data, indent=2)}")
-            elif "actions" in event:
-                print(f"\n--- Agent Actions Event: {json.dumps(event['actions'], indent=2)} ---")
-            elif "debug" in event:
-                print(f"\n--- Agent Debug Event: {json.dumps(event['debug'], indent=2)} ---")
-            else:
-                print(f"\n--- Unhandled Event Type: {json.dumps(event, indent=2)} ---")
-
-        print(f"\n--- Full First Conversation Response: {full_response_text_1} ---")
-
-
-        # --- Follow-up message within the SAME session ---
-        # No need to pass session_id explicitly; it's handled by the 'session' object.
-        user_query_2 = "What did you think of that experience?"
-
-        print(f"\n--- Sending Follow-up Query within session ---")
-        print(f"Query: '{user_query_2}'")
-
-        stream_response_2 = session.stream_query(
-            message=user_query_2,
-            # enable_tracing=True
-        )
-
-        full_response_text_2 = ""
-        for event in stream_response_2:
-            if "messages" in event:
-                for message_content in event["messages"]:
-                    if "text" in message_content:
-                        text_chunk = message_content["text"]
-                        full_response_text_2 += text_chunk
-                        print(f"Agent Text Chunk: {text_chunk}", end='', flush=True)
-            # Add other event type handling if needed for follow-up
-        print(f"\n--- Full Follow-up Conversation Response: {full_response_text_2} ---")
 
 
     # --- Error Handling ---
