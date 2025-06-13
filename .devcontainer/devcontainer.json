@@ -28,5 +28,9 @@
         }
     },
     "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt\"",
-    "remoteUser": "vscode"
+    "remoteUser": "vscode",
+    // Optional: If you want to run `gcloud init` or `gcloud auth login` interactively later.
+    // "containerEnv": {
+    //     "CLOUDSDK_CORE_DISABLE_PROMPTS": "1" // Set this if you want to suppress interactive prompts during builds
+    // }
 }
