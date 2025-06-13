@@ -1,0 +1,55 @@
+swagger: '2.0'
+info:
+  title: agent-api
+  description: API Gateway for a simple Hello World Cloud Function with API Key access
+  version: 1.0.0
+schemes:
+  - https
+produces:
+  - application/json
+# Define the API Key security scheme
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: X-Api-Key # The name of the header for the API key
+    in: header # The API key will be passed in the request header (e.g., X-Api-Key: YOUR_API_KEY)
+security:
+  - api_key: [] # Apply API Key security to all paths by default
+paths:
+  /hello:
+    get:
+      summary: Calls the Hello World function
+      operationId: helloWorld
+      x-google-backend:
+        address: https://us-central1-datascience-projects.cloudfunctions.net/my_agent_function
+        protocol: h2
+      parameters:
+        - in: query
+          name: name
+          type: string
+          description: Optional name to greet
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            type: string
+    post:
+      summary: Calls the Hello World function with a POST request
+      operationId: helloWorldPost
+      x-google-backend:
+        address: https://us-central1-datascience-projects.cloudfunctions.net/my_agent_function
+        protocol: h2
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+          description: Optional name to greet in JSON body
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            type: string
