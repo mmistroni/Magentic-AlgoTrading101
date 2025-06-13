@@ -141,11 +141,15 @@ echo "--- Creating API Config from OpenAPI Spec with Quota ---"
 # Generate a unique config ID based on timestamp
 API_CONFIG_ID="${API_NAME}-config-$(date +%s)"
 
+SVC_ACCT_NAME="${FUNCTION_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+
+echo "-- CCreating svc ${SVC_ACCT_NAME}"
+
 gcloud api-gateway api-configs create "${API_CONFIG_ID}" \
     --api="${API_NAME}" \
     --openapi-spec="${OPENAPI_SPEC_FILE}" \
     --project="${PROJECT_ID}" \
-    --backend-auth-service-account="${FUNCTION_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --backend-auth-service-account="myapigatewaysvcaccount@datascience-projects.iam.gserviceaccount.com" \
     --display-name="Hello World Config with Quota" \
     --async # Use async to allow the script to continue without waiting
 
@@ -166,18 +170,13 @@ echo "API Config created successfully."
 echo ""
 
 # --- Step 4: Create/Update the API Gateway ---
+# --- Step 4: Create/Update the API Gateway ---
 echo "--- Creating/Updating API Gateway: ${GATEWAY_ID} ---"
 
-# Get the latest API Config ID (in case previous async didn't get caught or if running standalone)
-API_CONFIG_ID=$(gcloud api-gateway api-configs list \
-    --api="${API_NAME}" \
-    --project="${PROJECT_ID}" \
-    --sort-by=~createTime \
-    --limit=1 \
-    --format="value(name)" | cut -d/ -f6)
-
+# --- FIX: Removed the problematic list command and directly using API_CONFIG_ID from previous step ---
+# No need to re-fetch; API_CONFIG_ID is already set from Step 3 and confirmed active.
 if [ -z "${API_CONFIG_ID}" ]; then
-    echo "Could not find a valid API Config ID. Exiting."
+    echo "Internal error: API_CONFIG_ID should not be empty at this stage. Exiting."
     exit 1
 fi
 
@@ -195,19 +194,16 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "API Gateway deployment initiated. This may take several minutes for the gateway to become fully operational."
-echo "You can check its status in the Google Cloud Console:"
-echo "https://console.cloud.google.com/api-gateway/gateways?project=${PROJECT_ID}"
-echo ""
+
 
 # --- Step 5: Create an API Key ---
 echo "--- Creating a new API Key ---"
 echo "Note: This API key will allow access to your API Gateway, subject to quotas."
-API_KEY_NAME=$(gcloud api-keys create \
+API_KEY_NAME=$(gcloud alpha services api-keys create \
     --project="${PROJECT_ID}" \
-    --display-name="Hello World API Key" \
+    --display-name="Hello World API Key for ${API_NAME}" \
     --format="value(name)")
-
+    
 # Extract the key string from the full resource name
 # The format is 'projects/<project-id>/locations/global/keys/<key-string>'
 API_KEY=$(echo "${API_KEY_NAME}" | awk -F'/' '{print $NF}')
