@@ -16,10 +16,10 @@ FUNCTION_NAME="my_agent_function" # As defined in deploy-function-sh
 FUNCTION_REGION="us-central1" # As defined in deploy-function-sh
 
 # The name for your new API (e.g., 'my-hello-api'). This is used for the OpenAPI spec.
-API_NAME="agent-api"
+API_NAME="agent-api2"
 
 # The ID for your new API Gateway (e.g., 'hello-gateway'). This will be part of the gateway URL.
-GATEWAY_ID="agent-gateway"
+GATEWAY_ID="agent-gateway2"
 
 # The Google Cloud region where you want to deploy your API Gateway.
 GATEWAY_REGION="${FUNCTION_REGION}"
