@@ -54,3 +54,7 @@ Example Postman/cURL usage:
 Keep your API Key secret! This key controls access to your API.
 You can manage API keys in the Google Cloud Console: https://console.cloud.google.com/apis/credentials?project=datascience-projects
 vscode@codespaces-5c1a68:/workspaces/Magentic-AlgoTrading101/agent_cloud_function$ 
+
+
+
+gcloud config set project datascience-projects
