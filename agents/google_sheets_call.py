@@ -2,12 +2,9 @@ import google.auth
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from typing import List, Dict, Any, Optional, Union
 import os
 import json
-credentials_json_str = os.getenv('GOOGLE_SHEET_CREDENTIALS')
-
-credentials_info = json.loads(credentials_json_str)
-
 
 
 # Define the API scopes (permissions) your agent needs
@@ -21,6 +18,9 @@ def get_sheets_service_with_service_account():
     """Authenticates using a service account and returns a Google Sheets API service object."""
     try:
         # Create credentials from the service account key file
+        credentials_json_str = os.getenv('GOOGLE_SHEET_CREDENTIALS')
+
+        credentials_info = json.loads(credentials_json_str)
         creds = service_account.Credentials.from_service_account_info(
             credentials_info, scopes=SCOPES)
 
@@ -34,6 +34,80 @@ def get_sheets_service_with_service_account():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return None
+
+def calculate_column_sum(self, spreadsheet_id: str, range_name: str, column_index: int) -> Optional[Union[int, float]]:
+        """
+        Calculates the sum of numeric values in a specific column within a given range.
+
+        Args:
+            spreadsheet_id (str): The ID of the spreadsheet.
+            range_name (str): The A1 notation of the range to read (e.g., "Sheet1!A1:D5").
+                              The sum will be calculated within this range.
+            column_index (int): The 0-based index of the column to sum.
+                                 (e.g., 0 for column A, 1 for column B, etc.).
+
+        Returns:
+            Optional[Union[int, float]]: The sum of the column values if successful,
+                                         or None if an error occurs or no numeric data is found.
+        """
+        service = get_sheets_service_with_service_account()
+        range_name: str = f'Sheet1!C{7}:Z'
+        if data is None:
+            print(f"Could not read data from range '{range_name}' to calculate sum.")
+            return None
+
+        total_sum: Union[int, float] = 0
+        found_numeric_value = False
+
+        for row_idx, row in enumerate(data):
+            if column_index < len(row):
+                cell_value = row[column_index]
+                try:
+                    # Attempt to convert to float, as it handles both ints and decimals
+                    numeric_value = float(cell_value)
+                    total_sum += numeric_value
+                    found_numeric_value = True
+                except ValueError:
+                    # If conversion fails, it's not a valid number. Skip or log.
+                    print(f"Warning: Value '{cell_value}' at row {row_idx+1}, column {column_index+1} "
+                          f"in range '{range_name}' is not numeric. Skipping.")
+                except Exception as e:
+                    print(f"An unexpected error occurred processing cell value '{cell_value}': {type(e).__name__}: {e}")
+            else:
+                print(f"Warning: Row {row_idx+1} in range '{range_name}' does not have a column at index {column_index}. Skipping.")
+
+        if not found_numeric_value:
+            print(f"No numeric values found in column {column_index+1} of range '{range_name}'. Sum is 0.")
+
+        return total_sum if found_numeric_value else 0 # Return 0 if no numeric values were found
+
+def find_last_row_index(self, spreadsheet_id: str, sheet_name: str, reference_column: str = 'A') -> int:
+    """
+    Finds the index of the last row containing data in a specified reference column.
+
+    Args:
+        spreadsheet_id (str): The ID of the spreadsheet.
+        sheet_name (str): The name of the sheet within the spreadsheet (e.g., "Sheet1").
+        reference_column (str): The column to check for data (e.g., 'A', 'B', 'C').
+                                The function will read the entire column to find the last row.
+
+    Returns:
+        int: The 1-based index of the last row containing data in the reference column.
+                Returns 0 if the column is entirely empty or if an error occurs.
+    """
+    full_column_range = f"{sheet_name}!{reference_column}:{reference_column}"
+    data = self.read_data(spreadsheet_id, full_column_range)
+
+    if data is None:
+        print(f"Could not read data from column '{reference_column}' to find last row index.")
+        return 0
+    else:
+        # The length of the returned data list is the number of rows with content.
+        # Since rows are 1-based in Google Sheets, this length is the last row index.
+        last_row = len(data)
+        print(f"Last row with data in column '{reference_column}' is: {last_row}")
+        return last_row
+
 
 def append_row_after_headers(spreadsheet_id, sheet_name, start_row_for_append, data_to_append):
     """
@@ -84,7 +158,7 @@ if __name__ == "__main__":
         # You can find this in the spreadsheet's URL:
         # https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit
         #https://docs.google.com/spreadsheets/d/1uVb4olpIX_9jzF0hn-rdUoOh9XRU4Wnc/edit?gid=1137654152#gid=1137654152
-        SPREADSHEET_ID = "1hGkQHbYKtDfsQvAsgTT6eZe9sPjuxA3MrTVZV1O7RLE" # <<< IMPORTANT: Update this ID!
+        SPREADSHEET_ID =  os.getenv('BUDGET_SPREADSHEET_ID')#"1hGkQHbYKtDfsQvAsgTT6eZe9sPjuxA3MrTVZV1O7RLE" # <<< IMPORTANT: Update this ID!
         RANGE_NAME = "Sheet1!A1:D5" # Example range
 
         try:
@@ -121,6 +195,17 @@ if __name__ == "__main__":
                                ['2025-06-08', 'Lunch', 125.12]]
             
             append_row_after_headers(SPREADSHEET_ID, 'Sheet1', START_ROW_FOR_APPEND, values_to_write2)
+
+
+            SUM_ENTIRE_COLUMN_C_RANGE = "Sheet1!C:C"
+            COLUMN_TO_SUM_INDEX_FOR_FULL_COLUMN = 0 # When range is a single column, its index is 0
+
+            print(f"Attempting to sum the entire column C in range '{SUM_ENTIRE_COLUMN_C_RANGE}'...")
+            column_sum_full_column = sheets_connector.calculate_column_sum(
+                SPREADSHEET_ID, SUM_ENTIRE_COLUMN_C_RANGE, COLUMN_TO_SUM_INDEX_FOR_FULL_COLUMN
+            )
+
+
         
         
         except HttpError as err:
