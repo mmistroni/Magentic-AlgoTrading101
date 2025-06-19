@@ -35,7 +35,7 @@ def get_sheets_service_with_service_account():
         print(f"An unexpected error occurred: {e}")
         return None
 
-def calculate_column_sum(self, spreadsheet_id: str, range_name: str, column_index: int) -> Optional[Union[int, float]]:
+def calculate_column_sum(spreadsheet_id: str, range_name: str, column_index: int) -> Optional[Union[int, float]]:
         """
         Calculates the sum of numeric values in a specific column within a given range.
 
@@ -51,7 +51,11 @@ def calculate_column_sum(self, spreadsheet_id: str, range_name: str, column_inde
                                          or None if an error occurs or no numeric data is found.
         """
         service = get_sheets_service_with_service_account()
-        range_name: str = f'Sheet1!C{7}:Z'
+
+        result = service.spreadsheets().values().get(
+                spreadsheetId=spreadsheet_id, range=range_name).execute()
+        data: List[List[Any]] = result.get("values", [])
+        
         if data is None:
             print(f"Could not read data from range '{range_name}' to calculate sum.")
             return None
@@ -81,7 +85,7 @@ def calculate_column_sum(self, spreadsheet_id: str, range_name: str, column_inde
 
         return total_sum if found_numeric_value else 0 # Return 0 if no numeric values were found
 
-def find_last_row_index(self, spreadsheet_id: str, sheet_name: str, reference_column: str = 'A') -> int:
+def find_last_row_index(spreadsheet_id: str, sheet_name: str, reference_column: str = 'A') -> int:
     """
     Finds the index of the last row containing data in a specified reference column.
 
@@ -142,6 +146,7 @@ def append_row_after_headers(spreadsheet_id, sheet_name, start_row_for_append, d
 
         print(f"{result.get('updates').get('updatedCells')} cells appended.")
         print(f"Updated range: {result.get('updates').get('updatedRange')}")
+        return result.get('updates').get('updatedRange')
 
     except Exception as err:
         print(f"An error occurred: {err}")
@@ -194,20 +199,21 @@ if __name__ == "__main__":
             values_to_write2 = [['2025-06-08', 'Food', 13.22], 
                                ['2025-06-08', 'Lunch', 125.12]]
             
-            append_row_after_headers(SPREADSHEET_ID, 'Sheet1', START_ROW_FOR_APPEND, values_to_write2)
+            update_range = append_row_after_headers(SPREADSHEET_ID, 'Sheet1', START_ROW_FOR_APPEND, values_to_write2)
 
-
-            SUM_ENTIRE_COLUMN_C_RANGE = "Sheet1!C:C"
+            lastRow = update_range.split(':')[1]
+            SUM_ENTIRE_COLUMN_C_RANGE = f"Sheet1!C6:{lastRow}"
             COLUMN_TO_SUM_INDEX_FOR_FULL_COLUMN = 0 # When range is a single column, its index is 0
 
-            print(f"Attempting to sum the entire column C in range '{SUM_ENTIRE_COLUMN_C_RANGE}'...")
-            column_sum_full_column = sheets_connector.calculate_column_sum(
+            print(f'About to sum:{SUM_ENTIRE_COLUMN_C_RANGE}')
+
+            column_sum_full_column = calculate_column_sum(
                 SPREADSHEET_ID, SUM_ENTIRE_COLUMN_C_RANGE, COLUMN_TO_SUM_INDEX_FOR_FULL_COLUMN
             )
 
+            print(f'So far we have spent:{column_sum_full_column}')
 
-        
-        
+
         except HttpError as err:
             print(f"Failed to interact with spreadsheet: {err}")
         except Exception as e:
