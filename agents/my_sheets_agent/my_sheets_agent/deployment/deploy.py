@@ -5,7 +5,7 @@ import os
 # --- Configuration ---
 PROJECT_ID = "datascience-projects"  # Replace with your Google Cloud Project ID
 LOCATION = "us-central1"           # Replace with your desired GCP region (e.g., "us-central1", "europe-west4")
-STAGING_BUCKET = "gs://your-adk-staging-bucket" # Replace with your GCS staging bucket
+STAGING_BUCKET = "gs://adk_short_bot" # Replace with your GCS staging bucket
 AGENT_NAME = "my-sheets-agent"  # A unique name for your deployed agent (Reasoning Engine resource)
 AGENT_CODE_DIR = "my_sheets_agent"     # The directory containing your agent.py and requirements.txt
 
@@ -15,8 +15,8 @@ AGENT_CODE_DIR = "my_sheets_agent"     # The directory containing your agent.py 
 # The values are the full Secret Manager resource paths.
 # Example: "projects/YOUR_PROJECT_ID/secrets/YOUR_SECRET_NAME/versions/latest"
 SECRETS = {
-    # "MY_API_KEY_ENV": f"projects/{PROJECT_ID}/secrets/my-api-key/versions/latest",
-    # "DB_PASSWORD_ENV": f"projects/{PROJECT_ID}/secrets/database-password/versions/1"
+     "BUDGET_SPREADSHEET_ID": f"projects/{PROJECT_ID}/secrets/BUDGET_SPREADSHEET_ID",
+     "GOOGLE_SHEETS_CREDENTIALS": f"projects/{PROJECT_ID}/secrets/GOOGLE_SHEETS_CREDENTIALS"
 }
 
 # --- Initialize Vertex AI SDK ---
