@@ -9,7 +9,8 @@
             "extensions": [
                 "ms-python.python",
                 "ms-vscode.go",
-                "eamodio.gitlens"
+                "eamodio.gitlens",
+                "ms-toolsai.jupyter" // Add the Jupyter extension here
             ],
             "settings": {
                 // Point VS Code to your virtual environment's Python interpreter
@@ -27,10 +28,11 @@
             }
         }
     },
-    "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt\"",
-    "remoteUser": "vscode",
+    // Modified postCreateCommand to include ipykernel installation
+    "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt && python3 -m ipykernel install --user --name=magentic_algo_venv --display-name \"Magentic Algo VEnv\"\"",
+    "remoteUser": "vscode"
     // Optional: If you want to run `gcloud init` or `gcloud auth login` interactively later.
     // "containerEnv": {
-    //     "CLOUDSDK_CORE_DISABLE_PROMPTS": "1" // Set this if you want to suppress interactive prompts during builds
+    //     "CLOUDSDK_CORE_DISABLE_PROMPTS": "1" // Set this if you want to suppress interactive prompts during builds
     // }
 }
