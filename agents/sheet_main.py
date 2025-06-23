@@ -2,6 +2,7 @@ import os
 import json
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timedelta
+from datetime import date
 
 # Import the GoogleSheetManager class from your conceptual 'google_sheet_manager.py' file.
 # In a real environment, you would ensure 'google_sheet_manager.py' is in the same directory
@@ -37,9 +38,9 @@ if __name__ == "__main__":
     # For dates to display correctly in Google Sheets, ensure the column is formatted as 'Date'.
     # In Google Sheets: Select the column (e.g., Column A), then go to Format -> Number -> Date.
     new_expense_rows = [
-        ['2025-06-15', 'Food', 11.0],
-        ['2025-06-16', 'Lunch', 50.0],
-        ['2025-06-17', 'Transport', 100.0]
+        [f"{date.today().strftime('%Y-%m-%d')}", 'Food', 11.0],
+        [f"{date.today().strftime('%Y-%m-%d')}", 'Lunch', 50.0],
+        [f"{date.today().strftime('%Y-%m-%d')}", 'Transport', 100.0]
     ]
     
     # Using append_row, which will add these rows at the first available row after DEFAULT_START_EXPENSE_ROW
