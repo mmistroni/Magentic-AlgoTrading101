@@ -18,7 +18,7 @@ GCP_REGION="us-central1"
 RUNTIME="python311"
 
 # The entry point function name in your main.py (e.g., call_adk_agent)
-ENTRY_POINT=ENTRY_POINT="execute_call"
+ENTRY_POINT="execute_call"
 
 # The trigger type (e.g., http, event, pubsub)
 TRIGGER_TYPE="http"
