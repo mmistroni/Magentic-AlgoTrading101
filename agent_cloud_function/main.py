@@ -19,12 +19,23 @@ def execute_call(request):
     request_args = request.args
     logging.info('Attempting to access agent url')
 
+    project_number = "682143946483" # Replace with your actual project number if different
+    secret_id = "ADK-AGENT-URL" # Replace with your actual secret name
+
+    # Construct the full resource name including the version
+    # Using 'latest' is generally recommended for production
+    ADK_AGENT_URL_SECRET_NAME = f"projects/{project_number}/secrets/{secret_id}/versions/latest"
+
+    # --- Your original try-except block ---
     try:
         response = secret_client.access_secret_version(name=ADK_AGENT_URL_SECRET_NAME)
         adk_agent_endpoint = response.payload.data.decode("UTF-8")
+        logging.info(f'Successfully accessed secret: {secret_id}')
     except Exception as e:
-        logging.info(f'Failed toa ccess secret:{str(e)}')
-        adk_agent_endpoint = str(e)
+        logging.error(f'Failed to access secret {secret_id}: {str(e)}') # Use error level for failures
+        adk_agent_endpoint = "ERROR: Failed to retrieve secret" # Assign a default or handle appropriately
+        # Optionally re-raise if this is a critical error for the function
+        # raise e
 
     if request_json and 'name' in request_json:
         name = request_json['name']
