@@ -16,19 +16,14 @@ secret_id = "ADK-AGENT-URL" # Replace with your actual secret name
 # Construct the full resource name including the version
 # Using 'latest' is generally recommended for production
 ADK_AGENT_URL_SECRET_NAME = f"projects/{project_number}/secrets/{secret_id}/versions/latest"
-
-
-
+GOOGLE_CREDENTIALS_URL = f"projects/{project_number}/secrets/GOOGLE_SHEETS_CREDENTIALS/versions/latest"
 # Initialize Secret Manager client outside the function to reuse it
 # This avoids re-initializing the client for every function invocation
 secret_client = secretmanager.SecretManagerServiceClient()
 
-def _initializ_agent(agentUrl):
-    pass
-
-def _get_agent_url():
+def _get_secret_variable(secret_var_name):
     try:
-        response = secret_client.access_secret_version(name=ADK_AGENT_URL_SECRET_NAME)
+        response = secret_client.access_secret_version(name=secret_var_name)
         adk_agent_endpoint = response.payload.data.decode("UTF-8")
         logging.info(f'Successfully accessed secret: {secret_id}')
     except Exception as e:
@@ -38,7 +33,70 @@ def _get_agent_url():
         # raise e
     return adk_agent_endpoint
 
+def _initialize_vertex_ai_agent():
+    """
+    Initializes Vertex AI and loads the Agent Engine agent.
+    This function is designed to be called once globally during a Cloud Function's
+    cold start, and subsequent calls will return immediately if already initialized.
+    """
+    global _creds, _remote_agent
 
+    FQN_AGENT_ID = _get_secret_variable(ADK_AGENT_URL_SECRET_NAME)
+    # If the agent is already loaded, no need to re-initialize
+    if _remote_agent is not None:
+        return
+
+    # Ensure required environment variables are set
+    if not PROJECT_ID or not FQN_AGENT_ID:
+        raise ValueError(
+            "Environment variables GOOGLE_PROJECT_ID or GOOGLE_AGENT_FQN are not set. "
+            "Please configure them in your Cloud Function deployment."
+        )
+
+    # Load credentials from the environment variable (expected to be a JSON string)
+    credentials_json_str = os.getenv('GOOGLE_SHEET_CREDENTIALS') # This name is from your provided code
+    if not credentials_json_str:
+        raise ValueError(
+            "GOOGLE_SHEET_CREDENTIALS environment variable not set. "
+            "It should contain the JSON string of your service account key."
+        )
+    try:
+        credentials_info = json.loads(credentials_json_str)
+        _creds = service_account.Credentials.from_service_account_info(credentials_info)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse GOOGLE_SHEET_CREDENTIALS as JSON: {e}")
+
+    # Initialize Vertex AI SDK
+    vertexai.init(
+        project=PROJECT_ID,
+        location=LOCATION,
+        credentials=_creds,
+    )
+    print(f"Vertex AI initialized for project: {PROJECT_ID}, location: {LOCATION}")
+
+    # Get the Agent Engine object
+    try:
+        _remote_agent = agent_engines.get(FQN_AGENT_ID)
+        print(f"Successfully retrieved agent: {FQN_AGENT_ID}")
+    except google.api_core.exceptions.NotFound as e:
+        raise RuntimeError(
+            f"Agent with FQN '{FQN_AGENT_ID}' not found. "
+            f"Please verify GOOGLE_AGENT_FQN is correct and the agent is deployed in '{LOCATION}'. Details: {e}"
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to get remote agent: {e}")
+
+
+
+# Call the initialization function once when the script module is loaded.
+# This ensures that on a warm start of the Cloud Function, the agent is already ready.
+#try:
+#    _initialize_vertex_ai_agent()
+#except Exception as e:
+    # Log the error during global initialization.
+    # The Cloud Function will still attempt to deploy, but invocations will fail
+    # if the agent initialization was unsuccessful.
+#   print(f"Global Vertex AI Agent initialization failed: {e}")
 
 def execute_call(request): 
     """Responds to any HTTP request.
@@ -55,7 +113,7 @@ def execute_call(request):
     
     # --- Your original try-except block ---
     
-    adk_agent_endpoint = _get_agent_url()
+    adk_agent_endpoint = _get_secret_variable(ADK_AGENT_URL_SECRET_NAME)
 
     if request_json and 'name' in request_json:
         name = request_json['name']
