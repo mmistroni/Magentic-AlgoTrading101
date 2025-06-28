@@ -39,6 +39,7 @@ gcloud functions deploy "${FUNCTION_NAME}" \
     --project "datascience-projects" \
     --region "${GCP_REGION}" \
     ${ALLOW_UNAUTHENTICATED} \
+    --set-env-vars GOOGLE_PROJECT_ID=${PROJECT_ID},GOOGLE_AGENT_LOCATION=${GCP_REGION} \
     --source="${SOURCE_DIR}" \
     --service-account="${FUNCTION_SERVICE_ACCOUNT}" \
     --verbosity=info # Increase verbosity for more detailed output during deployment
