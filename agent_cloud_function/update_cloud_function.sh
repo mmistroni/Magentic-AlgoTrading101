@@ -29,6 +29,11 @@ SOURCE_DIR="."
 FUNCTION_SERVICE_ACCOUNT="myagentfunctionsvc@datascience-projects.iam.gserviceaccount.com"
 ALLOW_UNAUTHENTICATED="--allow-unauthenticated" 
 
+# Memory allocated to the function in MiB.
+# Common values: 128, 256, 512, 1024, 2048, 4096...
+# Increased to 512MiB to address memory limit issues with Vertex AI SDK.
+FUNCTION_MEMORY="512MiB"
+
 # --- Deployment Command ---
 echo "--- Starting update for Cloud Function: ${FUNCTION_NAME} in region: ${GCP_REGION} ---"
 
@@ -42,6 +47,7 @@ gcloud functions deploy "${FUNCTION_NAME}" \
     --set-env-vars GOOGLE_PROJECT_ID=${PROJECT_ID},GOOGLE_AGENT_LOCATION=${GCP_REGION} \
     --source="${SOURCE_DIR}" \
     --service-account="${FUNCTION_SERVICE_ACCOUNT}" \
+    --memory="${FUNCTION_MEMORY}" \
     --verbosity=info # Increase verbosity for more detailed output during deployment
 
 # --- Important Notes ---
