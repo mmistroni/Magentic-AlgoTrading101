@@ -1,0 +1,23 @@
+[
+  {
+    "name": "case2fa759",
+    "data": [
+      {
+        "query": "tell me a joke",
+        "expected_tool_use": [
+          {
+            "tool_name": "get_dad_jokes",
+            "tool_input": {}
+          }
+        ],
+        "expected_intermediate_agent_responses": [],
+        "reference": "What do you call a belt made of watches? A waist of time."
+      }
+    ],
+    "initial_session": {
+      "state": {},
+      "app_name": "dad-joke-agent",
+      "user_id": "user"
+    }
+  }
+]
