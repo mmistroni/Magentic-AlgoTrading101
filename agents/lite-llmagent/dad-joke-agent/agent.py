@@ -2,11 +2,30 @@ import os
 import random
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
+from .prompts import ROOT_AGENT_INSTRUCTION
+
+model = LiteLlm(
+    model="openrouter/openai/gpt-4.1",
+    api_key=os.getenv('OPENROUTER_API_KEY')
+)
+
+def get_dad_jokes():
+    jokes = [
+    "What do you call fake spaghetti? An impasta",
+    "Why did the scarecrow win an award? Because he was outstanding in his field",
+    "Why did the chicken cross the road? to get to the  other side!",
+    "What do you call a belt made of watches? a waist of time",
+    ]
+
+    return random.choice(jokes)
+
+
+
 
 root_agent = Agent(
-    name="adk_short_bot",
-    model="gemini-2.0-flash",
-    description="A bot that shortens messages while maintaining their core meaning",
+    name="dad_joke_agent",
+    model=model,
+    description="Dad Joke Agent",
     instruction=ROOT_AGENT_INSTRUCTION,
-    tools=[count_characters],
+    tools=[get_dad_jokes],
 )
