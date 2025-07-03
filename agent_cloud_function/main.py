@@ -5,7 +5,7 @@ import json
 import vertexai
 from vertexai import agent_engines
 from google.oauth2 import service_account
-import google.api_core.exceptions # For more specific error handling
+import google.api_core.exceptions # For more specific error handlinglo
 
 # Set up logging for Cloud Functions
 logging.basicConfig(level=logging.INFO)
@@ -30,20 +30,20 @@ def _get_secret_variable(secret_full_name: str) -> str:
     """Accesses a secret version from Secret Manager."""
     global secret_client
     if secret_client is None:
-        logging.info("Initializing Secret Manager client globally.")
+        print("Initializing Secret Manager client globally.")
         secret_client = secretmanager.SecretManagerServiceClient()
 
     try:
         response = secret_client.access_secret_version(name=secret_full_name)
         # Log the secret ID, which is the 6th element in the split full name
         secret_id_for_log = secret_full_name.split('/')[5] if len(secret_full_name.split('/')) > 5 else secret_full_name
-        logging.info(f'Successfully accessed secret: {secret_id_for_log}')
+        print(f'Successfully accessed secret: {secret_id_for_log}')
         return response.payload.data.decode("UTF-8")
     except google.api_core.exceptions.NotFound:
-        logging.error(f'Secret not found: {secret_full_name}. Check secret name, project, and permissions.')
+        print(f'Secret not found: {secret_full_name}. Check secret name, project, and permissions.')
         raise ValueError(f"Secret '{secret_full_name.split('/')[5]}' not found or inaccessible.")
     except Exception as e:
-        logging.error(f'Failed to access secret {secret_full_name}: {e}')
+        print(f'Failed to access secret {secret_full_name}: {e}')
         raise RuntimeError(f"Failed to retrieve secret '{secret_full_name.split('/')[5]}': {e}")
 
 
@@ -56,10 +56,10 @@ def _initialize_vertex_ai_agent():
 
     # If the agent is already loaded (from a warm start), no need to re-initialize
     if _remote_agent is not None:
-        logging.info("Agent already initialized from a warm start. Skipping re-initialization.")
+        print("Agent already initialized from a warm start. Skipping re-initialization.")
         return
 
-    logging.info("Performing cold start initialization for Vertex AI Agent.")
+    print("Performing cold start initialization for Vertex AI Agent.")
 
     # 1. Get Agent FQN from Secret Manager
     FQN_AGENT_ID = _get_secret_variable(ADK_AGENT_URL_SECRET_NAME)
@@ -75,12 +75,12 @@ def _initialize_vertex_ai_agent():
         if credentials_json_str and not credentials_json_str.startswith("ERROR:"):
             credentials_info = json.loads(credentials_json_str)
             _creds = service_account.Credentials.from_service_account_info(credentials_info)
-            logging.info("Google Sheets credentials loaded successfully.")
+            print("Google Sheets credentials loaded successfully.")
         else:
-            logging.warning("Google Sheets credentials secret was empty or failed to retrieve.")
+            print("Google Sheets credentials secret was empty or failed to retrieve.")
             _creds = None # Ensure _creds is None if not loaded successfully
     except (json.JSONDecodeError, ValueError, RuntimeError) as e:
-        logging.warning(f"Failed to load/parse Google Sheets credentials (this might be okay if not used for Vertex AI): {e}")
+        print(f"Failed to load/parse Google Sheets credentials (this might be okay if not used for Vertex AI): {e}")
         _creds = None # Ensure _creds is None if loading fails
 
     # 3. Initialize Vertex AI SDK
@@ -90,16 +90,18 @@ def _initialize_vertex_ai_agent():
         vertexai.init(
             project=PROJECT_ID,
             location=LOCATION,
-            # credentials=_creds, # <--- DO NOT PASS _CREDS HERE unless absolutely necessary for Vertex AI itself
+            #credentials=_creds, # <--- DO NOT PASS _CREDS HERE unless absolutely necessary for Vertex AI itself
         )
-        logging.info(f"Vertex AI SDK initialized for project: {PROJECT_ID}, location: {LOCATION} using default service account.")
+        print(f"Vertex AI SDK initialized for project: {PROJECT_ID}, location: {LOCATION} using default service account.")
+        
     except Exception as e:
-        raise RuntimeError(f"Failed to initialize Vertex AI SDK: {e}")
+        raise Exception(f"Some Problems in initializing Vertex Ai:Failed to initialize Vertex AI SDK: {e}" )
 
     # 4. Get the Agent Engine object
     try:
+        print('Trying to initialize agent..')
         _remote_agent = agent_engines.get(FQN_AGENT_ID)
-        logging.info(f"Successfully retrieved agent: {FQN_AGENT_ID}")
+        print(f"Successfully retrieved agent: {FQN_AGENT_ID}")
     except google.api_core.exceptions.NotFound:
         # Catch specific NotFound to provide a more specific error message
         raise RuntimeError(
@@ -109,18 +111,23 @@ def _initialize_vertex_ai_agent():
     except Exception as e:
         # Catch other exceptions during agent retrieval
         raise RuntimeError(f"Failed to get remote agent '{FQN_AGENT_ID}': {e}")
-
+    return "Vertex AI SDK initialized for project"
 
 # --- Global Initialization Block (executed once per cold start) ---
-try:
-    _initialize_vertex_ai_agent()
-except Exception as e:
-    logging.critical(f"FATAL: Global Vertex AI Agent initialization failed during cold start: {e}")
-    _initialization_error = str(e) # Store error to report in the function response
 
 # --- Cloud Function Entry Point ---
 def execute_call(request):
     """Responds to any HTTP request, initializing Vertex AI Agent if needed."""
+    _initialization_error = ''
+    status = ''
+    try:
+        logging.info('Initializing Vertex ai agent')
+        status = _initialize_vertex_ai_agent()
+    except Exception as e:
+        logging.critical(f"FATAL: Global Vertex AI Agent initialization failed during cold start: {e}")
+        _initialization_error = str(e) # Store error to report in the function response
+
+
 
     # First, check if global initialization failed during cold start
     if _initialization_error:
@@ -133,7 +140,7 @@ def execute_call(request):
         # This case *should* ideally not be hit if _initialization_error is None,
         # but serves as a failsafe.
         logging.critical("CRITICAL: _remote_agent is None but _initialization_error is also None. Unexpected state.")
-        return "Internal Server Error: Agent not initialized despite no reported init error.", 500
+        #return "Internal Server Error: Agent not initialized despite no reported init error.", 500
 
     request_json = request.get_json(silent=True)
     request_args = request.args
@@ -153,7 +160,7 @@ def execute_call(request):
     return (
         f'Hello {name}! Nice to see you again. '
         f'Project: {PROJECT_ID}, Location: {LOCATION}. '
-        f'Agent Successfully Initialized: True. '
-        f'Agent FQN: {_remote_agent.name}. '
+        f'Status:{status}'
+        f'Agent FQN: {_remote_agent}. '
         f'If creds loaded: {"Yes" if _creds else "No"}.'
     )
