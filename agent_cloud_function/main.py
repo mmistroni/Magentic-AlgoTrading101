@@ -122,14 +122,50 @@ except Exception as e:
     _initialization_error = str(e) # Store error to report in the function response
 
 def call_agent(input_text):
+    full_agent_response_text = ''
     try:
         print(f'Calling agent with {input_text}')
-        print(dir(_remote_agent))
-        print(_remote_agent.to_dict())
+        current_user_id = "my-unique-application-user-id" # A persistent ID for the user
+        print(f"\n--- Creating new session for user: {current_user_id} ---")
+        session = _remote_agent.create_session(user_id=current_user_id)
+        print(f"\n--- Streaming query and processing events ---")
+        for event in _remote_agent.stream_query(
+            user_id=current_user_id,
+            session_id=session,
+            message=input_text
+        ):
+            print(f'----- Received event: {json.dumps(event, indent=2)}') # Print the whole event for debugging
+
+            # --- Step 4: Extract text from the event ---
+            if isinstance(event, dict) and \
+               'content' in event and \
+               'parts' in event['content'] and \
+               len(event['content']['parts']) > 0 and \
+               'text' in event['content']['parts'][0]:
+                
+                part_text = event['content']['parts'][0]['text']
+                full_agent_response_text += part_text
+                print(f"Extracted part text: '{part_text}'")
+            elif 'author' in event:
+                print(f"Received non-content event from author: {event.get('author')}")
+            else:
+                print(f"Received event in unexpected format (no content.parts[0].text): {json.dumps(event, indent=2)}")
+
+        if not full_agent_response_text:
+            return "Agent responded, but no text content was found in any stream events."
+
+        print(f"\n--- All events processed. Final concatenated response ---")
+        return full_agent_response_text
+
     except Exception as e:
-        print(f'Failed to call agent:{str(e)}')
-
-
+        print(f"An error occurred while calling the streamed agent: {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for better debugging
+        # Accessing full_agent_response_text here is now safe because it's initialized globally
+        if full_agent_response_text:
+             return f"Error during streaming after partial response: {full_agent_response_text[:100]}... Details: {e}"
+        else:
+             return f"Error: Unable to get a response from the agent via streaming. Details: {e}"
 
 # --- Cloud Function Entry Point ---
 def execute_call(request):
@@ -160,7 +196,7 @@ def execute_call(request):
     # Now, you can actually use _remote_agent here, for example:
     # agent_response = _remote_agent.predict(prompt=f"Hello {name}, what can you do?")
     # response_text = agent_response.candidates[0].text
-    call_agent(name)
+    agent_response = call_agent(name)
     # For now, return a confirmation of agent status
     return (
         f'Hello {name}! Nice to see you again. '
@@ -168,4 +204,5 @@ def execute_call(request):
         f'Agent FQN: {_remote_agent.name}. '
         f'Agent Location: {_remote_agent.location}'
         f'If creds loaded: {"Yes" if _creds else "No"}.'
+        f'AgentResponse: {"Yes" if _creds else "No"}.'
     )
