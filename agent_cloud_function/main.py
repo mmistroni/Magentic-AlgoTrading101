@@ -122,16 +122,24 @@ except Exception as e:
     _initialization_error = str(e) # Store error to report in the function response
 
 def call_agent(input_text):
-    full_agent_response_text = ''
+    full_agent_response_text = ""
+
     try:
-        print(f'Calling agent with {input_text}')
+        # --- Step 1: Retrieve the Agent ---
+        # --- Step 2: Create a Session with the Agent ---
         current_user_id = "my-unique-application-user-id" # A persistent ID for the user
         print(f"\n--- Creating new session for user: {current_user_id} ---")
         session = _remote_agent.create_session(user_id=current_user_id)
+        session_id = session.get("id")
+        if not session_id:
+            return f"Error: Session creation did not return a valid 'id'. Session object: {json.dumps(session, indent=2)}"
+        print(f"Session created. Session ID: {session_id}")
+
+        # --- Step 3: Stream Messages within the Session and Process Events ---
         print(f"\n--- Streaming query and processing events ---")
         for event in _remote_agent.stream_query(
             user_id=current_user_id,
-            session_id=session,
+            session_id=session_id,
             message=input_text
         ):
             print(f'----- Received event: {json.dumps(event, indent=2)}') # Print the whole event for debugging
@@ -166,7 +174,6 @@ def call_agent(input_text):
              return f"Error during streaming after partial response: {full_agent_response_text[:100]}... Details: {e}"
         else:
              return f"Error: Unable to get a response from the agent via streaming. Details: {e}"
-
 # --- Cloud Function Entry Point ---
 def execute_call(request):
     """Responds to any HTTP request, initializing Vertex AI Agent if needed."""
@@ -204,5 +211,5 @@ def execute_call(request):
         f'Agent FQN: {_remote_agent.name}. '
         f'Agent Location: {_remote_agent.location}'
         f'If creds loaded: {"Yes" if _creds else "No"}.'
-        f'AgentResponse: {"Yes" if _creds else "No"}.'
+        f'AgentResponse: {agent_response}.'
     )
