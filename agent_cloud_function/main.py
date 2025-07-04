@@ -114,21 +114,26 @@ def _initialize_vertex_ai_agent():
     return "Vertex AI SDK initialized for project"
 
 # --- Global Initialization Block (executed once per cold start) ---
+try:
+    logging.info('Initializing Vertex ai agent')
+    _initialize_vertex_ai_agent()
+except Exception as e:
+    logging.critical(f"FATAL: Global Vertex AI Agent initialization failed during cold start: {e}")
+    _initialization_error = str(e) # Store error to report in the function response
+
+def call_agent(input_text):
+    try:
+        print(f'Calling agent with {input_text}')
+        print(dir(_remote_agent))
+        print(_remote_agent.to_dict())
+    except Exception as e:
+        print(f'Failed to call agent:{str(e)}')
+
+
 
 # --- Cloud Function Entry Point ---
 def execute_call(request):
     """Responds to any HTTP request, initializing Vertex AI Agent if needed."""
-    _initialization_error = ''
-    status = ''
-    try:
-        logging.info('Initializing Vertex ai agent')
-        status = _initialize_vertex_ai_agent()
-    except Exception as e:
-        logging.critical(f"FATAL: Global Vertex AI Agent initialization failed during cold start: {e}")
-        _initialization_error = str(e) # Store error to report in the function response
-
-
-
     # First, check if global initialization failed during cold start
     if _initialization_error:
         logging.error(f"Function invoked but global initialization previously failed: {_initialization_error}")
@@ -146,7 +151,7 @@ def execute_call(request):
     request_args = request.args
     logging.info('Executing Cloud Function with initialized agent.')
 
-    name = 'World'
+    name = 'World I went to the church and met lots of people who greeted me'
     if request_json and 'name' in request_json:
         name = request_json['name']
     elif request_args and 'name' in request_args:
@@ -155,12 +160,12 @@ def execute_call(request):
     # Now, you can actually use _remote_agent here, for example:
     # agent_response = _remote_agent.predict(prompt=f"Hello {name}, what can you do?")
     # response_text = agent_response.candidates[0].text
-
+    call_agent(name)
     # For now, return a confirmation of agent status
     return (
         f'Hello {name}! Nice to see you again. '
         f'Project: {PROJECT_ID}, Location: {LOCATION}. '
-        f'Status:{status}'
         f'Agent FQN: {_remote_agent.name}. '
+        f'Agent Location: {_remote_agent.location}'
         f'If creds loaded: {"Yes" if _creds else "No"}.'
     )
