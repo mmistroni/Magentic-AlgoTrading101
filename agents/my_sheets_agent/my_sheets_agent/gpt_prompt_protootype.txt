@@ -1,0 +1,16 @@
+I'd like to simulate an AI agent that i am designing.
+The agent will be built using the GAME framework
+with these components
+Goals: Manage a Budget
+Actions:
+- insert_expenses(description, amount)
+- list_expenses()
+- get_budget_amount()
+- get_remaining_days()
+- calculate_remaining_budget()
+At each step, your output must be an action to take.
+
+Stop and wait and i will type in the result of the action
+as my next message.
+
+ASk mme for the first task to performm.s
