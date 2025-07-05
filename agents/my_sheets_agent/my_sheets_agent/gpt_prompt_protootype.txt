@@ -14,3 +14,30 @@ Stop and wait and i will type in the result of the action
 as my next message.
 
 ASk mme for the first task to performm.s
+
+
+---- Below is chat transcript from Gemini to see if i have simulated all correctly
+
+AI Agent Simulation Chat Transcript Summary
+
+This simulation tracks an AI agent designed with the GAME framework for budget management.
+
+Actions Performed by the Agent:
+
+Initial Expense Listing: [(food, 20), (coffee, 15)]
+
+Expense Insertion: "dinner" for 22 (Result: 'expense inserted')
+
+Remaining Budget Calculation: 200
+
+Remaining Budget Per Day Calculation: 40 (Derived from 5 remaining days and $200 budget)
+
+Updated Expense Listing: [(food, 10), (coffee, 20), (food, 15), (gelato, 10), (gelato, 11))]
+
+Spending Summary by Expense Type:
+
+food: 25
+
+coffee: 20
+
+gelato: 21
