@@ -18,6 +18,7 @@ LOCATION = os.environ.get('GOOGLE_AGENT_LOCATION', "us-central1")
 # Construct full secret resource names using the determined PROJECT_ID
 ADK_AGENT_URL_SECRET_NAME = f"projects/{PROJECT_ID}/secrets/ADK-AGENT-URL/versions/latest"
 GOOGLE_SHEETS_CREDENTIALS_SECRET_NAME = f"projects/{PROJECT_ID}/secrets/GOOGLE_SHEET_CREDENTIALS/versions/latest"
+GOOGLE_SHEET_ID = f"projects/{PROJECT_ID}/secrets/BUDGET_SPREADSHEET_ID/versions/latest"
 
 # --- Global Variables for Warm Starts ---
 secret_client = None # Lazily initialize Secret Manager client
