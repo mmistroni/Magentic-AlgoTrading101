@@ -251,7 +251,7 @@ else:
 # --- Initialize the ADK Agent Instance ---
 LLM_MODEL_NAME = "gemini-1.5-flash-latest"
 
-budget_agent = LlmAgent( # Changed from Agent to LlmAgent
+root_agent = LlmAgent( # Changed from Agent to LlmAgent
     name="BudgetManager",
     description="An intelligent AI assistant specialized in managing personal budgets within a Google Sheet. It can add new expenses, retrieve financial summaries, list past transactions, and provide insights into daily spending.",
     model=LLM_MODEL_NAME,
