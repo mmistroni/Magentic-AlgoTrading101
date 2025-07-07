@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Any, Optional, Union
 
 # Import ADK components
-from google.adk.agents import LlmAgent # Changed from Agent to LlmAgent for consistency with ADK
+from google.adk.agents import Agent # Changed from Agent to LlmAgent for consistency with ADK
 from google.adk.tools import tool, Tool
 
 # Import your GoogleSheetManager and get_secret helper
@@ -249,10 +249,10 @@ else:
 
 
 # --- Initialize the ADK Agent Instance ---
-LLM_MODEL_NAME = "gemini-1.5-flash-latest"
+LLM_MODEL_NAME = "gemini-2.0-flash"
 
-root_agent = LlmAgent( # Changed from Agent to LlmAgent
-    name="BudgetManager",
+root_agent = Agent( # Changed from Agent to LlmAgent
+    name="my_sheets_agent",
     description="An intelligent AI assistant specialized in managing personal budgets within a Google Sheet. It can add new expenses, retrieve financial summaries, list past transactions, and provide insights into daily spending.",
     model=LLM_MODEL_NAME,
     tools=adk_agent_tools, # Provide the list of pre-configured wrapper tools here
