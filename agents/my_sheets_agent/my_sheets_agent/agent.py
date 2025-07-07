@@ -1,54 +1,87 @@
 # agent.py
 import os
+import yaml # NEW: Import yaml library to parse config.yaml
 from datetime import datetime
 from typing import List, Any, Optional, Union
 
 # Import ADK components
-from google.adk.agents import Agent
-from google.adk.
+from google.adk.agents import LlmAgent # Changed from Agent to LlmAgent for consistency with ADK
 from google.adk.tools import tool, Tool
 
 # Import your GoogleSheetManager and get_secret helper
-from google_sheet_manager import GoogleSheetManager, get_secret # <--- NEW IMPORT
+from google_sheet_manager import GoogleSheetManager, get_secret
 
 # --- Module-Level Configuration and Initialization (Runs ONCE per Cloud Function Cold Start) ---
-# These variables will be accessible by your @tool functions below.
 
-# 1. Get your Google Cloud Project ID from the environment
-YOUR_GCP_PROJECT_ID = os.environ.get('GCP_PROJECT')
+CONFIG_FILE_PATH = 'config.yaml' # Define the path to your config file
+
+# 1. Load configuration from config.yaml
+print(f"[{datetime.now()}] Loading configuration from {CONFIG_FILE_PATH}...")
+config = {}
+try:
+    with open(CONFIG_FILE_PATH, 'r') as f:
+        config = yaml.safe_load(f)
+    if not config:
+        raise ValueError("Config file is empty or invalid.")
+    print("Configuration loaded successfully.")
+except FileNotFoundError:
+    print(f"FATAL ERROR: Configuration file not found at {CONFIG_FILE_PATH}. Agent cannot proceed.")
+    exit(1) # Exit if critical config is missing
+except yaml.YAMLError as e:
+    print(f"FATAL ERROR: Error parsing YAML file {CONFIG_FILE_PATH}: {e}. Agent cannot proceed.")
+    exit(1) # Exit if critical config is malformed
+except ValueError as e:
+    print(f"FATAL ERROR: Configuration error in {CONFIG_FILE_PATH}: {e}. Agent cannot proceed.")
+    exit(1) # Exit if critical config is problematic
+
+# 2. Extract configuration values from the loaded YAML
+# Use .get() with a default or check for None and exit for critical values
+YOUR_GCP_PROJECT_ID = config.get('gcp_project_id')
 if not YOUR_GCP_PROJECT_ID:
-    print("Warning: GCP_PROJECT environment variable not set. Please set it or hardcode for local dev.")
-    # Fallback for local testing if not running in GCP environment.
-    # YOUR_GCP_PROJECT_ID = "your-actual-gcp-project-id" # <--- UNCOMMENT AND SET FOR LOCAL TESTING IF NEEDED!
+    print("FATAL ERROR: 'gcp_project_id' not found in config.yaml. Agent cannot proceed.")
+    exit(1)
 
-# 2. Define the Secret IDs you created in Secret Manager
-GOOGLE_SHEET_CREDS_SECRET_ID = 'google-sheet-credentials'
-MY_SPREADSHEET_ID_SECRET_ID = 'my-budget-spreadsheet-id'
+GOOGLE_SHEET_CREDS_SECRET_ID = config.get('service_account_creds_secret_id')
+MY_SPREADSHEET_ID_SECRET_ID = config.get('spreadsheet_id_secret_id')
 
-# 3. Define constants specific to YOUR Google Sheet's structure
-DEFAULT_SHEET_NAME = 'Expenses'
-DEFAULT_START_EXPENSE_ROW = 7
+if not GOOGLE_SHEET_CREDS_SECRET_ID:
+    print("FATAL ERROR: 'service_account_creds_secret_id' not found in config.yaml. Agent cannot proceed.")
+    exit(1)
+if not MY_SPREADSHEET_ID_SECRET_ID:
+    print("FATAL ERROR: 'spreadsheet_id_secret_id' not found in config.yaml. Agent cannot proceed.")
+    exit(1)
 
-# 4. Retrieve the actual Spreadsheet ID using the get_secret helper
-print(f"[{datetime.now()}] Attempting to retrieve MY_SPREADSHEET_ID from Secret Manager...")
+# Non-sensitive sheet structure constants (with defaults from config.yaml or hardcoded fallback)
+DEFAULT_SHEET_NAME = config.get('default_sheet_name', 'Expenses')
+DEFAULT_START_EXPENSE_ROW = config.get('default_start_expense_row', 7)
+
+
+# 3. Retrieve actual secrets from Secret Manager using the IDs from config.yaml
+print(f"[{datetime.now()}] Attempting to retrieve secrets from Secret Manager...")
+
 MY_SPREADSHEET_ID = get_secret(YOUR_GCP_PROJECT_ID, MY_SPREADSHEET_ID_SECRET_ID)
 if not MY_SPREADSHEET_ID:
     print(f"FATAL ERROR: Could not retrieve Spreadsheet ID from Secret Manager secret '{MY_SPREADSHEET_ID_SECRET_ID}'. Agent will not function.")
-    MY_SPREADSHEAT_ID = "ERROR_NO_SPREADSHEET_ID_FOUND"
+    exit(1) # Exit if a crucial secret cannot be retrieved
 
-# 5. Initialize the GoogleSheetManager instance
-print(f"[{datetime.now()}] Initializing GoogleSheetManager...")
+SERVICE_ACCOUNT_JSON_STRING = get_secret(YOUR_GCP_PROJECT_ID, GOOGLE_SHEET_CREDS_SECRET_ID)
+if not SERVICE_ACCOUNT_JSON_STRING:
+    print(f"FATAL ERROR: Could not retrieve service account JSON from Secret Manager secret '{GOOGLE_SHEET_CREDS_SECRET_ID}'. Agent will not function.")
+    exit(1) # Exit if a crucial secret cannot be retrieved
+
+
+# 4. Initialize the GoogleSheetManager instance with resolved secrets
+print(f"[{datetime.now()}] Initializing GoogleSheetManager with resolved credentials...")
 sheet_manager_instance = None
 try:
-    sheet_manager_instance = GoogleSheetManager(YOUR_GCP_PROJECT_ID, GOOGLE_SHEET_CREDS_SECRET_ID)
+    # Pass the actual spreadsheet ID and the service account JSON string
+    # This assumes your GoogleSheetManager's __init__ now accepts these directly
+    sheet_manager_instance = GoogleSheetManager(MY_SPREADSHEET_ID, SERVICE_ACCOUNT_JSON_STRING)
 except RuntimeError as e:
     print(f"CRITICAL ERROR: GoogleSheetManager failed to initialize: {e}. Sheet-related tools will be unavailable.")
 
 
 # --- Define ADK Tools (Wrapper Functions) ---
-# These functions are decorated with `@tool` and call the methods of `sheet_manager_instance`.
-# They "pre-fill" the `spreadsheet_id` and `sheet_name`.
-
 adk_agent_tools = [] # This list will hold the functions provided to the ADK Agent
 
 # Only define and add tools if the sheet_manager_instance was successfully created and authenticated
@@ -59,7 +92,7 @@ if sheet_manager_instance and sheet_manager_instance.service:
         """
         Adds a new expense record to the budget Google Sheet.
         Args:
-            date_str (str): The date of the expense in 'YYYY-MM-DD' format (e.g., '2025-07-06').
+            date_str (str): The date of the expense in 'YYYY-MM-DD' format (e.g., '2025-07-07').
             description (str): A brief description of the expense (e.g., 'Groceries', 'Coffee').
             amount (float): The monetary amount of the expense (e.g., 20.50).
         Returns:
@@ -218,7 +251,7 @@ else:
 # --- Initialize the ADK Agent Instance ---
 LLM_MODEL_NAME = "gemini-1.5-flash-latest"
 
-budget_agent = Agent(
+budget_agent = LlmAgent( # Changed from Agent to LlmAgent
     name="BudgetManager",
     description="An intelligent AI assistant specialized in managing personal budgets within a Google Sheet. It can add new expenses, retrieve financial summaries, list past transactions, and provide insights into daily spending.",
     model=LLM_MODEL_NAME,
@@ -232,5 +265,5 @@ budget_agent = Agent(
         "Provide clear and concise responses based on the tool outputs. "
         "Be proactive in offering budget insights and help the user stay on track. "
         "The current date is {current_date}."
-    ).format(current_date="2025-07-06"), # Inject current date into prompt for context
+    ).format(current_date=datetime.now().strftime('%Y-%m-%d')), # Inject current date into prompt for context
 )
