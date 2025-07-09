@@ -18,8 +18,6 @@ SHEET_MANAGER, MY_SPREADSHEET_ID, DEFAULT_SHEET_NAME, DEFAULT_START_EXPENSE_ROW 
 
 
 
-# Import your GoogleSheetManager and get_secret helper
-#from google_sheet_manager import GoogleSheetManager, get_secret
 # check this commit to resurrect  https://github.com/mmistroni/Magentic-AlgoTrading101/blob/c945a2b409a8df18caea0249dce75b7a3632d201/agents/my_sheets_agent/my_sheets_agent/agent.py
 def get_dads_jokes():
     jokes = [
