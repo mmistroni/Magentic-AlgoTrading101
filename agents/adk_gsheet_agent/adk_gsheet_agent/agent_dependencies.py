@@ -25,7 +25,7 @@ def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, 
             - The default start row for expense data.
     """
     print(f"[{datetime.now()}] Starting agent dependency initialization...")
-
+    # remeber to call gcloud auth application-default login
     # 1. Load configuration from config.yaml
     config = {}
     try:
