@@ -26,9 +26,9 @@ adk_agent_tools = [get_dad_jokes] # This list will hold the functions provided t
 
 
 root_agent = Agent(
-    name="dad_joke_agent",
+    name="adk_ghseet_agent",
     model="gemini-2.0-flash",\
-    description="Dad Joke Agent",
+    description="An intelligent AI assistant specialized in managing personal budgets within a Google Sheet. It can add new expenses, retrieve financial summaries, list past transactions, and provide insights into daily spending.",
     instruction=ROOT_AGENT_INSTRUCTIONS,
     tools=[get_dad_jokes],
 )
