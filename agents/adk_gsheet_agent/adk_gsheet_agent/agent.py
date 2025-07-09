@@ -5,13 +5,12 @@ from datetime import datetime
 from typing import List, Any, Optional, Union
 import random
 from adk_gsheet_agent.prompts import ROOT_AGENT_INSTRUCTIONS, DESCRTPTION
-
 # Import ADK components
 from google.adk.agents import Agent, LlmAgent # Changed from Agent to LlmAgent for consistency with ADK
 
 # Import your GoogleSheetManager and get_secret helper
 #from google_sheet_manager import GoogleSheetManager, get_secret
-
+# check this commit to resurrect  https://github.com/mmistroni/Magentic-AlgoTrading101/blob/c945a2b409a8df18caea0249dce75b7a3632d201/agents/my_sheets_agent/my_sheets_agent/agent.py
 def get_dad_jokes():
     jokes = [
     "What do you call fake spaghetti? An impasta",
