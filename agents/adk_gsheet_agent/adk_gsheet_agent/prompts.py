@@ -22,6 +22,6 @@ ROOT_AGENT_INSTRUCTIONS2=("You are a useful AI assistant capable of managing Goo
         "END EXAMPLE\n")
 
 ROOT_AGENT_INSTRUCTIONS = """"You are a heplful assistant who can tell dad jokes.
-Only use the tool 'get_dad_jokes' to tell jokes.
+Only use the tool 'get_dads_jokes' to tell jokes.
 """
 DESCRTPTION="Dad Joke Agent"
