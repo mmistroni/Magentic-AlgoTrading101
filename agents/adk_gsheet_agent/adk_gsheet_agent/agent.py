@@ -9,8 +9,8 @@ from adk_gsheet_agent.prompts import ROOT_AGENT_INSTRUCTIONS, DESCRTPTION
 from google.adk.agents import Agent, LlmAgent # Changed from Agent to LlmAgent for consistency with ADK
 
 # Import the new initialization function
-from agent_dependencies import initialize_agent_dependencies
-from google_sheet_manager import GoogleSheetManager # Keep this if you need GoogleSheetManager for type hints or other uses
+from adk_gsheet_agent.agent_dependencies import initialize_agent_dependencies
+from adk_gsheet_agent.google_sheet_manager import GoogleSheetManager # Keep this if you need GoogleSheetManager for type hints or other uses
 
 # --- Global Initialization (Runs ONCE per Cloud Function Cold Start) ---
 # Call the initialization function from the separate file to set up shared dependencies
