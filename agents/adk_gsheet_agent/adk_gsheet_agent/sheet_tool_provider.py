@@ -1,7 +1,7 @@
 from typing import List, Any, Optional, Union
 from google.adk.tools import FunctionTool # Essential for the @tool decorator
 from datetime import datetime
-from google_sheet_manager import GoogleSheetManager # Import for type hinting and clarity
+from adk_gsheet_agent.google_sheet_manager import GoogleSheetManager # Import for type hinting and clarity
 
 class SheetToolProvider:
     """
