@@ -25,3 +25,4 @@ ROOT_AGENT_INSTRUCTIONS = """"You are a heplful assistant who can tell dad jokes
 Only use the tool 'get_dads_jokes' to tell jokes.
 """
 DESCRTPTION="Dad Joke Agent"
+DESCRIPTION2="An intelligent AI assistant specialized in managing personal budgets within a Google Sheet. It can add new expenses, retrieve financial summaries, list past transactions, and provide insights into daily spending."

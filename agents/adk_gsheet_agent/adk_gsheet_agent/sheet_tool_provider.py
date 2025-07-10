@@ -1,5 +1,5 @@
 from typing import List, Any, Optional, Union
-from google.adk.tools import tool # Essential for the @tool decorator
+from google.adk.tools import FunctionTool # Essential for the @tool decorator
 from datetime import datetime
 from google_sheet_manager import GoogleSheetManager # Import for type hinting and clarity
 
@@ -21,7 +21,6 @@ class SheetToolProvider:
         self.current_date = datetime.now().strftime('%Y-%m-%d') # Capture current date at init for tool context
 
     # --- Expense Tools ---
-    @tool
     def add_expense(self, date_str: Optional[str] = None, description: str = "", amount: float = 0.0) -> Optional[str]:
         """
         Adds a new expense record to the budget Google Sheet.
@@ -44,7 +43,6 @@ class SheetToolProvider:
             data_to_append=data_to_append
         )
 
-    @tool
     def list_all_expenses_data(self) -> Optional[List[List[Any]]]:
         """
         Retrieves and returns all expense records from the budget Google Sheet.
@@ -61,7 +59,6 @@ class SheetToolProvider:
         )
 
     # --- Budget Calculation Tools ---
-    @tool
     def get_current_budget_total(self) -> Optional[float]:
         """
         Retrieves the total budget amount from the Google Sheet (assumed from cell B1).
@@ -73,7 +70,6 @@ class SheetToolProvider:
             sheet_name=self.default_sheet_name
         )
 
-    @tool
     def calculate_remaining_budget_value(self) -> Union[int, float, None]:
         """
         Calculates the remaining budget by subtracting total expenses from the total budget.
@@ -86,7 +82,6 @@ class SheetToolProvider:
             start_expense_row=self.default_start_expense_row
         )
 
-    @tool
     def get_days_left_in_budget_period(self) -> Optional[int]:
         """
         Calculates and returns the number of remaining days in the current budget period.
@@ -99,7 +94,6 @@ class SheetToolProvider:
             sheet_name=self.default_sheet_name
         )
 
-    @tool
     def get_daily_budget_breakdown_string(self) -> Optional[str]:
         """
         Provides a detailed breakdown of the remaining budget, including remaining amount,
@@ -115,7 +109,6 @@ class SheetToolProvider:
         )
 
     # --- General Sheet Interaction Tools ---
-    @tool
     def insert_new_empty_row(self, insert_at_row_index: int, num_rows: int = 1) -> bool:
         """
         Inserts one or more empty rows into the Google Sheet at a specified 1-based index.
@@ -135,7 +128,6 @@ class SheetToolProvider:
             num_rows=num_rows
         )
 
-    @tool
     def calculate_column_total(self, range_name: str, column_index: int) -> Union[int, float, None]:
         """
         Calculates the sum of numeric values in a specific column within a given range of a Google Sheet.
@@ -157,7 +149,6 @@ class SheetToolProvider:
             column_index=column_index
         )
 
-    @tool
     def read_sheet_range(self, range_name: str) -> Optional[List[List[Any]]]:
         """
         Reads all data from a specified range in the Google Sheet.
@@ -173,19 +164,20 @@ class SheetToolProvider:
             range_name=range_name
         )
 
-    def get_all_tools(self) -> List[tool]:
+    def get_all_tools(self) -> List[FunctionTool]:
         """
         Returns a list of all @tool decorated methods from this class.
         """
         # This uses introspection to find all methods decorated with @tool
         # This is more robust than manually listing them if you add more tools
         tools = []
-        for name in dir(self):
-            attribute = getattr(self, name)
-            if callable(attribute) and hasattr(attribute, '__wrapped__') and hasattr(attribute.__wrapped__, '__name__'):
-                # Check if it's a @tool decorated function by looking for the __wrapped__ attribute from functools.wraps
-                # And ensure it's not a dunder method or the get_all_tools method itself
-                if name.startswith('_') or name == 'get_all_tools':
-                    continue
-                tools.append(attribute)
+
+        tools.append(FunctionTool(self.add_expense))
+        tools.append(FunctionTool(self.list_all_expenses_data))
+        tools.append(FunctionTool(self.get_current_budget_total))
+        tools.append(FunctionTool(self.calculate_remaining_budget_value))
+        tools.append(FunctionTool(self.get_days_left_in_budget_period))
+        tools.append(FunctionTool(self.add_expense))
+
+
         return tools

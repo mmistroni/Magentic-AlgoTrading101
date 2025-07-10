@@ -4,7 +4,7 @@ import yaml # NEW: Import yaml library to parse config.yaml
 from datetime import datetime
 from typing import List, Any, Optional, Union
 import random
-from adk_gsheet_agent.prompts import ROOT_AGENT_INSTRUCTIONS2, DESCRTPTION
+from adk_gsheet_agent.prompts import ROOT_AGENT_INSTRUCTIONS2, DESCRIPTION2
 # Import the new SheetToolProvider class
 from adk_gsheet_agent.sheet_tool_provider import SheetToolProvider
 # Import ADK components
@@ -46,7 +46,7 @@ else:
 root_agent = Agent(
     name="adk_ghseet_agent",
     model="gemini-2.0-flash",\
-    description="An intelligent AI assistant specialized in managing personal budgets within a Google Sheet. It can add new expenses, retrieve financial summaries, list past transactions, and provide insights into daily spending.",
+    description=DESCRIPTION2,
     instruction=ROOT_AGENT_INSTRUCTIONS2,
     tools=adk_agent_tools,
 )
