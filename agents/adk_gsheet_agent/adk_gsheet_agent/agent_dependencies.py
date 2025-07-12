@@ -9,6 +9,29 @@ from adk_gsheet_agent.google_sheet_manager import GoogleSheetManager, get_secret
 # --- Module-Level Configuration Constant ---
 CONFIG_FILE_PATH = 'config.yaml'
 
+# --- Configuration Loading ---
+def load_agent_config():
+    """
+    Loads agent configuration from config.yaml.
+    It looks for config.yaml relative to the current file (main.py).
+    """
+    current_dir = os.path.dirname(__file__)
+    config_path = os.path.join(current_dir, CONFIG_FILE_PATH)
+
+    print(f"Attempting to load config from: {config_path}") # For debugging
+
+    try:
+        with open(config_path, 'r') as file:
+            return yaml.safe_load(file)
+    except FileNotFoundError:
+        print(f"Error: config.yaml not found at {config_path}. Ensure it's bundled with the agent.")
+        raise
+    except yaml.YAMLError as e:
+        print(f"Error parsing config.yaml: {e}")
+        raise
+
+
+
 def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, str, int]:
     """
     Loads configuration from config.yaml, retrieves secrets from Secret Manager,
@@ -27,22 +50,7 @@ def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, 
     print(f"[{datetime.now()}] Starting agent dependency initialization...")
     # remeber to call gcloud auth application-default login
     # 1. Load configuration from config.yaml
-    config = {}
-    try:
-        with open(CONFIG_FILE_PATH, 'r') as f:
-            config = yaml.safe_load(f)
-        if not config:
-            raise ValueError("Config file is empty or invalid.")
-        print(f"[{datetime.now()}] Configuration loaded successfully from {CONFIG_FILE_PATH}.")
-    except FileNotFoundError:
-        print(f"FATAL ERROR: Configuration file not found at {CONFIG_FILE_PATH}. Agent cannot proceed.")
-        exit(1) # Critical error, terminate cold start
-    except yaml.YAMLError as e:
-        print(f"FATAL ERROR: Error parsing YAML file {CONFIG_FILE_PATH}: {e}. Agent cannot proceed.")
-        exit(1) # Critical error, terminate cold start
-    except ValueError as e:
-        print(f"FATAL ERROR: Configuration error in {CONFIG_FILE_PATH}: {e}. Agent cannot proceed.")
-        exit(1) # Critical error, terminate cold start
+    config = load_agent_config()
 
     # 2. Extract configuration values from the loaded YAML
     your_gcp_project_id = config.get('gcp_project_id')
