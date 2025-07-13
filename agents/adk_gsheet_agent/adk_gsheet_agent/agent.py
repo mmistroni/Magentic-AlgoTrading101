@@ -39,8 +39,6 @@ if SHEET_MANAGER and SHEET_MANAGER.service:
 else:
     print("WARNING: GoogleSheetManager not ready from agent_dependencies. Agent will not have access to Google Sheet tools.")
 
-
-
 # check this commit to resurrect  https://github.com/mmistroni/Magentic-AlgoTrading101/blob/c945a2b409a8df18caea0249dce75b7a3632d201/agents/my_sheets_agent/my_sheets_agent/agent.py
 
 root_agent = Agent(

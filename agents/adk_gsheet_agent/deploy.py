@@ -65,28 +65,27 @@ def create() -> None:
     )
 
     # Now deploy to Agent Engine.
+    # Now deploy to Agent Engine.
     remote_app = agent_engines.create(
         agent_engine=app,
-        display_name=FLAGS.agent_name.replace('-', ' ').title(), # Generates a user-friendly display name
-        resource_id=FLAGS.agent_name, # The unique ID for the deployed agent
-        # Define required Python packages for the deployed environment.
-        # This list should include all dependencies from your requirements.txt.
+        display_name=FLAGS.agent_name.replace('-', ' ').title(),
+        resource_id=FLAGS.agent_name,
+        # --- MODIFICATION START ---
+        # Pass AGENT_ENTRYPOINT directly here.
+        agent_builder=AGENT_ENTRYPOINT, # This is where agent_builder belongs
+        # --- MODIFICATION END ---
         requirements=[
-            "google-cloud-aiplatform[adk,agent_engines]", # Essential for ADK agents
+            "google-cloud-aiplatform[adk,agent_engines]",
             "pyyaml",
             "google-api-python-client",
             "google-auth-oauthlib",
             "google-cloud-secret-manager",
             # Add any other specific packages your GSheet agent needs here
-            # e.g., "pandas", "openpyxl" if you're processing data locally before API calls.
         ],
-        # Include your agent's source directory. This bundles your 'adk_gsheet_agent'
-        # directory (containing agent.py, config.yaml, etc.) with the deployment.
         extra_packages=[AGENT_SOURCE_DIR],
     )
     print(f"Created remote app: {remote_app.resource_name}")
     print(f"Agent '{FLAGS.agent_name}' deployed successfully!")
-
 
 def delete(resource_id: str) -> None:
     """Deletes an existing deployment."""
@@ -167,7 +166,7 @@ def main(argv=None):
     project_id = (
         FLAGS.project_id if FLAGS.project_id else os.getenv("GOOGLE_PROJECT_ID")
     )
-    location = FLAGS.location if FLAGS.location else os.getenv("GOOGLE_CLOUD_LOCATION")
+    location = FLAGS.location if FLAGS.location else os.getenv("LOCATION")
     bucket = FLAGS.bucket if FLAGS.bucket else os.getenv("GOOGLE_CLOUD_STAGING_BUCKET")
     user_id = FLAGS.user_id
     resource_id = FLAGS.agent_name # Use the 'agent_name' flag for the resource_id
