@@ -1,5 +1,6 @@
 # config.yaml
 gcp_project_id: datascience-projects
+region: us-central1
 display_name: My Google Sheet Agent
 description: An ADK agent for managing and querying Google Sheets.
 
