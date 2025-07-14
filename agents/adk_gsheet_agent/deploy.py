@@ -32,9 +32,9 @@ def main():
         requirements = [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
     # 3. Set up Vertex AI project info
-    PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "your-project-id")
+    PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "datascience-projects")
     LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-    STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://your-staging-bucket")
+    STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://adk_short_bot")
 
     import vertexai
     vertexai.init(project=PROJECT_ID, location=LOCATION, staging_bucket=STAGING_BUCKET)
