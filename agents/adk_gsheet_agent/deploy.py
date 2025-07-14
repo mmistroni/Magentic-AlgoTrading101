@@ -1,97 +1,66 @@
 import os
-import sys
-
-import vertexai
-from absl import app, flags
-from dotenv import load_dotenv
+import yaml
+from datetime import datetime
 from vertexai import agent_engines
 from vertexai.preview import reasoning_engines
 
-# --- No direct import of the agent object here. ---
-# The agent will be loaded dynamically via AGENT_ENTRYPOINT.
+def load_root_agent():
+    import sys
+    agent_dir = os.path.join(os.path.dirname(__file__), "adk_gsheet_agent")
+    if agent_dir not in sys.path:
+        sys.path.insert(0, agent_dir)
+    from agent import root_agent  # Adjust if your agent is named differently
+    return root_agent
 
-FLAGS = flags.FLAGS
-flags.DEFINE_string("project_id", None, "GCP project ID.")
-flags.DEFINE_string("location", None, "GCP location.")
-flags.DEFINE_string("bucket", None, "GCP bucket for staging resources.")
-flags.DEFINE_string(
-    "agent_name", "adk-gsheet-agent", "Name for the deployed Agent Engine resource."
-)
-flags.DEFINE_string("user_id", "test_user", "User ID for session operations.")
-flags.DEFINE_string("session_id", None, "Session ID for operations.")
-flags.DEFINE_bool("create", False, "Creates a new deployment.")
-flags.DEFINE_bool("delete", False, "Deletes an existing deployment.")
-flags.DEFINE_bool("list", False, "Lists all deployments.")
-flags.DEFINE_bool("create_session", False, "Creates a new session.")
-flags.DEFINE_bool("list_sessions", False, "Lists all sessions for a user.")
-flags.DEFINE_bool("get_session", False, "Gets a specific session.")
-flags.DEFINE_bool("send", False, "Sends a message to the deployed agent.")
-flags.DEFINE_string(
-    "message",
-    "Can you provide me with the total expenses from Sheet1?",
-    "Message to send to the agent.",
-)
-flags.mark_bool_flags_as_mutual_exclusive(
-    [
-        "create",
-        "delete",
-        "list",
-        "create_session",
-        "list_sessions",
-        "get_session",
-        "send",
-    ]
-)
+def main():
+    # 1. Load environment variables from config.yaml
+    env_vars = {}
+    config_path = os.path.join(os.path.dirname(__file__), "adk_gsheet_agent", "config.yaml")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+            env_vars = {
+                "SPREADSHEET_ID_SECRET_ID": config.get("spreadsheet_id_secret_id"),
+                "SERVICE_ACCOUNT_CREDS_SECRET_ID": config.get("service_account_creds_secret_id"),
+                "DEFAULT_SHEET_NAME": config.get("default_sheet_name", "Sheet1"),
+                "DEFAULT_START_EXPENSE_ROW": str(config.get("default_start_expense_row", 7)),
+            }
 
-# --- Agent Specifics for Deployment ---
-# This path points to the directory containing your agent's 'agent.py' and 'config.yaml'.
-# It must be relative to where deploy_agent.py is run (your project root).
-AGENT_SOURCE_DIR = "./adk_gsheet_agent"
+    # 2. Load requirements from requirements.txt
+    requirements_path = os.path.join(os.path.dirname(__file__), "adk_gsheet_agent", "requirements.txt")
+    with open(requirements_path, "r") as f:
+        requirements = [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
-# This is the fully qualified path to the function within your agent's package
-# that Agent Engine will call to instantiate your agent.
-# It assumes your main agent definition and the `create_agent` function
-# are in 'adk_gsheet_agent/agent.py'.
-AGENT_ENTRYPOINT = "adk_gsheet_agent.agent:create_agent"
+    # 3. Set up Vertex AI project info
+    PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "your-project-id")
+    LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    STAGING_BUCKET = os.environ.get("STAGING_BUCKET", "gs://your-staging-bucket")
 
-def create() -> None:
-    """Creates a new deployment for the adk_gsheet_agent. 🚀"""
-    print(f"Attempting to deploy agent '{FLAGS.agent_name}'...")
+    import vertexai
+    vertexai.init(project=PROJECT_ID, location=LOCATION, staging_bucket=STAGING_BUCKET)
 
-    # 1. Instantiate AdkApp.
-    # In current Vertex AI SDK versions, AdkApp is a wrapper for deployment,
-    # and you DO NOT pass the 'agent' object directly to its constructor.
-    app_instance = reasoning_engines.AdkApp(
-        enable_tracing=True, # Recommended for visibility in Cloud Trace
-    )
+    # 4. Instantiate AdkApp with the agent
+    root_agent = load_root_agent()
+    app_instance = reasoning_engines.AdkApp(agent=root_agent, enable_tracing=True)
 
-    # 2. Deploy to Agent Engine.
-    # The 'agent_builder' argument specifies the function that Agent Engine will call
-    # to instantiate your agent in the cloud environment.
-    remote_app = agent_engines.create(
-        agent_engine=app_instance, # The AdkApp instance
-        display_name=FLAGS.agent_name.replace('-', ' ').title(), # Generates a user-friendly display name
-        resource_id=FLAGS.agent_name, # The unique ID for the deployed agent
-        agent_builder=AGENT_ENTRYPOINT, # 🔥 This is the key to fix the TypeError! 🔥
-        # Define required Python packages for the deployed environment.
-        # This list should include ALL dependencies from your requirements.txt.
-        requirements=[
-            "google-cloud-aiplatform[adk,agent_engines]", # Essential for ADK agents
-            "python-dotenv", # Crucial if your agent_dependencies.py loads .env locally
-            "pyyaml", # If your agent uses YAML for config
-            "google-api-python-client", # For Google Sheets API interactions
-            "google-auth-oauthlib", # For authentication with Google APIs
-            "google-cloud-secret-manager", # If you're fetching secrets
-            # Add any other specific packages your GSheet agent needs here, e.g.:
-            # "pandas",
-            # "openpyxl",
-        ],
-        # Include your agent's source directory. This bundles your 'adk_gsheet_agent'
-        # directory (containing agent.py, config.yaml, etc.) with the deployment.
-        extra_packages=[AGENT_SOURCE_DIR],
-        # You can also pass environment variables directly to the deployed agent:
-        # env_vars={
-        #     "MY_SPREADSHEET_ID": os.getenv("MY_SPREADSHEET_ID"),
-        #     "DEFAULT_SHEET_NAME": os.getenv("DEFAULT_SHEET_NAME"),
-        #     "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/service-account.json" # Only if service account file
-    )
+    # 5. Deploy to Agent Engine (NO resource_id, NO agent_builder)
+    print(f"[{datetime.now()}] Creating Agent Engine deployment...")
+    try:
+        remote_agent = agent_engines.create(
+            app_instance,
+            requirements=requirements,
+            extra_packages=[os.path.join(os.path.dirname(__file__), "adk_gsheet_agent")],
+            env_vars=env_vars,
+            # runtime_service_account=agent_runtime_service_account_email,  # Uncomment and set if needed
+            # staging_bucket=STAGING_BUCKET,  # Uncomment if you need to specify
+        )
+        print(f"[{datetime.now()}] Agent deployment successful! Agent Name: {remote_agent.name}")
+        print(f"Agent Console URL: https://console.cloud.google.com/vertex-ai/agents/detail/{remote_agent.name.split('/')[-1]}?project={PROJECT_ID}&region={LOCATION}")
+    except Exception as e:
+        print(f"CRITICAL ERROR: [{datetime.now()}] Agent deployment failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+if __name__ == "__main__":
+    main()
