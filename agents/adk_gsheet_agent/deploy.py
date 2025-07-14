@@ -94,3 +94,4 @@ def create() -> None:
         #     "MY_SPREADSHEET_ID": os.getenv("MY_SPREADSHEET_ID"),
         #     "DEFAULT_SHEET_NAME": os.getenv("DEFAULT_SHEET_NAME"),
         #     "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/service-account.json" # Only if service account file
+    )
