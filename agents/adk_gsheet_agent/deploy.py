@@ -35,19 +35,20 @@ def main():
 
     import vertexai
     vertexai.init(project=PROJECT_ID, location=LOCATION, staging_bucket=STAGING_BUCKET)
-
+    print('About to instantiate...')
     # 4. Instantiate AdkApp with the agent
     root_agent = load_root_agent()
     app_instance = reasoning_engines.AdkApp(agent=root_agent, enable_tracing=True)
 
     # 5. Deploy to Agent Engine
     print(f"[{datetime.now()}] Creating Agent Engine deployment...")
-
+    extras = [os.path.join(os.path.dirname(__file__), "adk_gsheet_agent")]
+    print(f'Extras are:{extras}')
     try:
         remote_agent = agent_engines.create(
             app_instance,
             requirements=requirements,
-            extra_packages=[os.path.join(os.path.dirname(__file__), "adk_gsheet_agent")],
+            extra_packages=extras,
             env_vars=env_vars,
             # runtime_service_account=agent_runtime_service_account_email,  # Uncomment and set if needed
             # staging_bucket=STAGING_BUCKET,  # Uncomment if you need to specify
