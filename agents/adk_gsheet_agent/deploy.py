@@ -5,11 +5,8 @@ from vertexai import agent_engines
 from vertexai.preview import reasoning_engines
 
 def load_root_agent():
-    import sys
-    agent_dir = os.path.join(os.path.dirname(__file__), "adk_gsheet_agent")
-    if agent_dir not in sys.path:
-        sys.path.insert(0, agent_dir)
-    from agent import root_agent  # Adjust if your agent is named differently
+    # Absolute import: assumes adk_gsheet_agent/agent.py defines root_agent
+    from adk_gsheet_agent.agent import root_agent
     return root_agent
 
 def main():
@@ -43,8 +40,9 @@ def main():
     root_agent = load_root_agent()
     app_instance = reasoning_engines.AdkApp(agent=root_agent, enable_tracing=True)
 
-    # 5. Deploy to Agent Engine (NO resource_id, NO agent_builder)
+    # 5. Deploy to Agent Engine
     print(f"[{datetime.now()}] Creating Agent Engine deployment...")
+
     try:
         remote_agent = agent_engines.create(
             app_instance,
