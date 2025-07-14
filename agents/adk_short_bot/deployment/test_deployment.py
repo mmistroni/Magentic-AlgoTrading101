@@ -23,40 +23,26 @@ from vertexai import agent_engines
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("project_id", None, "GCP project ID.")
-flags.DEFINE_string("location", None, "GCP location.")
-flags.DEFINE_string("bucket", None, "GCP bucket.")
+flags.DEFINE_string("project_id", 'datascience-projects', "GCP project ID.")
+flags.DEFINE_string("location", 'us-central1', "GCP location.")
+flags.DEFINE_string("bucket", 'adk_short_bot', "GCP bucket.")
 flags.DEFINE_string(
     "resource_id",
-    None,
+    "projects/datascience-projects/locations/us-central1/reasoningEngines/4304623207115128832",
     "ReasoningEngine resource ID (returned after deploying the agent)",
 )
-flags.DEFINE_string("user_id", None, "User ID (can be any string).")
-flags.mark_flag_as_required("resource_id")
-flags.mark_flag_as_required("user_id")
+flags.DEFINE_string("Tester", None, "User ID (can be any string).")
+#flags.mark_flag_as_required("resource_id")
+#flags.mark_flag_as_required("user_id")
 
 
 def main(argv: list[str]) -> None:  # pylint: disable=unused-argument
 
     load_dotenv()
 
-    project_id = (
-        FLAGS.project_id
-        if FLAGS.project_id
-        else os.getenv("GOOGLE_CLOUD_PROJECT")
-    )
-    location = (
-        FLAGS.location if FLAGS.location else os.getenv("GOOGLE_CLOUD_LOCATION")
-    )
-    bucket = (
-        FLAGS.bucket
-        if FLAGS.bucket
-        else os.getenv("GOOGLE_CLOUD_STORAGE_BUCKET")
-    )
-
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    location = os.getenv("GOOGLE_CLOUD_LOCATION")
-    bucket = os.getenv("GOOGLE_CLOUD_STORAGE_BUCKET")
+    project_id = 'datascience-projects'
+    location = 'us-central1'
+    bucket = 'adk_short_bot'
 
     if not project_id:
         print("Missing required environment variable: GOOGLE_CLOUD_PROJECT")
@@ -75,11 +61,11 @@ def main(argv: list[str]) -> None:  # pylint: disable=unused-argument
         location=location,
         staging_bucket=f"gs://{bucket}",
     )
-
+    user = 'TestMarco'
     agent = agent_engines.get(FLAGS.resource_id)
     print(f"Found agent with resource ID: {FLAGS.resource_id}")
-    session = agent.create_session(user_id=FLAGS.user_id)
-    print(f"Created session for user ID: {FLAGS.user_id}")
+    session = agent.create_session(user_id=user)
+    print(f"Created session for user ID: {user}")
     print("Type 'quit' to exit.")
     while True:
         user_input = input("Input: ")
@@ -87,7 +73,7 @@ def main(argv: list[str]) -> None:  # pylint: disable=unused-argument
             break
 
         for event in agent.stream_query(
-            user_id=FLAGS.user_id, session_id=session["id"], message=user_input
+            user_id=user, session_id=session["id"], message=user_input
         ):
             if "content" in event:
                 if "parts" in event["content"]:
@@ -97,8 +83,8 @@ def main(argv: list[str]) -> None:  # pylint: disable=unused-argument
                             text_part = part["text"]
                             print(f"Response: {text_part}")
 
-    agent.delete_session(user_id=FLAGS.user_id, session_id=session["id"])
-    print(f"Deleted session for user ID: {FLAGS.user_id}")
+    agent.delete_session(user_id=user, session_id=session["id"])
+    print(f"Deleted session for user ID: {user}")
 
 
 if __name__ == "__main__":
