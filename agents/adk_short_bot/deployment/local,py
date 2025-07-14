@@ -12,8 +12,8 @@ def main():
     # Load environment variables
     load_dotenv()
 
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    location = os.getenv("GOOGLE_CLOUD_LOCATION")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", 'datascience-projects')
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", 'us-central1')
 
     if not project_id:
         print("Missing required environment variable: GOOGLE_CLOUD_PROJECT")
