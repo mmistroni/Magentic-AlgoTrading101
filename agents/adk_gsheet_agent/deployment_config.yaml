@@ -1,0 +1,31 @@
+# deployment_config.yaml
+# Configuration for the deploy.py script to deploy your ADK agent to Google Cloud.
+
+# Your Google Cloud Project ID. This is where the agent will be deployed.
+project_id: datascience-projects
+
+# The Google Cloud region where you want to deploy your agent (e.g., us-central1, europe-west1).
+# Choose a region geographically close to your users or other resources.
+region: us-central1
+
+# The display name for your agent as it will appear in the Google Cloud Agent Builder console.
+agent_name: My Google Sheet Agent
+
+# --- Deployment Service Account Configuration ---
+# This service account's JSON key file is used by the 'deploy.py' script itself
+# to authenticate with Google Cloud and perform deployment operations (create agent,
+# deploy code, trigger Cloud Build).
+#
+# IMPORTANT: This file path must be correct and accessible from where you run deploy.py.
+# This file should be kept secure and NEVER committed to version control.
+# Example: credentials/your-deployment-sa-key.json
+service_account_key_file: path/to/your/deployment-sa-key.json # <-- REPLACE WITH ACTUAL PATH
+
+# --- Agent Runtime Service Account Configuration ---
+# This is the email address of the service account that your *deployed agent*
+# will use to run in Google Cloud's Agent Builder environment.
+#
+# This service account MUST have the necessary permissions to access your Google Sheet
+# (e.g., Sheets Editor role on the specific spreadsheet) and to use Vertex AI models.
+# Example: your-agent-runtime-sa@datascience-projects.iam.gserviceaccount.com
+agent_runtime_service_account_email: your-agent-runtime-sa@datascience-projects.iam.gserviceaccount.com # <-- REPLACE WITH ACTUAL EMAIL
