@@ -19,7 +19,7 @@ import os
 
 import vertexai
 from absl import app, flags
-from adk_gsheet_agent.agent import root_agent
+from adk_gsheet_agent.agent import root_agent #
 from dotenv import load_dotenv
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp

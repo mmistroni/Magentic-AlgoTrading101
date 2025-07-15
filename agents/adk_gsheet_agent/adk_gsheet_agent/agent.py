@@ -38,107 +38,51 @@ from adk_gsheet_agent.google_sheet_manager import GoogleSheetManager
 # --- Global variable for the agent instance (primarily for adk web) ---
 root_agent: Optional[LlmAgent] = None
 
-# --- create_agent function (for Remote Deployment) ---
-# This function is called by the Agent Engine when deploying.
-def create_agent(config: Optional[Dict[str, Any]] = None) -> LlmAgent:
-    """
-    Creates and returns an instance of the Google Sheets ADK Agent for deployment.
-    All agent setup, including dependencies and tools, MUST be inside this function
-    for the remote deployment environment.
-    """
-    print(f"[{datetime.now()}] create_agent called for remote deployment.")
+print(f"[{datetime.now()}] create_agent called for remote deployment.")
 
-    if not (_ADK_IMPORTS_SUCCESS and _VERTEXAI_MODEL_IMPORT_SUCCESS):
-        raise RuntimeError("Required ADK or Vertex AI imports failed. Cannot create agent.")
+if not (_ADK_IMPORTS_SUCCESS and _VERTEXAI_MODEL_IMPORT_SUCCESS):
+    raise RuntimeError("Required ADK or Vertex AI imports failed. Cannot create agent.")
 
-    # Initialize Vertex AI for the deployed agent's context.
-    # Agent Engine typically sets these environment variables.
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID")
-    location = os.getenv("GOOGLE_CLOUD_LOCATION") or os.getenv("GCP_REGION")
-    if project_id and location:
-        vertexai.init(project=project_id, location=location)
-        print(f"[{datetime.now()}] vertexai.init() called within create_agent for Project: {project_id}, Location: {location}")
-    else:
-        print(f"WARNING: [{datetime.now()}] Project ID or Location not found in environment for create_agent. Agent Engine should provide this automatically.")
+# Initialize Vertex AI for the deployed agent's context.
+# Agent Engine typically sets these environment variables.
+project_id = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID")
+location = os.getenv("GOOGLE_CLOUD_LOCATION") or os.getenv("GCP_REGION")
+if project_id and location:
+    vertexai.init(project=project_id, location=location)
+    print(f"[{datetime.now()}] vertexai.init() called within create_agent for Project: {project_id}, Location: {location}")
+else:
+    print(f"WARNING: [{datetime.now()}] Project ID or Location not found in environment for create_agent. Agent Engine should provide this automatically.")
 
 
-    sheet_manager, spreadsheet_id, default_sheet_name, default_start_expense_row = initialize_agent_dependencies()
+sheet_manager, spreadsheet_id, default_sheet_name, default_start_expense_row = initialize_agent_dependencies()
 
-    adk_agent_tools = []
-    if sheet_manager and sheet_manager.service:
-        # SheetToolProvider will directly use FunctionTool internally.
-        tool_provider = SheetToolProvider(
-            sheet_manager=sheet_manager,
-            spreadsheet_id=spreadsheet_id,
-            default_sheet_name=default_sheet_name,
-            default_start_expense_row=default_start_expense_row,
-        )
-        adk_agent_tools = tool_provider.get_all_tools()
-        print(f"[{datetime.now()}] Remote Sheet tools loaded successfully for deployment.")
-    else:
-        print(f"WARNING: [{datetime.now()}] GoogleSheetManager not ready in create_agent. Agent will not have access to Google Sheet tools.")
-
-    # Pass the model name as a string, not the GenerativeModel object
-    agent_instance = LlmAgent(
-        name="adk_gsheet_agent_deployed",
-        model="gemini-2.0-flash", # <--- Corrected: Pass model name as string
-        description=DESCRIPTION2,
-        instruction=ROOT_AGENT_INSTRUCTIONS2,
-        tools=adk_agent_tools,
+adk_agent_tools = []
+if sheet_manager and sheet_manager.service:
+    # SheetToolProvider will directly use FunctionTool internally.
+    tool_provider = SheetToolProvider(
+        sheet_manager=sheet_manager,
+        spreadsheet_id=spreadsheet_id,
+        default_sheet_name=default_sheet_name,
+        default_start_expense_row=default_start_expense_row,
     )
-    print(f"[{datetime.now()}] Agent instance created by create_agent for deployment.")
-    return agent_instance
+    adk_agent_tools = tool_provider.get_all_tools()
+    print(f"[{datetime.now()}] Remote Sheet tools loaded successfully for deployment.")
+else:
+    print(f"WARNING: [{datetime.now()}] GoogleSheetManager not ready in create_agent. Agent will not have access to Google Sheet tools.")
 
+# Pass the model name as a string, not the GenerativeModel object
+agent_instance = LlmAgent(
+    name="adk_gsheet_agent_deployed",
+    model="gemini-2.0-flash", # <--- Corrected: Pass model name as string
+    description=DESCRIPTION2,
+    instruction=ROOT_AGENT_INSTRUCTIONS2,
+    tools=adk_agent_tools,
+)
 
+root_agent = agent_instance
+print(f"[{datetime.now()}] Agent instance created by create_agent for deployment.")
 # --- Global Initialization & Agent Instantiation (for `adk web` local testing) ---
 # This block runs once when adk_gsheet_agent/agent.py is first loaded (e.g., by `adk web`).
 print(f"[{datetime.now()}] agent.py: Running global initialization for adk web compatibility...")
 
-if not (_ADK_IMPORTS_SUCCESS and _VERTEXAI_MODEL_IMPORT_SUCCESS):
-    print(f"[{datetime.now()}] agent.py: Skipping global agent instantiation due to failed required imports.")
-else:
-    try:
-        # Initialize Vertex AI for local testing. This requires your project ID.
-        project_id_local = os.getenv("GOOGLE_CLOUD_PROJECT")
-        location_local = os.getenv("GOOGLE_CLOUD_LOCATION") # Or 'us-central1'
-        if project_id_local and location_local:
-             vertexai.init(project=project_id_local, location=location_local)
-             print(f"[{datetime.now()}] vertexai.init() called for local adk web for Project: {project_id_local}, Location: {location_local}")
-        else:
-             print(f"WARNING: [{datetime.now()}] GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_LOCATION not set for local adk web initialization.")
 
-
-        _global_sheet_manager, _global_my_spreadsheet_id, _global_default_sheet_name, _global_default_start_expense_row = initialize_agent_dependencies()
-
-        _global_adk_agent_tools = []
-        if _global_sheet_manager and _global_sheet_manager.service:
-            _global_tool_provider = SheetToolProvider(
-                sheet_manager=_global_sheet_manager,
-                spreadsheet_id=_global_my_spreadsheet_id,
-                default_sheet_name=_global_default_sheet_name,
-                default_start_expense_row=_global_default_start_expense_row,
-            )
-            _global_adk_agent_tools = _global_tool_provider.get_all_tools()
-            print(f"[{datetime.now()}] Global Sheet tools loaded successfully for adk web.")
-        else:
-            print(f"WARNING: [{datetime.now()}] Global GoogleSheetManager not ready. adk web might not have access to Google Sheet tools.")
-
-        # Pass the model name as a string, not the GenerativeModel object
-        root_agent = LlmAgent(
-            name="adk_gsheet_agent_local",
-            model="gemini-2.0-flash", # <--- Corrected: Pass model name as string
-            description=DESCRIPTION2,
-            instruction=ROOT_AGENT_INSTRUCTIONS2,
-            tools=_global_adk_agent_tools,
-        )
-        print(f"[{datetime.now()}] Global root_agent instantiated successfully for adk web.")
-
-    except Exception as e:
-        print(f"CRITICAL ERROR: [{datetime.now()}] Global root_agent instantiation failed for adk web: {e}")
-        root_agent = None
-
-# --- Final check for debugging ---
-if root_agent is None:
-    print(f"[{datetime.now()}] agent.py: After all setup (local), root_agent is None.")
-else:
-    print(f"[{datetime.now()}] agent.py: After all setup (local), root_agent is an Agent instance (name: {root_agent.name}).")
