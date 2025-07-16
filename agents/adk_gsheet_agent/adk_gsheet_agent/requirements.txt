@@ -1,6 +1,6 @@
 pyyaml
 google==3.0.0
-google-adk
+google-adk==
 google-ai-generativelanguage==0.6.15
 google-api-core==2.24.2
 google-api-python-client==2.169.0
