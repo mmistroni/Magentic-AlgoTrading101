@@ -50,6 +50,20 @@ def get_current_service_account():
         print("This code might not be running in a Google Cloud environment or lacks necessary permissions.")
         return None
 
+def _check_package_version(pkg='google-adk'):
+    import importlib.metadata
+    print(f'Checking version of {pkg}')
+    try:
+        # Attempt to get the version of the 'google-adk' package
+        version = importlib.metadata.version(pkg)
+        print(f"The deployed google-adk version is: {version}")
+    except importlib.metadata.PackageNotFoundError:
+        # Handle the case where the package is not found
+        print(f"The '{pkg}' package is not installed in this environment.")
+    except Exception as e:
+        # Catch any other potential errors during the version retrieval
+        print(f"An error occurred while trying to get the {pkg} version: {e}")
+
 
 
 def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, str, int]:
@@ -67,6 +81,8 @@ def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, 
             - The default sheet name for operations.
             - The default start row for expense data.
     """
+    print('......Checking packages vesions')
+    _check_package_version('google-adk')
     print(f"[{datetime.now()}] Starting agent dependency initialization...")
     # remeber to call gcloud auth application-default login
     # 1. Load configuration from config.yaml
