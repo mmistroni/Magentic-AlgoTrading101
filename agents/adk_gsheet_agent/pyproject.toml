@@ -5,7 +5,7 @@ description = "A bot that shortens your messages"
 authors = [
     {name = "Marco Mistroni", email = "mmistroni@gmail.com"}
 ]
-readme = "README.md"
+readme = "readme.md"
 requires-python = ">=3.11"
 license = "Apache License 2.0"
 
