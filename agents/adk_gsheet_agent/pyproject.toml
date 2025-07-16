@@ -1,5 +1,5 @@
 [project]
-name = "adk_gcloud_agent"
+name = "adk_gsheet_agent"
 version = "0.1.0"
 description = "A bot that shortens your messages"
 authors = [
