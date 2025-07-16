@@ -1,16 +1,16 @@
 [project]
-name = "adk-short-bot"
+name = "adk_gcloud_agent"
 version = "0.1.0"
 description = "A bot that shortens your messages"
 authors = [
-    {name = "Brandon Hancock", email = "brandon@brandonhancock.io"}
+    {name = "Marco Mistroni", email = "mmistroni@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = "Apache License 2.0"
 
 [tool.poetry.dependencies]
-python = ">=3.12"
+python = ">=3.11"
 requests = "^2.31.0"
 google-adk = "^0.1.0"
 pydantic = "^2.11.3"
@@ -19,14 +19,19 @@ google-cloud-aiplatform = {extras = ["adk", "agent_engines"], version = "^1.42.1
 absl-py = "^2.1.0"
 cloudpickle = "^3.0.0"
 
-[tool.poetry.scripts]
-adk-short-bot = "adk_short_bot:app"
-deploy-local = "deployment.local:main"
-deploy-remote = "deployment.remote:main"
-cleanup = "deployment.cleanup:cleanup_deployment"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.deployment]
+optional = true
+
+[tool.poetry.group.deployment.dependencies]
+absl-py = "^2.2.1"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+
 
  
