@@ -56,7 +56,7 @@ def _check_package_version(pkg='google-adk'):
     try:
         # Attempt to get the version of the 'google-adk' package
         version = importlib.metadata.version(pkg)
-        print(f"The deployed google-adk version is: {version}")
+        print(f"The deployed {pkg} version is: {version}")
     except importlib.metadata.PackageNotFoundError:
         # Handle the case where the package is not found
         print(f"The '{pkg}' package is not installed in this environment.")
@@ -83,6 +83,9 @@ def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, 
     """
     print('......Checking packages vesions')
     _check_package_version('google-adk')
+    _check_package_version('pydantic')
+    _check_package_version('google-cloud-aiplatform')
+    
     print(f"[{datetime.now()}] Starting agent dependency initialization...")
     # remeber to call gcloud auth application-default login
     # 1. Load configuration from config.yaml
