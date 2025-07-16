@@ -47,7 +47,7 @@ class SheetToolProvider:
             data_to_append=data_to_append
         )
 
-    def list_all_expenses_data(self, user:Any = None) -> Optional[List[List[Any]]]:
+    def list_all_expenses_data(self, user:Optional[str]= None) -> Optional[List[List[Any]]]:
         """
         Retrieves and returns all expense records from the budget Google Sheet.
         Each record is a list, typically [Date, Description, Amount].
@@ -64,7 +64,7 @@ class SheetToolProvider:
         )
 
     # --- Budget Calculation Tools ---
-    def get_current_budget_total(self, user:Any = None) -> Optional[float]:
+    def get_current_budget_total(self, user:Optional[str]= None) -> Optional[float]:
         """
         Retrieves the total budget amount from the Google Sheet (assumed from cell B1).
         Returns:
@@ -76,7 +76,7 @@ class SheetToolProvider:
             sheet_name=self.default_sheet_name
         )
 
-    def calculate_remaining_budget_value(self, user:Any = None) -> Union[int, float, None]:
+    def calculate_remaining_budget_value(self, user:Optional[str] = None) -> Union[int, float, None]:
         """
         Calculates the remaining budget by subtracting total expenses from the total budget.
         Returns:
@@ -89,7 +89,7 @@ class SheetToolProvider:
             start_expense_row=self.default_start_expense_row
         )
 
-    def get_days_left_in_budget_period(self, user:Any = None) -> Optional[int]:
+    def get_days_left_in_budget_period(self, user:Optional[str] = None) -> Optional[int]:
         """
         Calculates and returns the number of remaining days in the current budget period.
         The period is defined by start/end dates in cells B3/B4 of the Google Sheet (YYYY-MM-DD format).
@@ -102,7 +102,7 @@ class SheetToolProvider:
             sheet_name=self.default_sheet_name
         )
 
-    def get_daily_budget_breakdown_string(self, user:Any = None) -> Optional[str]:
+    def get_daily_budget_breakdown_string(self, user:Optional[str]) -> Optional[str]:
         """
         Provides a detailed breakdown of the remaining budget, including remaining amount,
         estimated daily allowance, and days left in the period.
