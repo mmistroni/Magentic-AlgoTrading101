@@ -2,6 +2,7 @@ import os
 import yaml
 from datetime import datetime
 from typing import Optional, Tuple
+import requests
 
 # Assuming google_sheet_manager is in the same or a discoverable path
 from adk_gsheet_agent.google_sheet_manager import GoogleSheetManager, get_secret
@@ -29,6 +30,25 @@ def load_agent_config():
     except yaml.YAMLError as e:
         print(f"Error parsing config.yaml: {e}")
         raise
+
+
+def get_current_service_account():
+    """
+    Retrieves the email address of the service account
+    associated with the current Google Cloud environment.
+    """
+    metadata_server_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email"
+    headers = {"Metadata-Flavor": "Google"}
+
+    try:
+        response = requests.get(metadata_server_url, headers=headers)
+        response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+        service_account_email = response.text.strip()
+        return service_account_email
+    except requests.exceptions.RequestException as e:
+        print(f"Error accessing metadata server: {e}")
+        print("This code might not be running in a Google Cloud environment or lacks necessary permissions.")
+        return None
 
 
 
@@ -68,10 +88,19 @@ def initialize_agent_dependencies() -> Tuple[Optional[GoogleSheetManager], str, 
         print("FATAL ERROR: 'spreadsheet_id_secret_id' not found in config.yaml. Agent cannot proceed.")
         exit(1) # Critical error, terminate cold start
 
-    # Non-sensitive sheet structure constants with defaults
-    default_sheet_name = config.get('default_sheet_name', 'Expenses')
-    default_start_expense_row = config.get('default_start_expense_row', 7)
 
+    print(f'------------- finding service account-')
+    service_account = get_current_service_account()
+    if service_account:
+        print(f"The agent is running with service account: {service_account}")
+    else:
+        print("Could not determine the service account.")
+
+
+    # Non-sensitive sheet structure constants with defaults
+    default_sheet_name = config.get('default_sheet_name', 'Sheet1')
+    default_start_expense_row = config.get('default_start_expense_row', 7)
+    print(f'------Attempting to retrieve {my_spreadsheet_id_secret_id}')
 
     # 3. Retrieve actual secrets from Secret Manager
     print(f"[{datetime.now()}] Attempting to retrieve secrets from Secret Manager for project '{your_gcp_project_id}'...")

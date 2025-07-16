@@ -17,6 +17,7 @@ def get_secret(project_id: str, secret_id: str) -> Optional[str]:
     try:
         client = secretmanager.SecretManagerServiceClient()
         name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+        print(f'----- attempting to retrieve SECRET {name}')
         response = client.access_secret_version(request={"name": name})
         secret_value = response.payload.data.decode("UTF-8")
         print(f"Successfully retrieved secret '{secret_id}'.")
