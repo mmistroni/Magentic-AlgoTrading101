@@ -51,6 +51,7 @@ class SheetToolProvider:
         """
         Retrieves and returns all expense records from the budget Google Sheet.
         Each record is a list, typically [Date, Description, Amount].
+        This tool requires no input.
         Returns:
             Optional[List[List[Any]]]: A list of expense records, or None if an error occurs.
         """
@@ -67,6 +68,7 @@ class SheetToolProvider:
     def get_current_budget_total(self) -> Optional[float]:
         """
         Retrieves the total budget amount from the Google Sheet (assumed from cell B1).
+        This tool requires no input.
         Returns:
             Optional[float]: The budget amount as a float, or None if not found or not numeric.
         """
@@ -79,6 +81,7 @@ class SheetToolProvider:
     def calculate_remaining_budget_value(self) -> Union[int, float, None]:
         """
         Calculates the remaining budget by subtracting total expenses from the total budget.
+        This tool requires no input.
         Returns:
             Union[int, float, None]: The remaining budget value, or None if data cannot be retrieved.
         """
@@ -93,6 +96,7 @@ class SheetToolProvider:
         """
         Calculates and returns the number of remaining days in the current budget period.
         The period is defined by start/end dates in cells B3/B4 of the Google Sheet (YYYY-MM-DD format).
+        This tool requires no input.
         Returns:
             Optional[int]: The number of days remaining (including today), or 0 if the period has ended, or None on error.
         """
@@ -106,6 +110,7 @@ class SheetToolProvider:
         """
         Provides a detailed breakdown of the remaining budget, including remaining amount,
         estimated daily allowance, and days left in the period.
+        This tool requires no input.
         Returns:
             Optional[str]: A formatted string (e.g., '£150.00 (£30.00 per day for 5 days left)'),
                             or just the remaining amount if over budget, or None on error.
