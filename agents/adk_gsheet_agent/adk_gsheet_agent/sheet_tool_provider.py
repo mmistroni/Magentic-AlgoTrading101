@@ -169,6 +169,11 @@ class SheetToolProvider:
         """
         Reads all data from a specified range in the Google Sheet.
 
+        oogle.genai.errors.ClientError: 400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Unable to submit request because `read_sheet_range` functionDeclaration `response` schema specified other fields alongside any_of. When using any_of, it must be the only field set. Learn more: https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/function-calling', 'status': 'INVALID_ARGUMENT'}}   
+
+
+
+
         Args:
             range_name (str): The A1 notation or R1C1 notation of the range to retrieve (e.g., "Sheet1!A1:C10" or "Sheet1!A:C").
 
