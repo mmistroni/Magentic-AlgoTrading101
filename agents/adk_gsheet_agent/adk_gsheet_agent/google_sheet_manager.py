@@ -312,7 +312,7 @@ class GoogleSheetManager:
             print(f"Error calculating column sum: {e}")
             return None
 
-    def read_sheet_data_internal(self, spreadsheet_id: str, range_name: str) -> Optional[List[List[Any]]]:
+    def read_sheet_data_internal(self, spreadsheet_id: str, range_name: str) -> Optional[List[List[Union[str, str, float]]]]:
         """
         Reads all data from a specified range in the Google Sheet.
         """
@@ -324,10 +324,44 @@ class GoogleSheetManager:
                 spreadsheetId=spreadsheet_id, range=range_name).execute()
             values = result.get('values', [])
             print(f"Successfully read data from range {range_name}. Rows: {len(values)}")
-            return values
+            return self._process_sheet_values(values)
         except HttpError as err:
             print(f"HTTP error reading sheet data: {err}")
             return None
         except Exception as e:
             print(f"Error reading sheet data: {e}")
             return None
+        
+    def _process_sheet_values(self, values: List[List[Any]]) -> List[List[Union[str, float, int, bool]]]:
+        """
+        Internal method to process raw values from Google Sheets API,
+        converting them to appropriate Python types (str, float, int, bool).
+        """
+        processed_values: List[List[Union[str, float, int, bool]]] = []
+
+        for row in values:
+            processed_row: List[Union[str, float, int, bool]] = []
+            for cell_value in row:
+                if isinstance(cell_value, (int, float, bool)):
+                    # If already a number or boolean
+                    processed_row.append(cell_value)
+                elif isinstance(cell_value, str):
+                    # Try converting from string
+                    try:
+                        processed_row.append(int(cell_value))
+                    except ValueError:
+                        try:
+                            processed_row.append(float(cell_value))
+                        except ValueError:
+                            lower_value = cell_value.lower()
+                            if lower_value == 'true':
+                                processed_row.append(True)
+                            elif lower_value == 'false':
+                                processed_row.append(False)
+                            else:
+                                processed_row.append(cell_value)
+                else:
+                    # Fallback for unexpected types, convert to string
+                    processed_row.append(str(cell_value))
+            processed_values.append(processed_row)
+        return processed_values

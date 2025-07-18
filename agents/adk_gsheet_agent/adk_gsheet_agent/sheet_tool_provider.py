@@ -47,21 +47,24 @@ class SheetToolProvider:
             data_to_append=data_to_append
         )
 
-    def list_all_expenses_data(self, user:Optional[str]= None) -> Optional[List[List[Any]]]:
+    def list_all_expenses_data(self, user:Optional[str]= None) -> Optional[List[str]]:
         """
         Retrieves and returns all expense records from the budget Google Sheet.
         Each record is a list, typically [Date, Description, Amount].
         Returns:
-            Optional[List[List[Any]]]: A list of expense records, or None if an error occurs.
+            Optional[List[str]]: A list of expense records, or None if an error occurs.
         """
         print(f"[{datetime.now()}] Tool: list_all_expenses_data called.")
         expense_columns = 'A:C' # Adjust these columns if your expenses span different columns
-        return self.sheet_manager.get_all_expenses_data_internal(
+        data = self.sheet_manager.get_all_expenses_data_internal(
             spreadsheet_id=self.spreadsheet_id,
             sheet_name=self.default_sheet_name,
             start_expense_row=self.default_start_expense_row,
             expense_columns=expense_columns
         )
+
+        return [f'{tpl[0]}-{tpl[1]}-{tpl[2]}' for tpl in data]
+
 
     # --- Budget Calculation Tools ---
     def get_current_budget_total(self, user:Optional[str]= None) -> Optional[float]:
