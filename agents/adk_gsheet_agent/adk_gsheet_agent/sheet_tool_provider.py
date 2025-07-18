@@ -142,7 +142,7 @@ class SheetToolProvider:
             num_rows=num_rows
         )
 
-    def calculate_column_total(self, range_name: str, column_index: int) -> Union[int, float, None]:
+    def calculate_column_total(self, range_name: str, column_index: int) -> float:
         """
         Calculates the sum of numeric values in a specific column within a given range of a Google Sheet.
 
@@ -154,15 +154,16 @@ class SheetToolProvider:
                                  If range_name is multiple columns (e.g., 'Sheet1!A:D'), this should be
                                  the appropriate index for that wider range (e.g., 2 for column C).
         Returns:
-            Union[int, float, None]: The sum of the column values if successful,
+            float: The sum of the column values if successful,
                                      0 if no numeric data is found, or None if an error occurs.
         """
         print(f"[{datetime.now()}] Tool: calculate_column_total called for range '{range_name}', column index {column_index}.")
-        return self.sheet_manager.calculate_column_sum_internal(
+        result =  self.sheet_manager.calculate_column_sum_internal(
             spreadsheet_id=self.spreadsheet_id,
             range_name=range_name,
             column_index=column_index
         )
+        return float(result)
 
     def read_sheet_range(self, range_name: str) -> Optional[List[List[Union[str, str, float]]]]:
         """

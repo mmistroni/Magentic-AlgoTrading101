@@ -282,7 +282,7 @@ class GoogleSheetManager:
             print(f"Error getting sheet ID: {e}")
             return None
 
-    def calculate_column_sum_internal(self, spreadsheet_id: str, range_name: str, column_index: int) -> Union[int, float, None]:
+    def calculate_column_sum_internal(self, spreadsheet_id: str, range_name: str, column_index: int) -> float:
         """
         Calculates the sum of numeric values in a specific column within a given range of a Google Sheet.
         """
@@ -307,10 +307,10 @@ class GoogleSheetManager:
             return total_sum
         except HttpError as err:
             print(f"HTTP error calculating column sum: {err}")
-            return None
+            return 0.0
         except Exception as e:
             print(f"Error calculating column sum: {e}")
-            return None
+            return 0.0
 
     def read_sheet_data_internal(self, spreadsheet_id: str, range_name: str) -> Optional[List[List[Union[str, str, float]]]]:
         """
