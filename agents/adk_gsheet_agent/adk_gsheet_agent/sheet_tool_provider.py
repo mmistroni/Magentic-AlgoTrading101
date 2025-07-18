@@ -163,7 +163,7 @@ class SheetToolProvider:
             column_index=column_index
         )
 
-    def read_sheet_range(self, range_name: str) -> Optional[List[List[Any]]]:
+    def read_sheet_range(self, range_name: str) -> Optional[List[List[Union[str, str, float]]]]:
         """
         Reads all data from a specified range in the Google Sheet.
 
