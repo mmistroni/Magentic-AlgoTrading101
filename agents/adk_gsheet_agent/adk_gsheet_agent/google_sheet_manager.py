@@ -150,15 +150,15 @@ class GoogleSheetManager:
             return None
 
     def get_remaining_budget_value_internal(self, spreadsheet_id: str, sheet_name: str,
-                                            start_expense_row: int, expense_columns: str = 'A:C') -> Union[int, float, None]:
+                                            start_expense_row: int, expense_columns: str = 'A:C') -> float:
         """Calculates the remaining budget."""
         total_budget = self.get_budget_amount_internal(spreadsheet_id, sheet_name)
         if total_budget is None:
-            return None
+            return 0.0
 
         expenses_data = self.get_all_expenses_data_internal(spreadsheet_id, sheet_name, start_expense_row, expense_columns)
         if expenses_data is None:
-            return None
+            return 0.0
 
         total_expenses = 0.0
         # Assuming amount is in the 3rd column (index 2) of the fetched data

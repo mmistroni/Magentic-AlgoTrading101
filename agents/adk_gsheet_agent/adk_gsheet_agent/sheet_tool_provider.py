@@ -79,18 +79,19 @@ class SheetToolProvider:
             sheet_name=self.default_sheet_name
         )
 
-    def calculate_remaining_budget_value(self, user:Optional[str] = None) -> Union[int, float, None]:
+    def calculate_remaining_budget_value(self, user:Optional[str] = None) -> float:
         """
         Calculates the remaining budget by subtracting total expenses from the total budget.
         Returns:
-            Union[int, float, None]: The remaining budget value, or None if data cannot be retrieved.
+            float: The remaining budget value, or None if data cannot be retrieved.
         """
         print(f"[{datetime.now()}] Tool: calculate_remaining_budget_value called.")
-        return self.sheet_manager.get_remaining_budget_value_internal(
+        result =  self.sheet_manager.get_remaining_budget_value_internal(
             spreadsheet_id=self.spreadsheet_id,
             sheet_name=self.default_sheet_name,
             start_expense_row=self.default_start_expense_row
         )
+        return float(result)
 
     def get_days_left_in_budget_period(self, user:Optional[str] = None) -> Optional[int]:
         """
