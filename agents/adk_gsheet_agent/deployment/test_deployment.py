@@ -28,7 +28,7 @@ flags.DEFINE_string("location", 'us-central1', "GCP location.")
 flags.DEFINE_string("bucket", 'adk_short_bot', "GCP bucket.")
 flags.DEFINE_string(
     "resource_id",
-    "projects/682143946483/locations/us-central1/reasoningEngines/2156828397324468224",
+    "projects/682143946483/locations/us-central1/reasoningEngines/1025017515970920448",
     "ReasoningEngine resource ID (returned after deploying the agent)",
 )
 flags.DEFINE_string("Tester", None, "User ID (can be any string).")
