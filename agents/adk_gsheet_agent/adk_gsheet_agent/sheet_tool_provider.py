@@ -201,6 +201,6 @@ class SheetToolProvider:
         tools.append(FunctionTool(self.get_daily_budget_breakdown_string))
         tools.append(FunctionTool(self.insert_new_empty_row))
         tools.append(FunctionTool(self.calculate_column_total))
-        tools.append(FunctionTool(self.read_sheet_range))
+        #tools.append(FunctionTool(self.read_sheet_range))
 
         return tools
