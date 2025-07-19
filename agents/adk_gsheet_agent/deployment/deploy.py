@@ -43,6 +43,7 @@ def create() -> None:
     remote_agent = agent_engines.create(
         adk_app,
         display_name=root_agent.name,
+        description='An intelligent AI assistant specialized in managing personal budgets within a Google Sheet',
         requirements=[
             "google-adk==1.6.1",
             "google-cloud-aiplatform[agent_engines] (>=1.91.0,!=1.92.0)",
