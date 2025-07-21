@@ -204,6 +204,7 @@ def execute_call(request):
     # Now, you can actually use _remote_agent here, for example:
     # agent_response = _remote_agent.predict(prompt=f"Hello {name}, what can you do?")
     # response_text = agent_response.candidates[0].text
+    print(f'Calling agent ')
     agent_response = call_agent(name)
     # For now, return a confirmation of agent status
     return (
