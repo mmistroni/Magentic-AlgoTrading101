@@ -42,7 +42,7 @@ if __name__ == "__main__":
                        
     # Parameters to be sent as query string for the GET request
     # 'name' is now a query parameter as per your example
-    query_params = {"name": "APIUser"}
+    query_params = {"name": "Can  you list all expenses for user marco?"}
 
     # Get the API key from the environment variable
     # The environment variable is named X_API_KEY as per your request

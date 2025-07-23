@@ -208,10 +208,10 @@ def execute_call(request):
     agent_response = call_agent(name)
     # For now, return a confirmation of agent status
     return (
-        f'Hello {name}! Nice to see you again. '
-        f'Project: {PROJECT_ID}, Location: {LOCATION}. '
-        f'Agent FQN: {_remote_agent.name}. '
-        f'Agent Location: {_remote_agent.location}'
-        f'If creds loaded: {"Yes" if _creds else "No"}.'
+        #f'Hello {name}! Nice to see you again. '
+        #f'Project: {PROJECT_ID}, Location: {LOCATION}. '
+        #f'Agent FQN: {_remote_agent.name}. '
+        #f'Agent Location: {_remote_agent.location}'
+        #f'If creds loaded: {"Yes" if _creds else "No"}.'
         f'AgentResponse: {agent_response}.'
     )
