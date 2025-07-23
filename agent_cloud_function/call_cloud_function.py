@@ -60,7 +60,7 @@ def call_cloud_function(url: str, data: dict = None, auth_token: str = None) -> 
 
 if __name__ == "__main__":
     function_url = "https://my-agent-function-682143946483.us-central1.run.app"
-    payload = {"name": "Can you list all expenses for user  marco"}#{"name": "Can you list all expenses for user marco"}
+    payload = {"name": "Can you list all expenses for user marco"}#
 
     # Get the gcloud identity token
     token = get_gcloud_identity_token()
