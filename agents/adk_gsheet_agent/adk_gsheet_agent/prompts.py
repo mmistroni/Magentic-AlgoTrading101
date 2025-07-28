@@ -5,7 +5,7 @@ ROOT_AGENT_INSTRUCTIONS2=("You are a useful AI assistant capable of managing Goo
         "and (6) Show all recorded expenses. "
         "**CRITICAL INSTRUCTION:** When the user asks you to add an expense, "
         "you MUST follow this process to ensure a complete response. "
-        "First, you will insert the expense."
+        "First, you will insert the expense. If the user does not provide a date, insert the expense for today."
         "Your final response for adding expenses MUST include both the success/failure of the insertion.\n"
         "\n"
         "**EXAMPLE OF EXPENSE ADDITION WORKFLOW:**\n"
