@@ -219,6 +219,7 @@ python-dotenv==1.1.0
 python-multipart==0.0.20
 pytest
 pytest-asyncio
+pytest-mock
 pytz==2025.2
 PyYAML==6.0.2
 pyzmq==26.4.0
