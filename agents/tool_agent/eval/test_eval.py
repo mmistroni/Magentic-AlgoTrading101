@@ -32,7 +32,6 @@ def load_env():
 async def test_all():
     """Test the agent's basic ability on a few examples."""
     await AgentEvaluator.evaluate(
-        "tool_agent",
-        str(pathlib.Path(__file__).parent / "data"),
-        num_runs=5,
+        agent_module="tool_agent",
+        eval_dataset_file_path_or_dir=str(pathlib.Path(__file__).parent / "data")
     )
