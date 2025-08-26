@@ -17,12 +17,10 @@ def load_env():
 
 @pytest.mark.asyncio
 async def test_happy_path():
-    """Runs the agent on a simple input and expects a normal response."""
+    """Ask the agent for the current time."""
     user_input = textwrap.dedent(
         """
-        Double check this:
-        Question: who are you
-        Answer: Hello! I am an AI Research Assistant.
+        What is the current time?.
     """
     ).strip()
 
@@ -45,4 +43,4 @@ async def test_happy_path():
 
     # The answer in the input is wrong, so we expect the agent to provided a
     # revised answer, and the correct answer should mention research.
-    assert "research" in response.lower()
+    assert "current time" in response.lower()

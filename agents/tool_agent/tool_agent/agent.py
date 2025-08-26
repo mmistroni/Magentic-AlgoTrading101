@@ -15,8 +15,8 @@ root_agent = Agent(
     description="A Tooling agent",
     instruction=ROOT_AGENT_INSTRUCTION,
     tools=[
-        #get_current_time, 
-        google_search
+        get_current_time, 
+        #google_search
         
         ],
 )

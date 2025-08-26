@@ -1,0 +1,67 @@
+{
+  "eval_set_id": "evalsetef2b1c",
+  "name": "evalsetef2b1c",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "case339d40",
+      "conversation": [
+        {
+          "invocation_id": "e-4686f7d5-8bf3-439b-b3c3-53995aa0db49",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "what is the current time"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "The current time is 2025-08-26 19:43:22.\n"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-926b3e28-130c-472f-9b3e-7c56ec3bfcdf",
+                "args": {},
+                "name": "get_current_time"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1756237401.603147
+        }
+      ],
+      "session_input": {
+        "app_name": "tool_agent",
+        "user_id": "user",
+        "state": {}
+      },
+      "creation_timestamp": 1756237413.6984065
+    }
+  ],
+  "creation_timestamp": 1756237391.2388904
+}
