@@ -9,7 +9,7 @@ from agent_team.prompts import ROOT_WEATHER_AGENT
 
 AGENT_MODEL = 'MODEL_GEMINI_2_0_FLASH' # Starting with Gemini
 
-weather_agent = Agent(
+root_agent = Agent(
     name="weather_agent_v1",
     model=AGENT_MODEL, # Can be a string for Gemini or a LiteLlm object
     description="Provides weather information for specific cities.",
@@ -17,6 +17,6 @@ weather_agent = Agent(
     tools=[get_weather], # Pass the function directly
 )
 
-print(f"Agent '{weather_agent.name}' created using model '{AGENT_MODEL}'.")
+print(f"Agent '{root_agent.name}' created using model '{AGENT_MODEL}'.")
 
 
