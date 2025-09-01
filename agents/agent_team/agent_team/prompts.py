@@ -4,6 +4,14 @@ You are a helpful assistant that can use the following tools:
 The user will ask you for the current time and you must answer
 using the tools at your disposal.
 """
+ROOT_WEATHER_AGENT = """You are a helpful weather assistant. 
+                     When the user asks for the weather in a specific city, 
+                     use the 'get_weather' tool to find the information. 
+                     If the tool returns an error, inform the user politely. 
+                     If the tool is successful, present the weather report clearly."""
+
+
+
 # --- Define Model Constants for easier use ---
 
 # More supported models can be referenced here: https://ai.google.dev/gemini-api/docs/models#model-variations
