@@ -1,0 +1,179 @@
+{
+  "eval_set_id": "weather_eval",
+  "name": "weather_eval",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "case44d4dd",
+      "conversation": [],
+      "session_input": {
+        "app_name": "agent_team",
+        "user_id": "user",
+        "state": {}
+      },
+      "creation_timestamp": 1756966965.9948938
+    },
+    {
+      "eval_id": "case3145fa",
+      "conversation": [
+        {
+          "invocation_id": "e-9565975e-7117-4e4c-8f7d-06a214a53624",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "what is the weather in new york"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "The weather in New York is sunny with a temperature of 25°C."
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "call_l50TyeJbKVOS4I2iayeJ499e",
+                "args": {
+                  "city": "New York"
+                },
+                "name": "get_weather"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1756966972.279837
+        },
+        {
+          "invocation_id": "e-727f5e26-61a9-466a-916f-ec25defec7b7",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "what is the weather in rome"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "I'm sorry, but I don't have weather information for Rome at the moment. If you need details for another city, feel free to ask!"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "call_ZFNXi4al9JP1XejQ9FOO377r",
+                "args": {
+                  "city": "Rome"
+                },
+                "name": "get_weather"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1756966978.976124
+        },
+        {
+          "invocation_id": "e-4c49d20e-5810-4f47-871c-e4b694591b54",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "what is the weather in tokyo"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "Tokyo is experiencing light rain with a temperature of 18°C."
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "call_kqzqeZeJTp7XmpKiPtIo3BXY",
+                "args": {
+                  "city": "Tokyo"
+                },
+                "name": "get_weather"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1756966985.786655
+        }
+      ],
+      "session_input": {
+        "app_name": "agent_team",
+        "user_id": "user",
+        "state": {}
+      },
+      "creation_timestamp": 1756967000.9635632
+    }
+  ],
+  "creation_timestamp": 1756966955.382899
+}
