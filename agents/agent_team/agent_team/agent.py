@@ -6,17 +6,23 @@ from google.adk.runners import Runner
 from google.genai import types # For creating message Content/Parts
 from agent_team.tools import get_weather
 from agent_team.prompts import ROOT_WEATHER_AGENT
+from google.adk.models.lite_llm import LiteLlm
+import os
 
-AGENT_MODEL = 'MODEL_GEMINI_2_0_FLASH' # Starting with Gemini
+liteLlmModel = LiteLlm(
+    model="openrouter/openai/gpt-4.1",
+    api_key=os.getenv('OPENROUTER_API_KEY')
+)
+
 
 root_agent = Agent(
     name="weather_agent_v1",
-    model=AGENT_MODEL, # Can be a string for Gemini or a LiteLlm object
+    model=liteLlmModel, # Can be a string for Gemini or a LiteLlm object
     description="Provides weather information for specific cities.",
     instruction=ROOT_WEATHER_AGENT,
     tools=[get_weather], # Pass the function directly
 )
 
-print(f"Agent '{root_agent.name}' created using model '{AGENT_MODEL}'.")
+print(f"Agent '{root_agent.name}' created using model '{liteLlmModel}'.")
 
 
