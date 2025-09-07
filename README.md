@@ -22,14 +22,16 @@ https://medium.com/google-cloud/evaluate-and-deploy-an-llm-agent-with-adk-on-goo
 https://google.github.io/adk-docs/tutorials/agent-team/
 
 
-
-
 # ADK Course: https://youtu.be/P4VFL9nIaIA
-
-
 
 # adk agent remote  https://youtu.be/bPtKnDIVEsg?si=SnmmOfJtuCay3aeF
 
 # Unit Testing ADK Agents
 https://github.com/google/adk-samples/blob/main/python/agents/academic-research/tests/test_agents.py
+
+# Multi Agent sample
+https://youtu.be/cz2pKLPw994
+
+# Multi Agent Patterns
+https://medium.com/@princekrampah/multi-agent-architecture-in-multi-agent-systems-multi-agent-system-design-patterns-langgraph-b92e934bf843
 
