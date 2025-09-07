@@ -5,21 +5,24 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from google.genai import types # For creating message Content/Parts
 from agent_team.tools import get_weather
-from agent_team.prompts import ROOT_WEATHER_AGENT
+from agent_team.prompts import WEATHER_AGENT_INSTRUCTIONS
 from google.adk.models.lite_llm import LiteLlm
+from agent_team.models import OPENROUTER_GPT
 import os
+from google.adk.models.lite_llm import LiteLlm
 
 liteLlmModel = LiteLlm(
-    model="openrouter/openai/gpt-4.1",
+    model=OPENROUTER_GPT,
     api_key=os.getenv('OPENROUTER_API_KEY')
 )
+
 
 
 root_agent = Agent(
     name="weather_agent_v1",
     model=liteLlmModel, # Can be a string for Gemini or a LiteLlm object
     description="Provides weather information for specific cities.",
-    instruction=ROOT_WEATHER_AGENT,
+    instruction=WEATHER_AGENT_INSTRUCTIONS,
     tools=[get_weather], # Pass the function directly
 )
 
