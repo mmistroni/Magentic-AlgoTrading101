@@ -6,11 +6,12 @@ from google.adk.runners import Runner
 from google.genai import types # For creating message Content/Parts
 from agent_team.tools import say_hello
 from agent_team.prompts import GREETING_AGENT_INSTRUCTIONS
-from agent_team.models import MODEL_CLAUDE_SONNET, OPENROUTER_GPT
+from agent_team.models import MODEL_CLAUDE_SONNET, OPENROUTER_GPT, GEMINI_FLASH_LITE
 import os
 
+
 model = LiteLlm(
-    model=OPENROUTER_GPT,
+    model=GEMINI_FLASH_LITE,
     api_key=os.getenv('OPENROUTER_API_KEY')
 )
 
