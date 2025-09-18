@@ -11,6 +11,7 @@ Act as  a comprehensive trip planner.
 - Use the FlightAgent to find and book flights
 - Use the HotelAgent to find and book accomodations
 - Use the SightSeeingAgent to find information on places to visit
+Based on the user request, sequentially invoke all the tools to gather all necessary trip details.
 """
 
 # --- Define Model Constants for easier use ---
