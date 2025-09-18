@@ -1,0 +1,83 @@
+{
+  "eval_set_id": "evalset03208f",
+  "name": "evalset03208f",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "trip_planning_evalset",
+      "conversation": [
+        {
+          "invocation_id": "e-3daa4b9c-4666-42ff-a941-844e364a1830",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "i want to spend my honeymoon in venice on 10 december 2025 for 7 nights, please find me flight from london, hotels and places to visit"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "OK. I have the flight and hotel information for your honeymoon in Venice.\n\n**Flights:**\n\n*   **British Airways:** Flight BA254 from London to Venice on December 10, 2025, returning on December 17, 2025. The price is $150.00.\n*   **EasyJet:** Flight EasyJet876 from London to Venice on December 10, 2025, returning on December 17, 2025. The price is $120.00.\n\n**Hotels:**\n\nI have a list of hotels in Venice for 7 nights starting on December 10, 2025.\n\n**Places to Visit:**\n\nHere are some places to visit in Venice:\n\n*   St. Mark's Square (Piazza San Marco)\n*   St. Mark's Basilica (Basilica di San Marco)\n*   Doge's Palace (Palazzo Ducale)\n*   Rialto Bridge (Ponte di Rialto)\n*   Grand Canal\n*   Gondola Ride\n*   Bridge of Sighs (Ponte dei Sospiri)\n*   Murano\n*   Burano\n*   Peggy Guggenheim Collection"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-3ffa7ae6-a19c-4f5d-811b-1b718c8e5710",
+                "args": {
+                  "request": "find flights from London to Venice on 10 December 2025 for 7 nights"
+                },
+                "name": "FlightAgent"
+              },
+              {
+                "id": "adk-2300e1ca-526e-4d3d-932b-9ec5f5f5f980",
+                "args": {
+                  "request": "find hotels in Venice for 7 nights starting on 10 December 2025"
+                },
+                "name": "HotelAgent"
+              },
+              {
+                "id": "adk-15b5bcc3-cfcf-4ffb-a045-8a8edd4ff8f7",
+                "args": {
+                  "request": "find places to visit in Venice"
+                },
+                "name": "SightseeingAgent"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1758225765.398653
+        }
+      ],
+      "session_input": {
+        "app_name": "multi_agent",
+        "user_id": "user",
+        "state": {}
+      },
+      "creation_timestamp": 1758225791.6004949
+    }
+  ],
+  "creation_timestamp": 1758225732.6510348
+}
