@@ -18,7 +18,7 @@ import textwrap
 
 import dotenv
 import pytest
-from multi_agent.hotel_agent import hagent
+from multi_agent.sightseeing_agent import sagent
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 from google.genai.types import Tool
@@ -35,13 +35,13 @@ async def test_happy_path():
     """Runs the agent on a simple input and expects a normal response."""
     user_input = textwrap.dedent(
         """
-        I want you to book me an hotel in paris.
+        Find me places to visit in paris.
     """
     ).strip()
 
-    app_name = "agent_team"
+    app_name = "multi agent"
 
-    runner = InMemoryRunner(agent=hagent, app_name=app_name)
+    runner = InMemoryRunner(agent=sagent, app_name=app_name)
     session = await runner.session_service.create_session(
         app_name=runner.app_name, user_id="test_user"
     )

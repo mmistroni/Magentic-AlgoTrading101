@@ -35,7 +35,8 @@ async def test_happy_path():
     """Runs the agent on a simple input and expects a normal response."""
     user_input = textwrap.dedent(
         """
-        I want you to tell me the weather for the city of london.
+        I want to plan a holiday in paris on 10 november 2025, find me hotels, flights from
+        london and places to visit.
     """
     ).strip()
 

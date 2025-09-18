@@ -41,7 +41,7 @@ async def test_happy_path():
 
     app_name = "agent_team"
 
-    runner = InMemoryRunner(agent=flight_agent, app_name=app_name)
+    runner = InMemoryRunner(agent=fagent, app_name=app_name)
     session = await runner.session_service.create_session(
         app_name=runner.app_name, user_id="test_user"
     )
