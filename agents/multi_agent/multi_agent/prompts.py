@@ -4,8 +4,15 @@ FLIGHT_AGENT_INSTRUCTIONS = """You are a flight booking agent...You always retur
 HOTEL_AGENT_INSTRUCTIONS = """You are a hotel booking agent... You always return a valid JSON..."""
 
 
-SIGHTSEEING_AGENT_INSTRUCTIONS = """You are a sightseeing agent...You always return a valid JSON..."
+SIGHTSEEING_AGENT_INSTRUCTIONS = """You are a sightseeing agent...You always return a valid JSON..."""
+
+TRIPPLANNER_AGENT_INSTRUCTIONS = """
+Act as  a comprehensive trip planner.
+- Use the FlightAgent to find and book flights
+- Use the HotelAgent to find and book accomodations
+- Use the SightSeeingAgent to find information on places to visit
 """
+
 # --- Define Model Constants for easier use ---
 
 # More supported models can be referenced here: https://ai.google.dev/gemini-api/docs/models#model-variations
