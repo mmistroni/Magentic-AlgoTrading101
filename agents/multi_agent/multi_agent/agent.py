@@ -1,14 +1,14 @@
 from google.adk.agents import LlmAgent
 from .prompts import TRIPPLANNER_AGENT_INSTRUCTIONS
-from .flight_agent import flight_agent
-from .sightseeing_agent import sightseeingt_agent
-from .hotel_agent import hotel_agent
+from .flight_agent import fagent
+from .sightseeing_agent import sagent
+from .hotel_agent import hagent
 from google.adk.tools import agent_tool
 # Coordinator Agent
 
-flight_tool = agent_tool.AgentTool(flight_agent)
-hotel_tool = agent_tool.AgentTool(hotel_agent)
-sightseeing_tool = agent_tool.AgentTool(sightseeingt_agent)
+flight_tool = agent_tool.AgentTool(fagent)
+hotel_tool = agent_tool.AgentTool(hagent)
+sightseeing_tool = agent_tool.AgentTool(sagent)
 
 
 root_agent = LlmAgent(

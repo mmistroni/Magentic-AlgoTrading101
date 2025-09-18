@@ -18,7 +18,7 @@ import textwrap
 
 import dotenv
 import pytest
-from multi_agent.flight_agent import flight_agent
+from multi_agent.flight_agent import fagent
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 from google.genai.types import Tool
