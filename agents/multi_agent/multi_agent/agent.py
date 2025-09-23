@@ -11,17 +11,19 @@ from google.adk.tools import agent_tool
 #1. Create a parallel agent for concurrent tasks
 plan_parallel = ParallelAgent(
     name="ParallelTripAgent",
-    sub_agents=[fagent, sagent]
+    sub_agents=[fagent, hagent]
 )  
 
-#2. Create a summary agent to gather results
-trip_summary_agent = LlmAgent(
-    name="TripSummaryAgent",
-    instructions="Summarize the trip details from the flight, hotel and sightseeing agents...",
-    model='gemini-2.0-flash',
-)
 
+# 2. Create a summary agent to gather results
+trip_summary = LlmAgent(
+    model='gemini-2.0-flash',
+    name="TripSummaryAgent",
+    instruction="Summarize the trip details from the flight, hotel, and sightseeing agents...",
+    output_key="trip_summary")
+
+# please help me plan a visit to paris in november for a honeymoon, book flights from london heathrow and book a 5 night stay in a hotel close to eiffel tower
 root_agent = SequentialAgent(
     name="PlanTripWorkflow",
-    sub_agents=[sagent, plan_parallel, trip_summary_agent]
+    sub_agents=[sagent, plan_parallel, trip_summary]
 )
