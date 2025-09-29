@@ -17,6 +17,10 @@
 
 # MultiAgent tutorial https://cloud.google.com/blog/products/ai-machine-learning/build-multi-agentic-systems-using-google-adk
 
+# MCP tutorial
+https://codelabs.developers.google.com/codelabs/cloud-run/use-mcp-server-on-cloud-run-with-an-adk-agent?hl=en&utm_source=email&utm_medium=newsletter&utm_campaign=dev_program_september#0 
+
+
 
 ## Agent Chat UI
 Tutorials and Resources for Agent Chat UI
