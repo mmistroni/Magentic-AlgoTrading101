@@ -1,5 +1,9 @@
+# --- STAGE 1: Get the uv binary from its official image ---
+# Use a specific version tag instead of 'latest' for stability in production builds.
+FROM ghcr.io/astral-sh/uv:latest AS uv_installer
+
+# --- STAGE 2: Your main devcontainer image build (original Dockerfile content) ---
 # Use a base image that includes Python.
-# You can choose a specific Python version if needed, e.g., python:3.10-slim-bookworm
 FROM python:3.11-slim-bookworm
 
 # Set environment variables for non-interactive installations
@@ -55,10 +59,14 @@ ENV POETRY_HOME="/opt/poetry" \
     PATH="$POETRY_HOME/bin:$PATH"
 
 # Install Poetry
-# Ensure curl is installed before using it for the Poetry script, then clean up.
 # Curl is already installed from the gcloud SDK dependencies.
 RUN curl -sSL https://install.python-poetry.org | python - \
     && rm -rf /var/lib/apt/lists/* # Clean up apt lists again, if any were generated
+
+# --- CRITICAL ADDITION: Copy uv and uvx binaries into /usr/local/bin ---
+# This directory is already in the system PATH for all users by default.
+COPY --from=uv_installer /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=uv_installer /usr/local/bin/uvx /usr/local/bin/uvx
 
 # Switch to the newly created 'vscode' user for subsequent commands and the default shell
 USER $USERNAME
