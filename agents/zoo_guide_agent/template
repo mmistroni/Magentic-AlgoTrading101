@@ -1,0 +1,3 @@
+SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+MODEL="gemini-2.5-flash"
+MCP_SERVER_URL="${MCP_ZOO_SERVER}"
