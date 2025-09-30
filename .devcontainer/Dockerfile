@@ -1,78 +1,62 @@
 # --- STAGE 1: Get the uv binary from its official image ---
-# Use a specific version tag instead of 'latest' for stability in production builds.
+# We use this stage only to extract the binary.
 FROM ghcr.io/astral-sh/uv:latest AS uv_installer
 
-# --- STAGE 2: Your main devcontainer image build (original Dockerfile content) ---
-# Use a base image that includes Python.
+# --- STAGE 2: Your main devcontainer image build ---
 FROM python:3.11-slim-bookworm
 
-# Set environment variables for non-interactive installations
-ENV DEBIAN_FRONTEND=noninteractive
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    PATH="/opt/poetry/bin:$PATH"
 
-# Add necessary packages for user creation (sudo, git, openssh-client)
-# AND common dependencies needed for gcloud SDK (curl, gnupg, apt-transport-https, ca-certificates, lsb-release)
-# AND build-essential (often needed for Python packages like cffi/cryptography that Poetry might install)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    sudo \
-    git \
-    openssh-client \
-    curl \
-    gnupg \
-    apt-transport-https \
-    ca-certificates \
-    lsb-release \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create the 'vscode' user and group with UID/GID 1000 (standard for dev containers)
+# Define user arguments (standard for dev containers)
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
-# Create the group and user, add to sudoers, and install libffi-dev (often needed for Python packages)
-RUN groupadd --gid $USER_GID $USERNAME \
+# 1. Install System Dependencies and Create User/Group
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        sudo \
+        git \
+        openssh-client \
+        curl \
+        gnupg \
+        apt-transport-https \
+        ca-certificates \
+        lsb-release \
+        build-essential \
+        libffi-dev \
+    # Create the user and group
+    && groupadd --gid $USER_GID $USERNAME \
     && useradd -s /bin/bash -u $USER_UID -g $USER_GID -m $USERNAME \
-    && apt-get update \
-    && apt-get install -y libffi-dev \
+    # Add user to sudoers
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
-    && rm -rf /var/lib/apt/lists/* # Clean up apt lists again after this install
+    && rm -rf /var/lib/apt/lists/*
 
-# --- Start Google Cloud SDK Installation ---
-# Add Google Cloud public key
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+# 2. Install Google Cloud SDK
+# Add Google Cloud public key and repo
+RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    # Update and install the SDK
+    && apt-get update && apt-get install -y google-cloud-sdk \
+    && rm -rf /var/lib/apt/lists/*
 
-# Add the Cloud SDK distribution URI to the apt sources list
-RUN echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+    
+# 3. Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python -
 
-# Update the apt-get package list and install the Cloud SDK
-RUN apt-get update && apt-get install -y google-cloud-sdk
-
-# Install optional components if needed (e.g., kubectl, gsutil)
-# Uncomment the line below if you need these:
-# RUN apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin google-cloud-sdk-app-engine-python
-# --- End Google Cloud SDK Installation ---
-
-# Set environment variables for Poetry
-ENV POETRY_HOME="/opt/poetry" \
-    POETRY_VIRTUALENVS_IN_PROJECT=true \
-    PATH="$POETRY_HOME/bin:$PATH"
-
-# Install Poetry
-# Curl is already installed from the gcloud SDK dependencies.
-RUN curl -sSL https://install.python-poetry.org | python - \
-    && rm -rf /var/lib/apt/lists/* # Clean up apt lists again, if any were generated
-
-# --- CRITICAL ADDITION: Copy uv and uvx binaries into /usr/local/bin ---
-# This directory is already in the system PATH for all users by default.
-COPY --from=uv_installer /usr/local/bin/uv /usr/local/bin/uv
-COPY --from=uv_installer /usr/local/bin/uvx /usr/local/bin/uvx
-
-# Switch to the newly created 'vscode' user for subsequent commands and the default shell
+# 4. Install uvx (The Corrected Multi-Stage Copy)
+# The binaries are located directly in the root of the uv_installer image.
+COPY --from=uv_installer /uv /usr/local/bin/uv
+COPY --from=uv_installer /uvx /usr/local/bin/uvx
+# Switch to the newly created 'vscode' user for security and file ownership
 USER $USERNAME
 
-# Set the working directory for your project inside the Codespace
-# CODESPACE_NAME is a Dev Container variable, use that directly
+# Set the working directory for your project
 WORKDIR /workspaces/${CODESPACE_NAME}
 
 # Command to keep the container running
