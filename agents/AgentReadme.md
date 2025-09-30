@@ -50,3 +50,8 @@ https://www.youtube.com/watch?v=tl5rQktClqc
 
 # MCP
 https://langchain-ai.github.io/langgraph/agents/mcp/an
+
+
+
+# anothe rsample
+https://innovationlab.fetch.ai/resources/docs/next/examples/mcp-integration/langgraph-mcp-agent-example

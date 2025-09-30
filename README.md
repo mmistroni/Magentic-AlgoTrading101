@@ -35,3 +35,5 @@ https://youtu.be/cz2pKLPw994
 # Multi Agent Patterns
 https://medium.com/@princekrampah/multi-agent-architecture-in-multi-agent-systems-multi-agent-system-design-patterns-langgraph-b92e934bf843
 
+
+# mcp
