@@ -1,6 +1,6 @@
 #https://martinfowler.com/articles/function-call-LLM.html?utm_source=www.pythonweekly.com&utm_medium=newsletter&utm_campaign=python-weekly-issue-698-may-8-2025&_bhlid=f944725abe32d871b0b01da685a24e6396fdb57b#ScaffoldOfATypicalAgent
 from .mcp_schemas import CLARIFY_SCHEMA, PRODUCT_DETAILS_SCHEMA, SEARCH_SCHEMA
-from .mcp_models import SearchClient, 
+from .mcp_models import SearchClient
 import json
 import requests
 

@@ -59,7 +59,9 @@ class MCPGeminiAgent:
 
     async def connect(self):
         await self.select_server()
+        print('--- connecting....')
         self.stdio_transport = await self.exit_stack.enter_async_context(stdio_client(self.server_params))
+        print('----sdio')
         self.stdio, self.write = self.stdio_transport
         self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
         await self.session.initialize()
