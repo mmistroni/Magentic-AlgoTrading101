@@ -8,15 +8,18 @@ mcp = FastMCP("Math")
 
 @mcp.tool()
 def add(a: int, b: int) -> int:
+  ''' Adds two numbers together.'''
   return a + b
 
 @mcp.tool()
 def subtract(a: int, b: int) -> int:
+  ''' Subtracts b from a.'''
   return a - b
 
 @mcp.tool()
 def multiply(a: int, b: int) -> int:
-  return a + b
+  ''' Multiplies two numbers.'''
+  return a * b
 
 
 if __name__ =="__main__":
