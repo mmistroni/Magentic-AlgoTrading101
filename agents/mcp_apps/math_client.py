@@ -16,7 +16,7 @@ server_params = StdioServerParameters(
 model = ChatOpenAI(model="gpt-4o")
 
 
-async def run_agent():
+async def run_agent(query):
   async with stdio_client(server_params) as (read, write):
     # Open an MCP session to interact with the math_server.py tool.
     async with ClientSession(read, write) as session:
@@ -29,12 +29,11 @@ async def run_agent():
       # Run the agent.
       agent_response = await agent.ainvoke(
         # Now, let's give our message.
-       {"messages": "what's (4 + 6) x 14?"})
+       {"messages": query})
       # Return the response.
       return agent_response["messages"][3].content
     
-async def chat(self):
-    print(f"\nMCP-Gemini Assistant is ready and connected to: {self.server_name}")
+async def chat():
     print("Enter your question below, or type 'quit' to exit.")
     while True:
         try:
@@ -43,9 +42,9 @@ async def chat(self):
                 print("Session ended. Goodbye!")
                 break
             print(f"Processing your request...")
-            res = await self.agent_loop(query)
+            res = await run_agent(query)
             print("\nGemini's answer:")
-            print(res.text)
+            print(res)
         except KeyboardInterrupt:
             print("\nSession interrupted. Goodbye!")
             break
@@ -54,5 +53,5 @@ async def chat(self):
     
 
 if __name__ == "__main__":
-    result = asyncio.run(run_agent())
+    result = asyncio.run(chat())
     print(result)
