@@ -1,7 +1,7 @@
 # Agent workbook
 
 1. Google Sheets Agent  DONE - July 2025
-2. Google MultiAgent - following ADK agent team samples
+2. Google MultiAgent - following ADK agent team samples i
 3. Google News Agent - Read list of shares from GCP and fetch news - see samples https://medium.com/@airabbitX/turn-claude-into-a-super-power-with-mcp-activepieces-f76cc83049fc
 4. Google Expenditure Agent - replacing JavaScript UI to update expenses in Amazon DB
 5. Google OBB Agent for Six step dance stock investigation
@@ -15,10 +15,23 @@
           - smolagent
 
 
-# MultiAgent tutorial https://cloud.google.com/blog/products/ai-machine-learning/build-multi-agentic-systems-using-google-adk
 
-# MCP tutorial
+# MCP tutorial - DONE = Zoo Agent
 https://codelabs.developers.google.com/codelabs/cloud-run/use-mcp-server-on-cloud-run-with-an-adk-agent?hl=en&utm_source=email&utm_medium=newsletter&utm_campaign=dev_program_september#0 
+
+The tutorial above deploys an agent which interacts wtih an mcp server
+
+## Now we need to call the agent above programmatically
+
+
+# MultiAgent tutorial https://cloud.google.com/blog/products/ai-machine-learning/build-multi-agentic-systems-using-google-adk - DONE
+
+## Now we need to call the agent above programmatically
+  
+
+#Once we sort out the deployment and programmatic call, we'll need to draft a set of steps we can apply
+#for all the agents
+
 
 
 
