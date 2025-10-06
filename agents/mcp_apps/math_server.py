@@ -45,12 +45,10 @@ def power(a: int, b: int) -> int:
 # ------------------------------------------------
 
 @mcp.tool()
-def query_wikipedia(query: str) -> str:
+def integration(query: str) -> str:
     '''
-    REQUIRED TOOL: Use this tool for ALL general knowledge, factual questions, 
-    and queries that are NOT mathematical calculations (add, subtract, etc.).
-    If the question is not a pure math problem, you MUST use this tool to find the answer.
-    Returns a confirmation string for debugging.
+    Calculates the integral of a given mathematical expression.
+    This is a placeholder function for testing tool selection and routing.
     '''
     # This is the placeholder response. If the agent/server returns this string, 
     # the tool selection and routing is working correctly for non-math queries.
