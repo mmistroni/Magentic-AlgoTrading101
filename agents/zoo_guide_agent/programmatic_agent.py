@@ -64,10 +64,10 @@ def get_auth_headers(audience: str, project_id: str) -> dict:
         print(f"[AUTH] General Authentication Error: {e}")
         raise e
 
-def query_agent(message: str, headers: dict) -> str:
-    """Sends a query to the ADK agent's /run endpoint (non-streaming)."""
+def query_agent(message: str) -> str:
+    """Sends a query to the public ADK agent's /run endpoint (no authentication needed)."""
     
-    # 1. Define the REST payload according to ADK's /run schema
+    # 1. Define the REST payload
     payload = {
         "app_name": APP_NAME,
         "user_id": USER_ID,
@@ -76,11 +76,14 @@ def query_agent(message: str, headers: dict) -> str:
             "role": "user",
             "parts": [{"text": message}]
         },
-        "streaming": False # Explicitly request non-streaming response
+        "streaming": False 
     }
     
-    # 2. Make the authenticated POST request
+    # 2. Make the standard POST request
     print(f"\n-> Sending message: '{message}' to {RUN_ENDPOINT}")
+    
+    # The headers only specify content type, NOT authorization
+    headers = {"Content-Type": "application/json"}
     
     try:
         response = requests.post(RUN_ENDPOINT, headers=headers, json=payload)
@@ -104,29 +107,29 @@ def query_agent(message: str, headers: dict) -> str:
         
         return "Agent responded (200 OK), but could not parse the final text event."
     
-    elif response.status_code == 403:
-        return f"Error {response.status_code} (Forbidden): Authentication failed. Ensure the authenticated user/service account has the Cloud Run Invoker role on the service."
     else:
         return f"Error {response.status_code}: {response.text}"
 
 # --- MAIN EXECUTION ---
 def main():
-    print('start')
-    proj = os.environ.get('GOOGLE_PROJECT_ID')
-    print(f"--- Starting Programmatic ADK Agent Interaction{proj} ---")
+    print("--- Starting Programmatic ADK Agent Interaction (Public Access) ---")
+    
+    if not CLOUD_RUN_URL:
+        print("!!! Please update CLOUD_RUN_URL in the script before running. !!!")
+        return
         
-    # Get the authenticated headers object
-    try:
-        print('GEtting auth haders')
-        auth_headers = get_auth_headers(CLOUD_RUN_URL, proj)
-    except Exception as e:
-        raise e
-
     # 1st Message: Conversation start
-    response_1 = query_agent("Hello, what can you do?", auth_headers) # Pass headers dictionary
+    response_1 = query_agent("Hello, what can you do?")
     print(f"\n<- Agent Response 1: {response_1}")
     
-    # ... (rest of the query calls) ...
+    # 2nd Message: Follow-up question (uses the same SESSION_ID for memory)
+    response_2 = query_agent("Please remember that my favorite animal is the cheetah.")
+    print(f"\n<- Agent Response 2: {response_2}")
+
+    # 3rd Message: A new question to test memory
+    response_3 = query_agent("What is my favorite animal?")
+    print(f"\n<- Agent Response 3: {response_3}")
+
 
 if __name__ == "__main__":
     main()
