@@ -24,6 +24,10 @@ async def run_agent(query):
       await session.initialize()
       # Load tools
       tools = await load_mcp_tools(session)
+
+      print(f'Loaded tools: {[tool.name for tool in tools]}')
+
+
       # Create a ReAct agent.
       agent = create_react_agent(model, tools)
       # Run the agent.
@@ -43,7 +47,7 @@ async def chat():
                 break
             print(f"Processing your request...")
             res = await run_agent(query)
-            print("\nGemini's answer:")
+            print("\nMCP's answer:")
             print(res)
         except KeyboardInterrupt:
             print("\nSession interrupted. Goodbye!")
