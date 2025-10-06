@@ -11,8 +11,8 @@ from google.oauth2 import id_token  # <--- NEW/CRITICAL IMPORT for low-level tok
 # --- CONFIGURATION (UPDATE THESE) ---
 # Your deployed Cloud Run service URL (no trailing slash)
 # You need to authenticate to access the service via gcloud auth
-CLOUD_RUN_URL = "https://zoo-tour-guide-682143946483.europe-west1.run.app"
-# The name of your agent application (defaults to your directory name, but "zoo-tour-guide" is a safe bet here)
+CLOUD_RUN_URL = "https://zoo-tour-guide-682143946483.europe-west1.run.app" 
+# 2. VERIFIED APP NAME from --service_name
 APP_NAME = "zoo-tour-guide" 
 # A unique identifier for the user (can be any string you define)
 USER_ID = "programmatic-user-001"
