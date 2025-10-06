@@ -1,10 +1,12 @@
-import os
 import requests
 import os
 import json
 from google.auth import default
 from google.auth.transport.requests import Request
 from google.auth.exceptions import DefaultCredentialsError
+from google.oauth2 import id_token  # <--- NEW/CRITICAL IMPORT for low-level token fetching
+# You can remove any previous imports related to AuthorizedSession or IdTokenCredentialsFromCredentials
+
 
 # --- CONFIGURATION (UPDATE THESE) ---
 # Your deployed Cloud Run service URL (no trailing slash)
@@ -17,7 +19,7 @@ USER_ID = "programmatic-user-001"
 # A unique identifier for this conversation session (e.g., a UUID or a custom string)
 SESSION_ID = "session-test-001"
 
-GCP_PROJECT_ID = os.environ['GOOGLE_CLOUD_PROJECT'] # Use PROJECT_ID as a fallback default
+GCP_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID') # Use PROJECT_ID as a fallback default
 
 
 # --- ADK API ENDPOINTS ---
@@ -29,31 +31,34 @@ USER_ID = "programmatic-user-001"
 SESSION_ID = "session-test-001" 
 RUN_ENDPOINT = f"{CLOUD_RUN_URL}/run"
 
+
 def get_auth_headers(audience: str, project_id: str) -> dict:
-    """Generates an authenticated header for the Cloud Run service using an ID Token."""
+    """
+    Fetches a raw ID Token using the low-level google.oauth2.id_token
+    module, which is highly compatible with user-based Application Default Credentials.
+    """
     try:
-        # Get credentials, explicitly setting the project for the quota
-        credentials, project = default(project=project_id)
+        # 1. Load generic credentials (relies on gcloud auth and GCLOUD_PROJECT env var)
+        credentials, project = default()
         
-        # Refresh credentials if necessary
-        if credentials and not credentials.valid:
-             credentials.refresh(Request())
+        # 2. Use the low-level function to fetch the ID Token
+        #    It takes the Request object and the audience (Cloud Run URL).
+        id_token_value = id_token.fetch_id_token(Request(), audience)
         
-        # Fetch the ID Token using the Cloud Run URL as the audience
-        auth_request = Request()
-        credentials.fetch_id_token(auth_request, audience)
-        id_token = credentials.token
-        
-        print(f"[AUTH] Token acquired. Starts with: {id_token[:10]}...") 
+        # 3. Check for project context
+        if project is None:
+             print("[WARNING] Project ID not detected. Ensure 'export GCLOUD_PROJECT=...' was run.")
+
+        print(f"[AUTH] Token acquired. Starts with: {id_token_value[:10]}...") 
         
         return {
-            "Authorization": f"Bearer {id_token}",
+            "Authorization": f"Bearer {id_token_value}",
             "Content-Type": "application/json"
         }
     except DefaultCredentialsError as e:
         print("\n--- AUTHENTICATION ERROR: MISSING PROJECT ID / CREDENTIALS ---")
         print("1. Ensure 'gcloud auth application-default login' was successful.")
-        print("2. Set GCP_PROJECT_ID correctly in the script.")
+        print("2. Ensure 'export GCLOUD_PROJECT=YOUR_GCP_PROJECT_ID' was run.")
         raise e
     except Exception as e:
         print(f"[AUTH] General Authentication Error: {e}")
@@ -106,35 +111,22 @@ def query_agent(message: str, headers: dict) -> str:
 
 # --- MAIN EXECUTION ---
 def main():
-    print("--- Starting Programmatic ADK Agent Interaction ---")
-    
-    if not CLOUD_RUN_URL or not GCP_PROJECT_ID:
-        print("!!! Please update CLOUD_RUN_URL and GCP_PROJECT_ID in the script before running. !!!")
-        return
+    print('start')
+    proj = os.environ.get('GOOGLE_PROJECT_ID')
+    print(f"--- Starting Programmatic ADK Agent Interaction{proj} ---")
         
-    # Authenticate once before sending messages
+    # Get the authenticated headers object
     try:
-        auth_headers = get_auth_headers(CLOUD_RUN_URL, GCP_PROJECT_ID)
+        print('GEtting auth haders')
+        auth_headers = get_auth_headers(CLOUD_RUN_URL, proj)
     except Exception as e:
-        # Authentication error already printed inside get_auth_headers
         raise e
 
     # 1st Message: Conversation start
-    response_1 = query_agent("Hello, what can you do?", auth_headers)
-    print(f"<- Agent Response 1: {response_1}")
+    response_1 = query_agent("Hello, what can you do?", auth_headers) # Pass headers dictionary
+    print(f"\n<- Agent Response 1: {response_1}")
     
-    # 2nd Message: Follow-up question (same SESSION_ID for memory)
-    response_2 = query_agent("Please remember that my favorite animal is the cheetah.", auth_headers)
-    print(f"<- Agent Response 2: {response_2}")
-
-    # 3rd Message: Test memory
-    response_3 = query_agent("What is my favorite animal?", auth_headers)
-    print(f"<- Agent Response 3: {response_3}")
-
+    # ... (rest of the query calls) ...
 
 if __name__ == "__main__":
-    # Temporarily set the environment variable as a fallback, 
-    # though we pass it explicitly in the function call for robustness.
-    os.environ['GCLOUD_PROJECT'] = GCP_PROJECT_ID
-    print(f"{os.environ['GCLOUD_PROJECT']}|")
     main()
