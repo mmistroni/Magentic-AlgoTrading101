@@ -88,3 +88,30 @@ gcloud run services add-iam-policy-binding zoo-data-backend \
     --role='roles/run.invoker' \
     --region='europe-west1' \
     --project=datascience-projects
+
+### curl call
+# 1. Get the URL of your deployed Cloud Run service
+export APP_URL="https://your-agent-service-xxxx-uc.a.run.app"
+
+# 2. Get an identity token (if your service requires authentication)
+export TOKEN=$(gcloud auth print-identity-token)
+
+curl -X POST "$APP_URL/run_sse" \
+-H "Authorization: Bearer $TOKEN" \
+-H "Content-Type: application/json" \
+-d '{
+  "app_name": "your_agent_directory_name",
+  "user_id": "api_user",
+  "session_id": "api_session_123",
+  "new_message": {
+    "role": "user",
+    "parts": [
+      {
+        "text": "What is the capital of Germany?"
+      }
+    ]
+  },
+  "streaming": false
+}'
+
+
