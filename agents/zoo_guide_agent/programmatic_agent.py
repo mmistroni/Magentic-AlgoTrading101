@@ -20,6 +20,7 @@ def get_id_token_credentials(target_audience: str) -> google.auth.credentials.Cr
     Loads Service Account credentials from the PROGRAMMATIC_AGENT_TOKEN environment 
     variable and configures them for ID Token generation with the specified audience.
     """
+    print(f"🔑 Loading service account credentials...{os.environ[CREDENTIALS_VAR]}")
     key_json = os.environ.get(CREDENTIALS_VAR)
     
     if not key_json:
@@ -83,7 +84,7 @@ def main():
         import requests 
         
         response = invoke_cloud_run_agent(
-            url=CLOUD_RUN_URL, 
+            url=f'{CLOUD_RUN_URL}/run', 
             payload=DEFAULT_PAYLOAD
         )
         
