@@ -68,3 +68,23 @@ https://langchain-ai.github.io/langgraph/agents/mcp/an
 
 # anothe rsample
 https://innovationlab.fetch.ai/resources/docs/next/examples/mcp-integration/langgraph-mcp-agent-example
+
+
+######### deployig agent on glcoud
+
+uvx --from google-adk adk deploy cloud_run \
+    --project=datascience-projects \
+    --region=europe-west1 \
+    --service_name=zoo-data-backend . \
+    --allow-unauthenticated=false  # <--- This is the key flag for a protected service
+
+
+### create iam service..
+
+
+## add iam service
+gcloud run services add-iam-policy-binding zoo-data-backend \
+    --member='' \
+    --role='roles/run.invoker' \
+    --region='europe-west1' \
+    --project=datascience-projects
