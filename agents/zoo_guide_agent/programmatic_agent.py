@@ -7,20 +7,30 @@ from google.oauth2 import service_account
 from typing import Dict, Any
 
 # --- Configuration ---
-# Your specific Cloud Run service URL
-CLOUD_RUN_URL = "https://zoo-data-backend-682143946483.europe-west1.run.app"
+# CORRECTED: Base URL + the ADK agent's standard streaming endpoint
+CLOUD_RUN_URL = "https://zoo-data-backend-682143946483.europe-west1.run.app/"
 # Environment variable storing the service account key JSON content
 CREDENTIALS_VAR = "PROGRAMMATIC_AGENT_TOKEN"
-# Example payload your agent expects
-DEFAULT_PAYLOAD = {"action": "get_inventory", "item_type": "lion"}
+
+# EXAMPLE PAYLOAD: Must match your agent's expected input schema.
+# Note that we set "streaming": false to receive a single, complete response.
+DEFAULT_PAYLOAD = {
+    "app_name": "zoo_data_agent",  # Check your ADK agent's directory name
+    "user_id": "programmatic_user",
+    "session_id": "client_session_001",
+    "new_message": {
+        "role": "user",
+        "parts": [{"text": "What is the status of the lion inventory?"}]
+    },
+    "streaming": False
+}
 
 
 def get_id_token_credentials(target_audience: str) -> google.auth.credentials.Credentials:
     """
-    Loads Service Account credentials from the PROGRAMMATIC_AGENT_TOKEN environment 
-    variable and configures them for ID Token generation with the specified audience.
+    Loads Service Account credentials and generates an ID Token scoped to the 
+    target_audience (Cloud Run URL, including the endpoint path).
     """
-    print(f"🔑 Loading service account credentials...{os.environ[CREDENTIALS_VAR]}")
     key_json = os.environ.get(CREDENTIALS_VAR)
     
     if not key_json:
@@ -32,16 +42,15 @@ def get_id_token_credentials(target_audience: str) -> google.auth.credentials.Cr
         service_account_info = json.loads(key_json)
     except json.JSONDecodeError:
         raise ValueError(
-            f"Failed to parse JSON content from '{CREDENTIALS_VAR}'. Ensure it is valid, unescaped JSON."
+            f"Failed to parse JSON content from '{CREDENTIALS_VAR}'. Ensure it is valid JSON."
         )
 
-    # Use the IDTokenCredentials class which correctly accepts the target_audience 
-    # to scope the token for Cloud Run.
+    # Use IDTokenCredentials, passing the full URL (including /run_sse) as the audience
     credentials = service_account.IDTokenCredentials.from_service_account_info(
         info=service_account_info,
         target_audience=target_audience
     )
-    
+    print('... Credentials loaded.=,,,,,')
     return credentials
 
 
@@ -50,25 +59,22 @@ def invoke_cloud_run_agent(
     payload: Dict[str, Any]
 ) -> requests.Response:
     """
-    Handles authentication, token fetching, and makes the authorized POST request.
+    Authenticates, generates an ID token, and makes the authorized POST request.
     """
     print(f"🚀 Attempting to invoke agent at {url}...")
     
-    # 1. Get credentials, scoped to the Cloud Run URL
+    # We pass the full URL (including /run_sse) as the audience
     credentials = get_id_token_credentials(url) 
     
-    # 2. Use the credentials object to generate a fresh ID token
     auth_req = AuthRequest()
     credentials.refresh(auth_req)
     id_token = credentials.token
     
-    # 3. Prepare the authorized request headers
     headers = {
         "Authorization": f"Bearer {id_token}",
         "Content-Type": "application/json"
     }
 
-    # 4. Make the secure POST request
     response = requests.post(url, headers=headers, json=payload)
     
     return response
@@ -79,19 +85,13 @@ def main():
     The main execution function for the programmatic client.
     """
     try:
-        # Quick check for required libraries
-        import google.auth.transport.requests 
-        import requests 
-        
         response = invoke_cloud_run_agent(
-            url=f'{CLOUD_RUN_URL}/run', 
+            url=CLOUD_RUN_URL, 
             payload=DEFAULT_PAYLOAD
         )
         
-        # Check the HTTP status code and raise an exception if it's 4xx or 5xx
         response.raise_for_status()
         
-        # Success output
         print("✅ Agent call successful!")
         print(f"Response Status: {response.status_code}")
         print("\nResponse Body:")
@@ -99,19 +99,17 @@ def main():
         
     except EnvironmentError as e:
         print(f"❌ ERROR: {e}")
-        print(f"\nACTION REQUIRED: Set the '{CREDENTIALS_VAR}' environment variable with the full JSON key content.")
-    except ValueError as e:
-        print(f"❌ ERROR: {e}")
+        print(f"\nACTION REQUIRED: Set the '{CREDENTIALS_VAR}' environment variable.")
     except requests.exceptions.HTTPError as e:
         print(f"❌ HTTP ERROR: Agent call failed with status code {e.response.status_code}")
         if e.response.status_code == 403:
-            print("\n**403 Forbidden Error:** Check the following:")
-            print("1. The **Cloud Run Invoker** role is granted to the service account.")
-            print(f"2. The 'target_audience' ({CLOUD_RUN_URL}) is correct.")
+            print("\n**403 Forbidden Error:** Check the Cloud Run Invoker role on the service account.")
+        elif e.response.status_code == 422:
+             print("\n**422 Unprocessable Entity:** The payload structure is incorrect. Ensure DEFAULT_PAYLOAD matches the agent's expected schema.")
         print("Response body:")
         print(e.response.text)
     except Exception as e:
-        print(f"❌ An unexpected error occurred: {e}. Please ensure required libraries are installed.")
+        print(f"❌ An unexpected error occurred: {e}")
 
 
 if __name__ == "__main__":
