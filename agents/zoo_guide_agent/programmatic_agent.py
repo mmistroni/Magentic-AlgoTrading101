@@ -14,6 +14,7 @@ CREDENTIALS_VAR = "PROGRAMMATIC_AGENT_TOKEN"
 
 # EXAMPLE PAYLOAD: Must match your agent's expected input schema.
 # Note that we set "streaming": false to receive a single, complete response.
+
 DEFAULT_PAYLOAD = {
     "app_name": "zoo_data_agent",  # Check your ADK agent's directory name
     "user_id": "programmatic_user",
@@ -86,7 +87,7 @@ def main():
     """
     try:
         response = invoke_cloud_run_agent(
-            url=CLOUD_RUN_URL, 
+            url=f'{CLOUD_RUN_URL}run_sse',  # CORRECTED: Full URL with endpoint
             payload=DEFAULT_PAYLOAD
         )
         
