@@ -11,3 +11,5 @@ capital_agent = LlmAgent(
     instruction=CAPITAL_AGENT_INSTRUCTION,
     tools=[get_capital_city]
 )
+
+root_agent = capital_agent
