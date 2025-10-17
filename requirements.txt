@@ -47,6 +47,7 @@ et_xmlfile==2.0.0
 executing==2.2.0
 fastapi==0.115.12
 fastjsonschema==2.21.1
+fastmcp
 filelock==3.18.0
 filetype==1.2.0
 findpython==0.6.3
