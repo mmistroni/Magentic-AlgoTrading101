@@ -114,3 +114,4 @@ curl -X POST "$APP_URL/run_sse" \
   "streaming": false
 }'
 
+# https://codelabs.developers.google.com/deploy-manage-observe-adk-cloud-run?hl=en#5
