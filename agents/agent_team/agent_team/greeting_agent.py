@@ -11,9 +11,10 @@ import os
 
 
 model = LiteLlm(
-    model=GEMINI_FLASH_LITE,
+    model=OPENROUTER_GPT,
     api_key=os.getenv('OPENROUTER_API_KEY')
 )
+
 
 
 greeting_agent = Agent(

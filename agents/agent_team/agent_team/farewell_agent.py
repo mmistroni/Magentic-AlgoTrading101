@@ -7,16 +7,17 @@ from google.genai import types # For creating message Content/Parts
 from agent_team.tools import say_goodbye
 from agent_team.prompts import FAREWELL_AGENT_INSTRUCTIONS
 from google.adk.models.lite_llm import LiteLlm
-from agent_team.models import GEMINI_FLASH
+from agent_team.models import GEMINI_FLASH, OPENROUTER_GPT
 import os
 
 from google.adk.models.lite_llm import LiteLlm
 
 
 model = LiteLlm(
-    model=GEMINI_FLASH,
+    model=OPENROUTER_GPT,
     api_key=os.getenv('OPENROUTER_API_KEY')
 )
+
 
 farewell_agent = Agent(
     name="farewell_agent_v1",
