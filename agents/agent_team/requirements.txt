@@ -1,2 +1,3 @@
 google-adk
+litellm
 # Add any other dependencies your agent needs
