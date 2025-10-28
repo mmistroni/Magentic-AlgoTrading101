@@ -5,7 +5,7 @@ export TOKEN=$(gcloud auth print-identity-token)
 echo 'Listing Apps'
 
 curl -X GET -H "Authorization: Bearer $TOKEN" $APP_URL/list-apps
-
+import random
 echo 'Creating session......'
 curl -X POST -H "Authorization: Bearer $TOKEN" \
     $APP_URL/apps/agent_team/users/user_123/sessions/session_abc \
@@ -24,7 +24,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "new_message": {
         "role": "user",
         "parts": [{
-        "text": "i am lookign for greetings?"
+        "text": "what can you do?"
         }]
     },
     "streaming": false
