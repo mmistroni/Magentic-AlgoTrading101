@@ -8,7 +8,7 @@ import os
 # --- USER-PROVIDED CREDENTIALS (Keep these) ---
 CLIENT_ID = os.environ['AWS_CLIENT_ID']
 CLIENT_SECRET = os.environ['AWS_CLIENT_SECRET']
-TOKEN_URL = os.environ['AWS_TOKEN_URL']
+TOKEN_URL = os.environ['TOKEN_URL']
 
 # --- FIX: Configuration for Bedrock Gateway Authentication ---
 # 1. This must be the exact Identifier of the Resource Server in your Cognito User Pool.
