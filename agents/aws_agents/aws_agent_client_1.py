@@ -3,6 +3,8 @@ import json
 import base64
 import os
 
+
+
 # --- USER-PROVIDED CREDENTIALS (Keep these) ---
 CLIENT_ID = os.environ['AWS_CLIENT_ID']
 CLIENT_SECRET = os.environ['AWS_CLIENT_SECRET']
