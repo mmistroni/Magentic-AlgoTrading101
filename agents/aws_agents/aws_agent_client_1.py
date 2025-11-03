@@ -129,6 +129,7 @@ access_token = fetch_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL, REQUIRED_
 
 if access_token:
     # 2. Use the token to call the Gateway
+    print(f'-- listing tools ----')
     tools = list_tools(gateway_url, access_token)
     print("\n--- Final Gateway Response ---")
     print(json.dumps(tools, indent=2))
