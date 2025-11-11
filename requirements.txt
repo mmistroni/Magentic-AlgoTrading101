@@ -149,7 +149,7 @@ openbb-benzinga
 openbb-bls
 openbb-cftc
 openbb-commodity
-opebbb_cftc
+opebbb-cftc
 openbb-core
 openbb-econdb
 openbb-economy
