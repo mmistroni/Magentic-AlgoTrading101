@@ -1,4 +1,5 @@
 google-adk
+openbb_core
 openbb_fmp
 openbb_cftc
 pydantic
