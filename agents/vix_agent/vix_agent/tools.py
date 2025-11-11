@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Union, Any
 import random
+from openbb import obb
 import time
 
 def cot_data_tool(market: str) -> Dict[str, Any]:
@@ -25,20 +26,7 @@ def cot_search_tool(future_string: str) -> List[Dict[str, Any]]:
     """
     TOOL: Search cftc information for a future.
     """
-    # obb.regulators.cftc.cot_search('vix futures'), and probaly the COTSearchFetcher
-    print(f"[COT Search Tool] Searching for reports matching '{query}'...")
-    time.sleep(0.4) # Simulate latency
-    
-    # Simulate search results
-    results = []
-    for i in range(3):
-        results.append({
-            "market": f"{query} Market {i+1}",
-            "report_date": f"2025-11-{10 - i}",
-            "summary": f"Summary of COT report for {query} Market {i+1}"
-        })
-    
-    return results
+    data =  obb.regulators.cftc.cot_search('future_string'
 
 
 

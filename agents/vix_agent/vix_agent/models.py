@@ -6,6 +6,15 @@ import time
 # --- Pydantic Data Models (Communication Protocol) ---
 # Pydantic models enforce the structure of data passed between agents.
 
+class CftcFutureModel(BaseModel):
+    """Model representing a CFTC future search result."""
+    future_name: str = Field(..., description="Name of the future contract.")
+    market_code: str = Field(..., description="Market code associated with the future.")
+    report_date: str = Field(..., description="Date of the CFTC report.")
+    non_commercial_long: int = Field(..., description="Non-commercial long positions.")
+    non_commercial_short: int = Field(..., description="Non-commercial short positions.")
+    non_commercial_spread: int = Field(..., description="Non-commercial spread positions.")
+
 class RawDataModel(BaseModel):
     """Data ingested by the DataIngestionAgent, containing raw COT and VIX figures."""
     market: str = Field(..., description="The financial market being analyzed (e.g., Gold, S&P 500).")
