@@ -118,5 +118,5 @@ curl -X POST "$APP_URL/run_sse" \
 
 
 ### Agents moved to cloud run
-- agent_team
-- capital_agent
+- agent_team        DONE
+- capital_agent     Done
