@@ -8,13 +8,10 @@ import time
 
 class CftcFutureModel(BaseModel):
     """Model representing a CFTC future search result."""
-    future_name: str = Field(..., description="Name of the future contract.")
-    market_code: str = Field(..., description="Market code associated with the future.")
-    report_date: str = Field(..., description="Date of the CFTC report.")
-    non_commercial_long: int = Field(..., description="Non-commercial long positions.")
-    non_commercial_short: int = Field(..., description="Non-commercial short positions.")
-    non_commercial_spread: int = Field(..., description="Non-commercial spread positions.")
-
+    future_name: str = Field(alias='name', description="Name of the future contract.")
+    market_code: str = Field(alias='code', description="Market code associated with the future.")
+    category: str = Field(description="Category of the future.")
+    
 class RawDataModel(BaseModel):
     """Data ingested by the DataIngestionAgent, containing raw COT and VIX figures."""
     market: str = Field(..., description="The financial market being analyzed (e.g., Gold, S&P 500).")
