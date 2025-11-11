@@ -115,3 +115,8 @@ curl -X POST "$APP_URL/run_sse" \
 }'
 
 # https://codelabs.developers.google.com/deploy-manage-observe-adk-cloud-run?hl=en#5
+
+
+### Agents moved to cloud run
+- agent_team
+- capital_agent
