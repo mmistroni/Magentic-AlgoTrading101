@@ -1,15 +1,22 @@
 from .prompts import CAPITAL_AGENT_INSTRUCTION
 from .tools import get_capital_city
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent, SequentialAgent, Context    
+from vix_agent.vix_agents import INGESTION_AGENT, FEATURE_AGENT, SIGNAL_AGENT
 
 
 
-capital_agent = LlmAgent(
-    model="gemini-2.0-flash",
-    name="capital_agent",
-    description="Answers user questions about the capital city of a given country.",
-    instruction=CAPITAL_AGENT_INSTRUCTION,
-    tools=[get_capital_city]
+initial_context = Context(market='Gold Futures') 
+
+root_agent = SequentialAgent(
+    name="COTAnalysisWorkflow",
+    sub_agents=[
+        INGESTION_AGENT,      # Retrieves data and writes 'raw_market_data' to Context.
+        FEATURE_AGENT,        # Reads 'raw_market_data', calculates, writes 'engineered_features' to Context.
+        SIGNAL_AGENT          # Reads 'engineered_features', outputs final SignalDataModel.
+    ]
 )
 
-root_agent = capital_agent
+# Execution Step
+final_context = root_agent.run(context=initial_context)
+final_result = final_context.get('final_output') 
+
