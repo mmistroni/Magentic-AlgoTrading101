@@ -275,3 +275,4 @@ scikit-learn
 pydantic>=2
 requests
 httpx
+pydantic
