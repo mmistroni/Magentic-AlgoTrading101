@@ -273,3 +273,5 @@ langchain_openai
 strands-agents
 scikit-learn
 pydantic>=2
+requests
+httpx

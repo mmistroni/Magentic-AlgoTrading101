@@ -29,3 +29,39 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     },
     "streaming": false
     }'
+
+
+
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    $APP_URL/run_sse \
+    -H "Content-Type: application/json" \
+    -d '{
+    "app_name": "agent_team",
+    "user_id": "user_123",
+    "session_id": "session_abc",
+    "new_message": {
+        "role": "user",
+        "parts": [{
+        "text": "what is the weather in paris?"
+        }]
+    },
+    "streaming": false
+    }'
+
+
+
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    $APP_URL/run_sse \
+    -H "Content-Type: application/json" \
+    -d '{
+    "app_name": "agent_team",
+    "user_id": "user_123",
+    "session_id": "session_abc",
+    "new_message": {
+        "role": "user",
+        "parts": [{
+        "text": "I think i am goingn to leave now?"
+        }]
+    },
+    "streaming": false
+    }'
