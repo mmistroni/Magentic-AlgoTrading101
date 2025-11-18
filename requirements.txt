@@ -276,3 +276,5 @@ pydantic>=2
 requests
 httpx
 pydantic
+pytest
+pytest-asyncio
