@@ -2,23 +2,24 @@ import os
 import json
 import asyncio
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import httpx 
 
-# --- Configuration for Local Testing ---
-# 📢 Fixed internal URL (use 127.0.0.1 for maximum internal compatibility)
+# --- Dynamic URL Configuration (for Codespaces internal access) ---
 APP_URL = "http://127.0.0.1:8080" 
 USER_ID = "user_123"
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
-APP_NAME = "capital_agent" # 📢 CHANGE THIS to match your actual agent name
+APP_NAME = "capital_agent" # Must match your agent's name
 # ---------------------------------------
 
-# --- (Other functions like get_auth_token and make_request remain the same) ---
+# --- Helper Function: Authentication Bypass ---
 
 async def get_auth_token() -> str:
     """Returns an empty string for local/Codespace unauthenticated development."""
     return ""
+
+# --- Core Request Function (ASYNC) ---
 
 async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, data: Dict[str, Any] = None) -> httpx.Response:
     """Helper function for asynchronous requests."""
@@ -34,69 +35,87 @@ async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, da
         else:
             raise ValueError(f"Unsupported method: {method}")
 
-        # Check for status codes 4xx or 5xx
         response.raise_for_status() 
         return response
     except httpx.HTTPStatusError as errh:
-        print(f"\n❌ **HTTP ERROR:** Status {response.status_code} for {url}")
-        print(f"❌ **Server Response (Raw):**\n{response.text}")
+        print(f"\n❌ **HTTP ERROR:** Status {errh.response.status_code} for {url}")
+        print(f"❌ **Server Response (Raw):**\n{errh.response.text}")
         raise
     except httpx.RequestError as err:
         print(f"\n❌ An unexpected network error occurred connecting to {url}: {err}")
-        # Print a diagnostic hint
-        print("💡 Hint: Did you run 'adk web --port 8080 --host 0.0.0.0' in a separate terminal?")
         raise
 
-async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str):
-    """Executes a single POST request to the /run_sse endpoint and parses the response."""
-    
-    print(f"\n[User] -> Sending message: '{message}'")
+# 📢 AMENDED FUNCTION: Added 'streaming' argument
+async def run_agent_request(
+    client: httpx.AsyncClient, 
+    session_id: str, 
+    message: str, 
+    streaming: bool = False # Default to False for Pytest/Testability
+) -> str:
+    """
+    Executes a request to the /run_sse endpoint.
+    Handles streaming output if requested (for standalone console).
+    Returns the final response text.
+    """
     
     run_data = {
         "app_name": APP_NAME,
         "user_id": USER_ID,
         "session_id": session_id,
         "new_message": {"role": "user", "parts": [{"text": message}]},
-        "streaming": False 
+        "streaming": streaming # 📢 Uses the argument to control streaming
     }
+    
+    raw_text = ""
     
     try:
         response = await make_request(client, "POST", "/run_sse", data=run_data)
-        
         raw_text = response.text.strip()
+        
+        # --- ROBUST SSE PARSING LOGIC ---
+        
         data_lines = [line.strip() for line in raw_text.split('\n') if line.strip().startswith("data:")]
         
         if not data_lines:
-             raise ValueError("No 'data:' lines found in response content.")
-        
+             # Case 1: No 'data:' lines. Try parsing the whole response as a single bare JSON error object.
+             try:
+                 error_response = json.loads(raw_text)
+                 error_message = error_response.get('error', 'Unknown bare JSON error.')
+                 return f"SERVER_ERROR: {error_message}"
+             except json.JSONDecodeError:
+                 return f"PARSING_ERROR: Unexpected non-JSON response from server."
+
+
+        # 2. Get the very last data block, which contains the final response payload.
         last_data_line = data_lines[-1]
         json_payload = last_data_line[len("data:"):].strip()
+        
         agent_response = json.loads(json_payload)
         
+        # 3. Extract the final text.
         final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', 'Agent response structure not recognized.')
         
-        print(f"[Agent] -> {final_text}")
+        # 📢 STANDALONE/STREAMING OUTPUT: Print if streaming was requested
+        if streaming:
+             print(f"[Agent] -> {final_text}")
+
+        # ✅ Return the final text for Pytest assertion
         return final_text
     
-    except json.JSONDecodeError as e:
-        print(f"\n🚨 **JSON PARSING FAILED**!")
-        print(f"   Error: {e}")
-        print("   --- RAW SERVER CONTENT ---")
-        print(raw_text)
-        print("   --------------------------")
-        
     except Exception as e:
-        print(f"❌ Agent request failed: {e}")
+        print(f"\n❌ FATAL ERROR during run_agent_request: {e}")
+        # 📢 CRITICAL: Always return a string for Pytest validation
+        return f"CRASH_ERROR: Failed to process request due to {type(e).__name__}"
 
-# --- Interactive Chat Loop and Main Logic (amain) remain the same ---
+# --- Interactive Chat Loop (For Standalone Use) ---
 
 async def chat_loop(client: httpx.AsyncClient, session_id: str):
     """Runs the main conversation loop, handling user input asynchronously."""
-    print("--- 💬 Start Chatting ---")
-    print("Type 'quit' or 'exit' to end the session.")
+    print("--- 💬 Start Chatting (Streaming Mode) ---")
     
     while True:
         try:
+            # Note: We set streaming=True here for the interactive console experience
             user_input = await asyncio.to_thread(input, f"[{USER_ID}]: ")
             
             if user_input.lower() in ['quit', 'exit']:
@@ -104,8 +123,9 @@ async def chat_loop(client: httpx.AsyncClient, session_id: str):
                 
             if not user_input.strip():
                 continue
-                
-            await run_agent_request(client, session_id, user_input)
+            
+            # 📢 STANDALONE: Call with streaming=True
+            await run_agent_request(client, session_id, user_input, streaming=True) 
 
         except Exception as e:
             print(f"An unexpected error occurred in the loop: {e}")
@@ -120,10 +140,9 @@ async def amain():
     async with httpx.AsyncClient(timeout=30.0) as client:
         
         # 1. Create Session
-        print("\n## 1. Creating Session")
         try:
             await make_request(client, "POST", current_session_endpoint, data=session_data)
-            print(f"✅ Session created successfully. Status 200.")
+            print(f"✅ Session created successfully.")
         except Exception as e:
             print(f"❌ Could not start session. Is the ADK running? Error: {e}")
             return
@@ -132,12 +151,13 @@ async def amain():
         await chat_loop(client, SESSION_ID)
         
         # 3. Cleanup: Delete Session (Best Practice)
-        print(f"\n## 3. Deleting Session: {SESSION_ID}")
         try:
              await make_request(client, "DELETE", current_session_endpoint)
              print("✅ Session deleted successfully.")
         except Exception as e:
              print(f"⚠️ Warning: Failed to delete session. {e}")
+
+
 
 
 if __name__ == "__main__":
