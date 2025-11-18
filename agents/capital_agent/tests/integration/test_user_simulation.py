@@ -31,7 +31,6 @@ async def http_client():
     Provides a session-scoped asynchronous HTTP client for all tests.
     FIX: Uses 'async def' and 'async with' to prevent TypeError.
     """
-    # 📢 FIX: 'async with' used for asynchronous context management
     async with httpx.AsyncClient(timeout=30.0, base_url=TEST_APP_URL) as client:
         yield client
 
@@ -45,7 +44,6 @@ async def agent_session(http_client):
 
     # SETUP: Clean up and create new session
     try:
-        # Use await with the http_client fixture
         await make_request(http_client, "DELETE", current_session_endpoint)
     except Exception:
         pass 
@@ -60,34 +58,11 @@ async def agent_session(http_client):
 # --- 3. Parameterized Test Cases (Simulation Scenarios) ---
 
 test_scenarios = [
-    # Scenario A: Greeting/Purpose Check (Non-Tool)
-    # Expected: The agent states its purpose (capital, country).
-    ("A_Greeting_Check", 
-     "What is your job?", 
-     "capital", "country"), 
-    
-    # Scenario B: Known Tool Success (Input: France, Output: Paris)
-    # This tests the agent's ability to call the tool and format the successful response.
-    ("B_Tool_Success_France", 
-     "What is the capital of France?", 
-     "france", "paris"), 
-     
-    # Scenario C: Known Tool Failure (Input: Spain, Output: "Sorry, I don't know...")
-    # This tests the agent's ability to call the tool and handle the tool's explicit failure message.
-    ("C_Known_Tool_Failure", 
-     "Capital of Spain, please.", 
-     "sorry", "spain"), 
-    # Scenario D: Refusal Check (Out of Scope)
-    # This tests the agent's adherence to its instructions to only discuss capitals.
-    ("D_Refusal_Check_Finance", 
-     "Tell me about stock markets.", 
-     "capital", "cannot"), 
-     
-    # Scenario E: Another Known Success (Input: Canada, Output: Ottawa)
-    # Using 'canada' from the search results to ensure the agent is generalizable beyond the provided sample list.
-    ("E_Tool_Success_Canada", 
-     "What about Canada's capital?", 
-     "canada", "ottawa"), 
+    ("A_Greeting_Check", "What is your job?", "capital", "country"), 
+    ("B_Tool_Success_France", "What is the capital of France?", "france", "paris"), 
+    ("C_Known_Tool_Failure", "Capital of Spain, please.", "sorry", "spain"), 
+    ("D_Refusal_Check_Finance", "Tell me about stock markets.", "capital", "cannot"), 
+    ("E_Tool_Success_Canada", "What about Canada's capital?", "canada", "ottawa"), 
 ]
 
 
@@ -100,8 +75,16 @@ async def test_agent_simulation_flow(http_client, agent_session, test_id, user_i
     session_id = agent_session
     print(f"\n--- Running Scenario: {test_id} ---")
     
-    # Run the request. (Must await the async function)
-    final_text = await run_agent_request(http_client, session_id, user_input)
+    # 📢 CRITICAL AMENDMENT: Explicitly call with streaming=False
+    final_text = await run_agent_request(
+        http_client, 
+        session_id, 
+        user_input, 
+        streaming=False 
+    )
+    
+
+
     
     # --- SCORING: Keyword Validation ---
     
