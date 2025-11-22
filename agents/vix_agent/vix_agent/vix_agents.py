@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from google.adk.agents import LlmAgent
-from vix_agent.tools import cot_data_tool, vix_data_tool
+from vix_agent.tools import cot_data_tool, vix_data_tool, mock_ingestion_tool
 from vix_agent.models import RawDataModel, FeatureDataModel, SignalDataModel, DataPointerModel
 from vix_agent.tools import cot_data_tool, vix_data_tool
 
@@ -13,7 +13,7 @@ INGESTION_AGENT = LlmAgent(
     Create a {DataPointerModel.__name__} object with the resulting storage URI.
     **Save the {DataPointerModel.__name__} object to the shared Context** under the key 'raw_data_pointer'.
     """,
-    tools=[cot_data_tool, vix_data_tool]
+    tools=[mock_ingestion_tool]
 )
 
 FEATURE_AGENT = LlmAgent(

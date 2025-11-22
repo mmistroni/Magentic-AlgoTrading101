@@ -3,8 +3,10 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Union, Any
 import random
-from openbb import obb
+import os
 import time
+import csv
+from .models import SignalDataModel
 
 def cot_data_tool(market: str) -> Dict[str, Any]:
     """
@@ -26,7 +28,7 @@ def cot_search_tool(future_string: str) -> List[Dict[str, Any]]:
     """
     TOOL: Search cftc information for a future.
     """
-    data =  obb.regulators.cftc.cot_search('future_string'
+    return 'vix'
 
 
 
@@ -45,3 +47,113 @@ def vix_data_tool() -> Dict[str, Any]:
         "vix_level": vix_level
     }
 
+# --- MOCK TOOL DEFINITIONS ---
+
+def mock_ingestion_tool() -> str:
+    """Creates the RAW data file."""
+    file_path = "./temp_data/raw_data_test.csv"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    # Create RAW data with 3 lines
+    raw_data = [
+        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
+        ['2025-11-20', '10.5', '90.0'],
+        ['2025-11-21', '11.2', '85.5'],
+        ['2025-11-22', '12.0', '78.0']
+    ]
+    with open(file_path, 'w', newline='') as f: 
+        writer = csv.writer(f)
+        writer.writerows(raw_data)
+        
+    print(f"[INGESTION Agent Tool called. RAW data created at: {file_path}")
+    return file_path
+
+def feature_engineering_tool(raw_data_uri: str) -> str:
+    """Reads the RAW file, adds features, and writes the ENGINEERED file."""
+    
+    # 1. READ INPUT FILE (URI from Ingestion Agent)
+    input_path = raw_data_uri
+    engineered_path = "./temp_data/engineered_data.csv"
+    
+    engineered_data = []
+    
+    try:
+        with open(input_path, 'r', newline='') as infile:
+            reader = csv.reader(infile)
+            header = next(reader)
+            
+            # Write new header with calculated features
+            engineered_data.append(header + ['COT_Z_Score', 'VIX_Percentile'])
+            
+            # 2. ADD FEW LINES / CALCULATE FEATURES (Mock Logic)
+            for row_num, row in enumerate(reader, start=1):
+                # Mock calculation: Z-Score = 0.5 + (row_num * 0.1)
+                z_score = 0.5 + (row_num * 0.1)
+                # Mock calculation: Percentile = 95 - (row_num * 5)
+                percentile = 95 - (row_num * 5)
+                
+                engineered_data.append(row + [f"{z_score:.2f}", f"{percentile:.2f}"])
+                
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        return ""
+
+    # 3. WRITE OUTPUT FILE (New URI for Signal Agent)
+    with open(engineered_path, 'w', newline='') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(engineered_data)
+        
+    print(f"FEATURE_AGENT Tool executed. ENGINEERED data created at: {engineered_path}")
+    return engineered_path
+
+def signal_generation_tool(engineered_data_uri: str) -> SignalDataModel:
+    """
+    Reads the engineered data file URI, applies mock trading logic,
+    and returns the structured SignalDataModel.
+    """
+    
+    input_path = engineered_data_uri
+    latest_features = {}
+    
+    try:
+        # 1. READ ENGINEERED DATA
+        with open(input_path, 'r', newline='') as infile:
+            reader = csv.reader(infile)
+            header = next(reader)
+            
+            # Read the last row (latest data point)
+            data_rows = list(reader)
+            if not data_rows:
+                return SignalDataModel(signal="Neutral", reason="No engineered data found in file.")
+                
+            latest_row = data_rows[-1]
+            
+            # Map the latest features to their names (assuming the header structure from previous mocks)
+            latest_features = {
+                'COT_Z_Score': float(latest_row[3]),  # Assuming index 3 for Z-Score
+                'VIX_Percentile': float(latest_row[4]) # Assuming index 4 for VIX Percentile
+            }
+            
+    except FileNotFoundError:
+        return SignalDataModel(signal="Neutral", reason=f"Engineered data file not found at {input_path}.")
+    except Exception as e:
+        return SignalDataModel(signal="Neutral", reason=f"Error reading/parsing data: {e}.")
+
+    # 2. APPLY TRADING LOGIC
+    cot_z = latest_features.get('COT_Z_Score', 0.0)
+    vix_p = latest_features.get('VIX_Percentile', 0.0)
+
+    # Logic: Mean-Reversion Strategy
+    if cot_z < -1.5 and vix_p > 90.0:
+        signal = "Buy"
+        reason = f"COT Z-Score ({cot_z}) indicates extreme bearish sentiment, combined with high VIX ({vix_p})."
+    elif cot_z > 1.5 and vix_p < 10.0:
+        signal = "Sell"
+        reason = f"COT Z-Score ({cot_z}) indicates extreme bullish sentiment, combined with low VIX ({vix_p})."
+    else:
+        signal = "Neutral"
+        reason = f"Metrics are within normal bounds. COT Z-Score: {cot_z}, VIX Percentile: {vix_p}."
+
+    # 3. RETURN STRUCTURED OUTPUT (Pydantic Model)
+    print(f"SIGNAL_AGENT Tool executed. Signal generated: {signal}")
+    return SignalDataModel(signal=signal, reason=reason)

@@ -1,5 +1,3 @@
-from .prompts import CAPITAL_AGENT_INSTRUCTION
-from .tools import get_capital_city
 from google.adk.agents import LlmAgent, SequentialAgent, Context    
 from vix_agent.vix_agents import INGESTION_AGENT, FEATURE_AGENT, SIGNAL_AGENT
 
