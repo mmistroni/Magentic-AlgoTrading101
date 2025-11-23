@@ -1,20 +1,24 @@
-from google.adk.agents import LlmAgent, SequentialAgent, Context    
-from vix_agent.vix_agents import INGESTION_AGENT, FEATURE_AGENT, SIGNAL_AGENT
+from google.adk.agents import LlmAgent, SequentialAgent 
+from vix_agent.vix_agents import INGESTION_TOOL_CALLER, INGESTION_MODEL_GENERATOR, \
+                                FEATURE_TOOL_CALLER,  FEATURE_MODEL_GENERATOR, \
+                                SIGNAL_AGENT
 
 
-
-initial_context = Context(market='Gold Futures') 
-
-root_agent = SequentialAgent(
+COT_WORKFLOW_PIPELINE = SequentialAgent(
     name="COTAnalysisWorkflow",
     sub_agents=[
-        INGESTION_AGENT,      # Retrieves data and writes 'raw_market_data' to Context.
-        FEATURE_AGENT,        # Reads 'raw_market_data', calculates, writes 'engineered_features' to Context.
-        SIGNAL_AGENT          # Reads 'engineered_features', outputs final SignalDataModel.
+        INGESTION_TOOL_CALLER,
+        INGESTION_MODEL_GENERATOR,
+        FEATURE_TOOL_CALLER,
+        FEATURE_MODEL_GENERATOR,
+        SIGNAL_AGENT # Assuming this is the final structured output
     ]
 )
 
+root_agent = COT_WORKFLOW_PIPELINE
+
 # Execution Step
-final_context = root_agent.run(context=initial_context)
-final_result = final_context.get('final_output') 
+#initial_context = Context(market='Gold Futures') 
+#final_context = root_agent.run(context=initial_context)
+#final_result = final_context.get('final_output') 
 

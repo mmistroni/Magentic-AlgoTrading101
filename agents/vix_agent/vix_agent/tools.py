@@ -157,3 +157,48 @@ def signal_generation_tool(engineered_data_uri: str) -> SignalDataModel:
     # 3. RETURN STRUCTURED OUTPUT (Pydantic Model)
     print(f"SIGNAL_AGENT Tool executed. Signal generated: {signal}")
     return SignalDataModel(signal=signal, reason=reason)
+
+
+# Assuming DataPointerModel is the type hint for the input parameter,
+# though the LlmAgent passes the content of the DataPointerModel's 'uri' field.
+
+def mock_feature_engineering_tool(raw_data_pointer_uri: str) -> str:
+    """
+    Mocks the Feature Engineering process.
+    
+    1. Reads the URI from the raw data pointer (simulated).
+    2. Writes a new file containing engineered features (simulated).
+    3. Returns the URI of the newly created engineered data file.
+    
+    Args:
+        raw_data_pointer_uri: The URI string pointing to the raw data (e.g., './temp_data/raw_data_test.csv').
+        
+    Returns:
+        The URI string pointing to the new engineered data.
+    """
+    
+    # In a real environment, you would use 'raw_data_pointer_uri' 
+    # to read data from GCS or a database.
+    
+    print(f"Mock Tool: Reading raw data from: {raw_data_pointer_uri}")
+    
+    # 1. Define the output path for the engineered features
+    engineered_path = "./temp_data/engineered_data.csv"
+    
+    # 2. Simulate writing the engineered features
+    # This data simulates the computed features (COT Z-Score, VIX percentile, etc.)
+    engineered_content = (
+        "timestamp,z_score,percentile\n"
+        "2025-11-20,-1.7,92.0"
+    )
+    
+    # Ensure the directory exists (handled by your fixture, but good practice)
+    os.makedirs(os.path.dirname(engineered_path), exist_ok=True)
+    
+    with open(engineered_path, 'w') as f: 
+        f.write(engineered_content)
+        
+    print(f"Mock Tool: Wrote engineered data to: {engineered_path}")
+        
+    # 3. Return the new URI that the FEATURE_MODEL_GENERATOR will use
+    return engineered_path
