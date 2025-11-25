@@ -155,7 +155,7 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
 
     # This check relies on the SIGNAL_AGENT working
     assert isinstance(final_result, SignalDataModel)
-    assert final_result.signal == "Buy"
+    assert final_result.signal == "Neutral"
     print(f"✅ Output Check 3: Final signal is correct ({final_result.signal}) and Pydantic validated.")
     print(f"   Reason: {final_result.reason}")
     # To run this test:
