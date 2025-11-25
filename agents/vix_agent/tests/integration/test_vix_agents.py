@@ -28,19 +28,6 @@ from google.adk.runners import Runner
 # Assuming mock_ingestion_tool is defined elsewhere or in vix_agent.tools
 # We must define the mock tool needed by the FeatureToolCaller.
 
-def mock_feature_engineering_tool(raw_data_pointer: str) -> str:
-    """Mocks FEATURE: Reads RAW URI string, writes ENGINEERED data, returns new URI string."""
-    # This mock ensures the engineered file exists and returns the expected path.
-    engineered_path = "./temp_data/engineered_data.csv"
-    with open(engineered_path, 'w') as f: f.write("timestamp,z_score,percentile\n2025-11-20,-1.7,92.0")
-    return engineered_path
-
-def mock_signal_generation_tool(feature_data_pointer: str) -> str:
-    """Mocks SIGNAL: Reads FEATURE URI, determines signal, and returns the full JSON string."""
-    # Since the Signal Agent is a generator, we assume the tool returns the final JSON string.
-    # To satisfy the SignalDataModel, the tool returns the data that the LLM will serialize.
-    return '{"signal": "Buy", "reason": "Mocked: High COT Z-Score indicates strong bullish conviction."}'
-
 # --------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -155,9 +142,9 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
 
     # This check relies on the SIGNAL_AGENT working
     assert isinstance(final_result, SignalDataModel)
-    assert final_result.signal == "Neutral"
+    assert final_result.signal == "Buy"
     print(f"✅ Output Check 3: Final signal is correct ({final_result.signal}) and Pydantic validated.")
-    print(f"   Reason: {final_result.reason}")
+    print(f"   Reason: {final_result.justification}")
     # To run this test:
     # 1. Save the entire code block as 'test_pipeline_pytest.py'.
     # 2. Run the command: 'pytest test_pipeline_pytest.py'

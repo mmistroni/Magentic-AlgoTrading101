@@ -200,12 +200,17 @@ def mock_feature_engineering_tool(raw_data_pointer_uri: str) -> str:
     os.makedirs(os.path.dirname(engineered_path), exist_ok=True)
     
     with open(engineered_path, 'w') as f: 
-        f.write(engineered_content)
-        
+        f.write("timestamp,z_score,percentile\n2025-11-20,-1.7,92.0")
     print(f"Mock Tool: Wrote engineered data to: {engineered_path}")
         
     # 3. Return the new URI that the FEATURE_MODEL_GENERATOR will use
     return engineered_path
+
+def mock_signal_generation_tool(feature_data_pointer: str) -> str:
+    """Mocks SIGNAL: Reads FEATURE URI, determines signal, and returns the full JSON string."""
+    # Since the Signal Agent is a generator, we assume the tool returns the final JSON string.
+    # To satisfy the SignalDataModel, the tool returns the data that the LLM will serialize.
+    return '{"signal": "Buy", "reason": "Mocked: High COT Z-Score indicates strong bullish conviction."}'
 
 
 

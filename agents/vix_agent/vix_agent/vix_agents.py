@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field
 from google.adk.agents import LlmAgent
 from vix_agent.tools import cot_data_tool, vix_data_tool, mock_ingestion_tool,\
-                            mock_feature_engineering_tool
+                            mock_feature_engineering_tool, \
+                            mock_signal_generation_tool
 from vix_agent.models import RawDataModel, FeatureDataModel, SignalDataModel, DataPointerModel
 from vix_agent.tools import cot_data_tool, vix_data_tool
 
@@ -63,20 +64,32 @@ FEATURE_MODEL_GENERATOR = LlmAgent(
 )
 # --- STAGE 3: SIGNAL GENERATION (This agent was already correct) ---
 
-SIGNAL_AGENT = LlmAgent(
-    name="SignalGenerationAgent",
-    model='gemini-2.5-flash',
-    instruction=f"""
-    Retrieve the 'feature_data_pointer' from the shared Context.
-    Use this pointer to determine a final 'Buy', 'Sell', or 'Neutral' signal.
-    **Return the final SignalDataModel as the output.**
-    """,
-    # NOTE: If this agent calls a tool (like a mock signal generation tool), you must 
-    # split it into a CALLER and GENERATOR pair, similar to the above.
-    # We will assume for now it only generates the schema based on context.
-    tools=[],
-    output_schema=SignalDataModel,
-    output_key='final_output' # <-- CRUCIAL: Saves the final result
+SIGNAL_TOOL_CALLER = LlmAgent(
+    name="SignalToolCallerAgent",
+    description="Calls the signal generation tool with the feature data URI and saves the raw signal output.",
+    tools=[mock_signal_generation_tool], # Must include the tool!
+    # No output_schema is set here to satisfy the framework's rule
+    # The agent will use its prompt to guide it to call the tool and save the output.
+    system_instruction="""
+    You are a data processing assistant. Your current task is to call the `mock_signal_generation_tool`.
+    The input for the tool is available in the session state key 'feature_data_pointer'. 
+    Pass the URI from that pointer to the tool. 
+    Store the tool's raw string output in the session state key 'raw_signal_json'.
+    """
 )
 
-# --- THE FINAL PIPELINE DEFINITION (You must use this in your Run
+
+# Rename the old SIGNAL_AGENT to reflect its new role
+SIGNAL_MODEL_GENERATOR = LlmAgent(
+    name="SignalGenerationAgent",
+    description="Generates the final structured trading signal based on the raw signal JSON.",
+    output_schema=SignalDataModel, # Output schema is set here.
+    output_key="final_output",     # Key for saving the Pydantic object to session state
+    # NO tools are included here to avoid the Pydantic error.
+    system_instruction="""
+    Your task is to generate the final output object that strictly adheres to the SignalDataModel.
+    The raw data needed for this model is available in the session state key 'raw_signal_json'.
+    Use that raw JSON string to populate the SignalDataModel fields.
+    """
+)
+

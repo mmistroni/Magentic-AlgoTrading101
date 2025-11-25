@@ -1,7 +1,7 @@
 from google.adk.agents import LlmAgent, SequentialAgent 
 from vix_agent.vix_agents import INGESTION_TOOL_CALLER, INGESTION_MODEL_GENERATOR, \
                                 FEATURE_TOOL_CALLER,  FEATURE_MODEL_GENERATOR, \
-                                SIGNAL_AGENT
+                                SIGNAL_TOOL_CALLER, SIGNAL_MODEL_GENERATOR
 
 
 COT_WORKFLOW_PIPELINE = SequentialAgent(
@@ -11,7 +11,9 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         INGESTION_MODEL_GENERATOR,
         FEATURE_TOOL_CALLER,
         FEATURE_MODEL_GENERATOR,
-        SIGNAL_AGENT # Assuming this is the final structured output
+        SIGNAL_TOOL_CALLER,
+        SIGNAL_MODEL_GENERATOR
+          # Assuming this is the final structured output
     ]
 )
 
