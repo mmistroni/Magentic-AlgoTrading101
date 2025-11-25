@@ -7,6 +7,8 @@ import os
 import time
 import csv
 from .models import SignalDataModel
+from typing import List, Dict, Any
+from google.adk.tools import FunctionTool
 
 def cot_data_tool(market: str) -> Dict[str, Any]:
     """
@@ -46,27 +48,6 @@ def vix_data_tool() -> Dict[str, Any]:
     return {
         "vix_level": vix_level
     }
-
-# --- MOCK TOOL DEFINITIONS ---
-
-def mock_ingestion_tool() -> str:
-    """Creates the RAW data file."""
-    file_path = "./temp_data/raw_data_test.csv"
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    
-    # Create RAW data with 3 lines
-    raw_data = [
-        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
-        ['2025-11-20', '10.5', '90.0'],
-        ['2025-11-21', '11.2', '85.5'],
-        ['2025-11-22', '12.0', '78.0']
-    ]
-    with open(file_path, 'w', newline='') as f: 
-        writer = csv.writer(f)
-        writer.writerows(raw_data)
-        
-    print(f"[INGESTION Agent Tool called. RAW data created at: {file_path}")
-    return file_path
 
 def feature_engineering_tool(raw_data_uri: str) -> str:
     """Reads the RAW file, adds features, and writes the ENGINEERED file."""
@@ -162,6 +143,29 @@ def signal_generation_tool(engineered_data_uri: str) -> SignalDataModel:
 # Assuming DataPointerModel is the type hint for the input parameter,
 # though the LlmAgent passes the content of the DataPointerModel's 'uri' field.
 
+# --- MOCK TOOL DEFINITIONS ---
+
+def mock_ingestion_tool() -> str:
+    """Creates the RAW data file."""
+    file_path = "./temp_data/raw_data_test.csv"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    # Create RAW data with 3 lines
+    raw_data = [
+        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
+        ['2025-11-20', '10.5', '90.0'],
+        ['2025-11-21', '11.2', '85.5'],
+        ['2025-11-22', '12.0', '78.0']
+    ]
+    with open(file_path, 'w', newline='') as f: 
+        writer = csv.writer(f)
+        writer.writerows(raw_data)
+        
+    print(f"[INGESTION Agent Tool called. RAW data created at: {file_path}")
+    return file_path
+
+
+
 def mock_feature_engineering_tool(raw_data_pointer_uri: str) -> str:
     """
     Mocks the Feature Engineering process.
@@ -202,3 +206,10 @@ def mock_feature_engineering_tool(raw_data_pointer_uri: str) -> str:
         
     # 3. Return the new URI that the FEATURE_MODEL_GENERATOR will use
     return engineered_path
+
+
+
+REAL_INGESTION_TOOL = FunctionTool(vix_data_tool)
+MOCK_INGESTION_TOOL = FunctionTool(mock_ingestion_tool)
+REAL_FEATURE_TOOL = FunctionTool(feature_engineering_tool)
+MOCK_FEATURE_TOOL = FunctionTool(mock_feature_engineering_tool)
