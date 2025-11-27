@@ -15,7 +15,9 @@ INGESTION_TOOL_CALLER = LlmAgent(
     Use the `mock_ingestion_tool` to fetch the latest data and **return the storage URI as a plain text string**.
     The output string will be automatically saved to the shared context under the key 'ingestion_raw_output'.
     """,
-    tools=[mock_ingestion_tool],
+    tools=[
+        #mock_ingestion_tool
+        ],
     # output_schema=DataPointerModel # <-- REMOVED: Cannot have tools + schema
 )
 
@@ -45,7 +47,9 @@ FEATURE_TOOL_CALLER = LlmAgent(
     The output string will be automatically saved to the shared context under the key 'feature_tool_raw_output'.
     """,
     # FIX 1: MUST include the tool in the tools list for it to be callable
-    tools=[mock_feature_engineering_tool], 
+    tools=[
+        #mock_feature_engineering_tool
+        ], 
     output_key='feature_tool_raw_output' # This key holds the URI string
 )
 
@@ -64,13 +68,15 @@ FEATURE_MODEL_GENERATOR = LlmAgent(
 )
 # --- STAGE 3: SIGNAL GENERATION (This agent was already correct) ---
 
+# Rename the old SIGNAL_AGENT to reflect its new role
+
 SIGNAL_TOOL_CALLER = LlmAgent(
     name="SignalToolCallerAgent",
     description="Calls the signal generation tool with the feature data URI and saves the raw signal output.",
-    tools=[mock_signal_generation_tool], # Must include the tool!
+    tools=[], # <-- FIX: Must be an empty list for Dependency Injection
     # No output_schema is set here to satisfy the framework's rule
     # The agent will use its prompt to guide it to call the tool and save the output.
-    system_instruction="""
+    instruction="""
     You are a data processing assistant. Your current task is to call the `mock_signal_generation_tool`.
     The input for the tool is available in the session state key 'feature_data_pointer'. 
     Pass the URI from that pointer to the tool. 
@@ -78,18 +84,15 @@ SIGNAL_TOOL_CALLER = LlmAgent(
     """
 )
 
-
-# Rename the old SIGNAL_AGENT to reflect its new role
 SIGNAL_MODEL_GENERATOR = LlmAgent(
     name="SignalGenerationAgent",
     description="Generates the final structured trading signal based on the raw signal JSON.",
-    output_schema=SignalDataModel, # Output schema is set here.
-    output_key="final_output",     # Key for saving the Pydantic object to session state
-    # NO tools are included here to avoid the Pydantic error.
-    system_instruction="""
+    output_schema=SignalDataModel, 
+    output_key="final_output",     
+    tools=[], 
+    instruction="""
     Your task is to generate the final output object that strictly adheres to the SignalDataModel.
     The raw data needed for this model is available in the session state key 'raw_signal_json'.
     Use that raw JSON string to populate the SignalDataModel fields.
     """
 )
-
