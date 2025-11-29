@@ -8,15 +8,15 @@ import csv
 from .models import SignalDataModel
 from typing import List, Dict, Any
 from google.adk.tools import FunctionTool
-
-# --------------------------------------------------------------------------
-# --- Core Pipeline Tool Definitions (Used by LlmAgents) ---
-# --------------------------------------------------------------------------
+from google.adk.tools import ToolContext 
+import os
+import csv
+from typing import List, Dict, Union, Any
 
 def ingestion_tool(market: str) -> str:
     """
-    TOOL: Creates the RAW data file at a specific URI.
-    The LlmAgent expects this function to return the URI string for the next stage.
+    TOOL: Creates the RAW data file at a specific URI and returns the URI string.
+    This relies on the LlmAgent's output_key to save the result to state.
     """
     file_path = "./temp_data/raw_data_test.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -26,13 +26,15 @@ def ingestion_tool(market: str) -> str:
         ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
         ['2025-11-20', '10.5', '90.0'],
         ['2025-11-21', '11.2', '85.5'],
-        ['2025-11-22', '12.0', '78.0'] # Last row is used for feature calculation
+        ['2025-11-22', '12.0', '78.0']
     ]
     with open(file_path, 'w', newline='') as f: 
         writer = csv.writer(f)
         writer.writerows(raw_data)
         
     print(f"[INGESTION Tool] RAW data created at: {file_path}")
+    
+    # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
 
 

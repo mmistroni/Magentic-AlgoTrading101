@@ -3,6 +3,7 @@ from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.tools import FunctionTool
 # Assuming these imports contain the actual tool logic for the pipeline
 from vix_agent.tools import (
+    ingestion_tool,
     vix_data_tool, # Used for Ingestion (if COT data is not used)
     feature_engineering_tool, 
     signal_generation_tool
@@ -15,33 +16,54 @@ FEATURE_FT = FunctionTool(feature_engineering_tool)
 SIGNAL_FT = FunctionTool(signal_generation_tool)
 
 # --- STAGE 1: DATA INGESTION ---
+# --- STAGE 1: DATA INGESTION ---
 
+# 1. INGESTION_TOOL_CALLER
+# Instruction focuses on calling the tool, which now handles state saving internally 
+# to a separate key ('ingestion_file_uri') via ToolContext. The output_key is removed 
+# as the tool's return value (an acknowledgement) is now irrelevant.
+
+INGESTION_FT = FunctionTool(ingestion_tool) 
+# Assuming DataPointerModel is imported:
+# from vix_agent.models import DataPointerModel 
+
+# --- STAGE 1: DATA INGESTION ---
+
+### 1. The Tool Caller Agent (LlmAgent)
+
+# This agent calls the tool and relies on its 'output_key' to save the URI.
 INGESTION_TOOL_CALLER = LlmAgent(
     name="IngestionToolCaller",
     model='gemini-2.5-flash',
     instruction=f"""
-    Use the `vix_data_tool` to fetch the latest data and **return the storage URI as a plain text string**.
-    The output string will be automatically saved to the shared context under the key 'ingestion_raw_output'.
+    Use the `ingestion_tool` to fetch the latest data for the requested market. The tool returns the storage URI string.
+    **CRITICAL:** Your final text output must be **ONLY** the URI string returned by the tool.
+    This string will be saved automatically to the shared context using the output key.
     """,
-    # 💥 FIX 1: Use the REAL tool FunctionTool wrapper here
-    tools=[INGESTION_FT],
-    # output_schema is not allowed with tools
+    # Pass the FunctionTool wrapper
+    tools=[INGESTION_FT], 
+    # 💥 FIX: The tool's return value (the URI) is captured and saved to this key.
+    output_key='ingestion_raw_output' 
 )
 
+### 2. The Model Generator Agent (LlmAgent)
+
+# This agent reads the URI from the key set by the first agent and wraps it in Pydantic JSON.
 INGESTION_MODEL_GENERATOR = LlmAgent(
-    # ... (Model Generator remains the same) ...
     name="IngestionModelGenerator",
     model='gemini-2.5-flash',
     instruction=f"""
-    Retrieve the raw URI string from the shared context key 'ingestion_raw_output'.
-    Convert this string into a valid JSON object matching the {DataPointerModel.__name__} schema.
+    Retrieve the raw URI string from the shared context key **'ingestion_raw_output'**. 
+    Convert this string into a valid JSON object matching the DataPointerModel schema.
     The URI should be mapped to the 'uri' field.
-    **The final JSON output must be returned to be saved as the DataPointerModel.**
+    The final JSON output must be returned to be saved as the DataPointerModel under 
+    the key 'raw_data_pointer'.
     """,
     tools=[], 
     output_schema=DataPointerModel,
     output_key='raw_data_pointer'
 )
+
 
 # --- STAGE 2: FEATURE ENGINEERING ---
 
@@ -113,9 +135,9 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
     sub_agents=[
         INGESTION_TOOL_CALLER,
         INGESTION_MODEL_GENERATOR,
-        FEATURE_TOOL_CALLER,
-        FEATURE_MODEL_GENERATOR,
-        SIGNAL_TOOL_CALLER,
-        SIGNAL_MODEL_GENERATOR
+        #FEATURE_TOOL_CALLER,
+        #FEATURE_MODEL_GENERATOR,
+        #SIGNAL_TOOL_CALLER,
+        #SIGNAL_MODEL_GENERATOR
     ]
 )
