@@ -122,8 +122,11 @@ curl -X POST "$APP_URL/run_sse" \
 - capital_agent     Done
 - multi_agent       done
 
+
+
 # Next steps
 - another multiagent implementation 
+- - https://github.com/google/adk-python/tree/main/contributing/samples/human_in_loop
 - implement multi agent using langchain/langgraph
 - simple agent runnign on aws
 - continue vix agent / price analysis agent
