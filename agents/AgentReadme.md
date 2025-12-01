@@ -120,4 +120,10 @@ curl -X POST "$APP_URL/run_sse" \
 ### Agents moved to cloud run
 - agent_team        DONE
 - capital_agent     Done
-- multi_agent       TODO
+- multi_agent       done
+
+# Next steps
+- another multiagent implementation 
+- implement multi agent using langchain/langgraph
+- simple agent runnign on aws
+- continue vix agent / price analysis agent
