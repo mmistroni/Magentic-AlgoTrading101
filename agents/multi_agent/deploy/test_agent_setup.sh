@@ -24,7 +24,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "new_message": {
         "role": "user",
         "parts": [{
-        "text": "What is the capital of Canada?"
+        "text": "Please suggest me places to visit in paris in july for a honeymoon and book flight from london and a 5 night stay at a 4 star hotel"
         }]
     },
     "streaming": false

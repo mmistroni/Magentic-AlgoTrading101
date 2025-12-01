@@ -8,11 +8,11 @@ import httpx
 import sys # ⬅️ ADDED: sys module for version check
 
 # --- Configuration (Dynamic) ---
-APP_URL = "https://agent-team-service-682143946483.us-central1.run.app"
+APP_URL = "https://multi-agent-service-682143946483.us-central1.run.app"
 USER_ID = "user_123"
 # Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
-APP_NAME = "agent_team"
+APP_NAME = "multi_agent"
 
 # --- Authentication Function (ASYNC) ---
 
