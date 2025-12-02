@@ -73,10 +73,10 @@ FEATURE_TOOL_CALLER = LlmAgent(
     instruction=f"""
     Retrieve the JSON content from the shared context key **'raw_data_pointer'**.
     
-    **CRITICAL:** Extract the **'uri'** field from that JSON object. 
-    Call the **`feature_engineering_tool`** passing **ONLY** the extracted URI string to the `raw_data_uri` argument.
+    Extract the **'uri'** field from that JSON object. 
+    Call the **`feature_engineering_tool`** passing ONLY the extracted URI string to the `raw_data_uri` argument.
     
-    Return the resulting feature data URI (a plain text string) as your final output.
+    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL. DO NOT ADD ANY DESCRIPTIVE TEXT, PREFIXES, OR ADDITIONAL PHRASES.**
     """,
     tools=[FEATURE_FT], 
     output_key='feature_tool_raw_output'
@@ -136,7 +136,7 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         INGESTION_TOOL_CALLER,
         INGESTION_MODEL_GENERATOR,
         FEATURE_TOOL_CALLER,
-        #FEATURE_MODEL_GENERATOR,
+        FEATURE_MODEL_GENERATOR,
         #SIGNAL_TOOL_CALLER,
         #SIGNAL_MODEL_GENERATOR
     ]

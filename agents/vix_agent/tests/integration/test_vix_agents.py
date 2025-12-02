@@ -140,3 +140,25 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     assert feature_uri_string_output == expected_feature_uri
     print("✅ CHECK 4: Ingestion Tool's URI output was successfully saved to context.")
     
+
+    #### FEATURE MODEL
+    # =========================================================================
+    # 7. ASSERT: Feature Pydantic Model Generation
+    # =========================================================================
+
+    # Check 5: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
+    feature_pointer_data = final_state.get('feature_data_pointer')
+    print(f"DEBUG 5: 'feature_data_pointer' context key value (Pydantic dict): {feature_pointer_data}")
+    
+    # Check 6: Pydantic Validation 
+    assert feature_pointer_data is not None
+    
+    try:
+        feature_pointer = DataPointerModel(**feature_pointer_data)
+    except Exception as e:
+        pytest.fail(f"FeatureDataPointer validation failed: {e}")
+        
+    assert feature_pointer.uri == expected_feature_uri
+    # Assuming DataPointerModel now includes 'market'
+    assert feature_pointer.market == "Gold Futures"
+    print("✅ CHECK 6: Final Feature Pydantic DataPointerModel validated.")    

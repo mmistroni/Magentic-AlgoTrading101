@@ -67,7 +67,7 @@ def feature_engineering_tool(raw_data_uri: str) -> str:
                 
     except FileNotFoundError:
         print(f"Error: Input file not found at {input_path}")
-        return ""
+        raise Exception(f"Error: Input file not found at {input_path}")
 
     # 3. WRITE OUTPUT FILE
     with open(engineered_path, 'w', newline='') as outfile:
