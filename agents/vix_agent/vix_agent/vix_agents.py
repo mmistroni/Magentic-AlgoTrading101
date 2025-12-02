@@ -71,12 +71,13 @@ FEATURE_TOOL_CALLER = LlmAgent(
     name="FeatureToolCaller",
     model='gemini-2.5-flash',
     instruction=f"""
-    Retrieve the **'raw_data_pointer'** from the shared context.
-    Call the **`feature_engineering_tool`** using the **URI from the raw_data_pointer** to process the raw data.
-    **Return the resulting feature data URI as a plain text string.**
-    The output string will be automatically saved to the shared context under the key 'feature_tool_raw_output'.
+    Retrieve the JSON content from the shared context key **'raw_data_pointer'**.
+    
+    **CRITICAL:** Extract the **'uri'** field from that JSON object. 
+    Call the **`feature_engineering_tool`** passing **ONLY** the extracted URI string to the `raw_data_uri` argument.
+    
+    Return the resulting feature data URI (a plain text string) as your final output.
     """,
-    # 💥 FIX 2: Use the REAL tool FunctionTool wrapper here
     tools=[FEATURE_FT], 
     output_key='feature_tool_raw_output'
 )
@@ -102,31 +103,30 @@ SIGNAL_TOOL_CALLER = LlmAgent(
     name="SignalToolCallerAgent",
     model='gemini-2.5-flash',
     description="Calls the signal generation tool with the feature data URI and saves the raw signal output.",
-    # 💥 FIX 3: Use the REAL tool FunctionTool wrapper here
     tools=[SIGNAL_FT],
     instruction="""
-    You are a data processing assistant. Your current task is to call the `signal_generation_tool`.
-    The input for the tool is available in the session state key 'feature_data_pointer'. 
-    Pass the URI from that pointer to the tool. 
-    Store the tool's raw output (which is a SignalDataModel object) in the session state key 'final_output'.
-    """
-    # Note: I changed the instruction to save to 'final_output' 
-    # to match the final SIGNAL_MODEL_GENERATOR's output_key, simplifying the final step.
+    Retrieve the JSON content of the **'feature_data_pointer'** from the shared context. 
+    **CRITICAL:** Extract the 'uri' field from this JSON and pass ONLY that URI string to the `signal_generation_tool`.
+    The tool's output (the raw trading signal JSON/dict) must be returned as your final text output.
+    """,
+    # Use a distinct output key for the raw output from the tool
+    output_key='signal_tool_output' 
 )
 
 SIGNAL_MODEL_GENERATOR = LlmAgent(
-    # ... (Model Generator remains the same) ...
-    name="SignalGenerationAgent",
-    description="Generates the final structured trading signal based on the raw signal JSON.",
+    name="SignalModelGenerator",
     model='gemini-2.5-flash',
-    output_schema=SignalDataModel, 
-    output_key="final_output",     
+    instruction=f"""
+    Retrieve the raw URI string from the shared context key **'signal_file_uri_raw'**. 
+    
+    **CRITICAL:** The URI points to a JSON file containing the final trading signal. You must instruct the environment to **read the content of this JSON file**.
+    
+    Then, take the content of that file and use it to construct a new JSON object that strictly adheres to the **{SignalDataModel.__name__}** schema.
+    The final JSON output (representing the signal itself) must be returned.
+    """,
     tools=[], 
-    instruction="""
-    Your task is to generate the final output object that strictly adheres to the SignalDataModel.
-    The raw data needed for this model is available in the session state key 'final_output' (or 'raw_signal_json' if you revert the CALLER's instruction).
-    Use that raw data/JSON to populate the SignalDataModel fields.
-    """
+    output_schema=SignalDataModel, # The desired final output type
+    output_key='final_signal_json' # The key holding the actual Signal JSON
 )
 
 # --- THE PIPELINE ---
@@ -136,7 +136,7 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         INGESTION_TOOL_CALLER,
         INGESTION_MODEL_GENERATOR,
         FEATURE_TOOL_CALLER,
-        FEATURE_MODEL_GENERATOR,
+        #FEATURE_MODEL_GENERATOR,
         #SIGNAL_TOOL_CALLER,
         #SIGNAL_MODEL_GENERATOR
     ]

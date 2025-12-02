@@ -77,18 +77,34 @@ def feature_engineering_tool(raw_data_uri: str) -> str:
     print(f"[FEATURE_AGENT Tool] ENGINEERED data created at: {engineered_path}")
     return engineered_path
 
-
-def signal_generation_tool(engineered_data_uri: str) -> str:
+def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     """
     Reads the engineered data file URI, applies trading logic,
-    and returns the structured SignalDataModel as a **JSON string**.
+    writes the structured SignalDataModel as a **JSON string** to a file,
+    and returns the **URI of the signal file**.
     """
     
     input_path = engineered_data_uri
+    # Use the market name in the output file path for better organization/debugging
+    signal_path = f"./temp_data/signal_output_{market.replace(' ', '_').lower()}.json" 
+    os.makedirs(os.path.dirname(signal_path), exist_ok=True)
     latest_features = {}
     
+    # --- Helper function to save signal on error ---
+    def save_error_signal(signal: str, confidence: float, justification: str) -> str:
+        """Saves a default or error signal and returns the path."""
+        model_output = SignalDataModel(
+            market=market,
+            signal=signal,
+            confidence=confidence,
+            justification=justification
+        )
+        with open(signal_path, 'w') as f:
+            f.write(model_output.model_dump_json(indent=2))
+        return signal_path
+
+    # --- 1. READ ENGINEERED DATA ---
     try:
-        # 1. READ ENGINEERED DATA
         with open(input_path, 'r', newline='') as infile:
             reader = csv.reader(infile)
             header = next(reader)
@@ -96,44 +112,64 @@ def signal_generation_tool(engineered_data_uri: str) -> str:
             # Read the last row (latest data point)
             data_rows = list(reader)
             if not data_rows:
-                # Returns a default model as JSON string
-                model_output = SignalDataModel(signal="Neutral", reason="No engineered data found in file.")
-                return model_output.model_dump_json()
+                print(f"[SIGNAL_AGENT Tool] No data in engineered file: {input_path}")
+                return save_error_signal("Neutral", 0.0, "No engineered data found in file to generate a signal.")
                 
             latest_row = data_rows[-1]
             
-            # Map the latest features to their names (assuming header structure)
+            # Map the latest features (assuming header structure: [0]TS, [1]COT, [2]VIX, [3]COT_Z, [4]VIX_P)
             latest_features = {
                 'COT_Z_Score': float(latest_row[3]), 
                 'VIX_Percentile': float(latest_row[4]) 
             }
             
     except FileNotFoundError:
-        model_output = SignalDataModel(signal="Neutral", reason=f"Engineered data file not found at {input_path}.")
-        return model_output.model_dump_json()
+        print(f"[SIGNAL_AGENT Tool] File not found: {input_path}")
+        return save_error_signal("Neutral", 0.0, f"Engineered data file not found at {input_path}.")
     except Exception as e:
-        model_output = SignalDataModel(signal="Neutral", reason=f"Error reading/parsing data: {e}.")
-        return model_output.model_dump_json()
+        print(f"[SIGNAL_AGENT Tool] Error reading data: {e}")
+        return save_error_signal("Neutral", 0.0, f"Error reading/parsing data: {e}.")
 
-    # 2. APPLY TRADING LOGIC
+    # --- 2. APPLY TRADING LOGIC ---
     cot_z = latest_features.get('COT_Z_Score', 0.0)
     vix_p = latest_features.get('VIX_Percentile', 0.0)
+    
+    # Default values
+    signal = "Neutral"
+    justification = f"Metrics are within normal bounds. COT Z-Score: {cot_z:.2f}, VIX Percentile: {vix_p:.2f}."
+    confidence_score = 0.4 
 
-    # Logic: Mean-Reversion Strategy (Note: This matches the expected "Neutral" in the test)
+    # Logic: Mean-Reversion Strategy
     if cot_z < -1.5 and vix_p > 90.0:
+        # Extreme short positioning (COT) combined with high volatility (VIX) is typically bullish
         signal = "Buy"
-        reason = f"COT Z-Score ({cot_z:.2f}) indicates extreme bearish sentiment, combined with high VIX ({vix_p:.2f})."
+        justification = f"COT Z-Score ({cot_z:.2f}) indicates extreme bearish sentiment, combined with high VIX ({vix_p:.2f}). Strong evidence for a mean-reversion BUY signal."
+        confidence_score = 0.85
     elif cot_z > 1.5 and vix_p < 10.0:
+        # Extreme long positioning (COT) combined with low volatility (VIX) is typically bearish
         signal = "Sell"
-        reason = f"COT Z-Score ({cot_z:.2f}) indicates extreme bullish sentiment, combined with low VIX ({vix_p:.2f})."
-    else:
-        signal = "Neutral"
-        reason = f"Metrics are within normal bounds. COT Z-Score: {cot_z:.2f}, VIX Percentile: {vix_p:.2f}."
-
-    # 3. RETURN STRUCTURED OUTPUT AS JSON STRING
+        justification = f"COT Z-Score ({cot_z:.2f}) indicates extreme bullish sentiment, combined with low VIX ({vix_p:.2f}). Strong evidence for a mean-reversion SELL signal."
+        confidence_score = 0.75
+    
+    # --- 3. WRITE STRUCTURED OUTPUT TO FILE ---
     print(f"[SIGNAL_AGENT Tool] Signal generated: {signal}")
-    model_output = SignalDataModel(signal=signal, reason=reason)
-    return model_output.model_dump_json() # 💥 CRITICAL: Return JSON string for LLM
+    model_output = SignalDataModel(
+        market=market, # Now populated from the input argument
+        signal=signal, 
+        confidence=confidence_score, # Now populated
+        justification=justification # Corrected field name
+    )
+    
+    with open(signal_path, 'w') as outfile:
+        # Write the JSON representation of the Pydantic model to the file
+        outfile.write(model_output.model_dump_json(indent=2)) 
+        
+    print(f"[SIGNAL_AGENT Tool] Signal JSON created at: {signal_path}")
+    
+    # --- 4. RETURN THE URI ---
+    return signal_path
+
+
 
 # --------------------------------------------------------------------------
 # --- Deprecated/Auxiliary Tools (Kept for completeness but not in pipeline) ---
