@@ -123,3 +123,40 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     raw_pointer = DataPointerModel(**raw_pointer_data)
     assert raw_pointer.uri == expected_raw_uri
     print("✅ CHECK 3: Final Pydantic DataPointerModel has the correct URI.")
+
+
+    #######  Checking Feature Agent#############
+    expected_feature_uri = "./temp_data/engineered_data.csv"
+    
+    # =========================================================================
+    # 6. ASSERT: Tool Output Verification
+    # =========================================================================
+
+    # Check 1: Tool Caller Output. The URI is saved to 'ingestion_raw_output' via the agent's output_key.
+    feature_uri_string_output = final_state.get('feature_tool_raw_output')
+    print(f"DEBUG 4: 'feature _output' context key value (URI string): '{feature_uri_string_output}'")
+    
+    # This assertion verifies the LlmAgent successfully captured the tool's return value (the URI).
+    assert feature_uri_string_output == expected_feature_uri
+    print("✅ CHECK 4: Ingestion Tool's URI output was successfully saved to context.")
+    
+    
+    # =========================================================================
+    # 7. ASSERT: Pydantic Model Generation
+    # =========================================================================
+
+    # Check 2: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
+    feature_pointer_data = final_state.get('feature_data_pointer')
+    print(f"DEBUG 5: 'feature_data_pointer' context key value (Pydantic dict): {feature_pointer_data}")
+    
+    # Check 3: Pydantic Validation 
+    assert feature_pointer_data is not None
+    feature_pointer = DataPointerModel(**feature_pointer_data)
+    assert feature_pointer.uri == expected_feature_uri
+    print("✅ CHECK 6: Final Pydantic DataPointerModel has the correct URI.")
+
+
+
+
+
+    
