@@ -161,4 +161,26 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     assert feature_pointer.uri == expected_feature_uri
     # Assuming DataPointerModel now includes 'market'
     assert feature_pointer.market == "Gold Futures"
-    print("✅ CHECK 6: Final Feature Pydantic DataPointerModel validated.")    
+    print("✅ CHECK 6: Final Feature Pydantic DataPointerModel validated.")
+
+
+
+    ### SIGNAL TOOL
+    # #######  Checking Feature Agent#############
+    market = "Gold Futures"
+    expected_signal_uri = f"./temp_data/signal_output_{market.replace(' ', '_').lower()}.json" 
+    
+    # =========================================================================
+    # 8. ASSERT: Tool Output Verification
+    # =========================================================================
+
+    # Check 1: Tool Caller Output. The URI is saved to 'ingestion_raw_output' via the agent's output_key.
+    signal_uri_string_output = final_state.get('signal_file_uri_raw')
+    print(f"DEBUG 4: 'signal _output' context key value (URI string): '{signal_uri_string_output}'")
+    
+    # This assertion verifies the LlmAgent successfully captured the tool's return value (the URI).
+    print(f'signal outp ut is :{signal_uri_string_output} vs expected {expected_signal_uri}')
+    assert signal_uri_string_output == expected_signal_uri
+    #print("✅ CHECK 4: Ingestion Tool's URI output was successfully saved to context.")
+    
+    

@@ -106,11 +106,13 @@ SIGNAL_TOOL_CALLER = LlmAgent(
     tools=[SIGNAL_FT],
     instruction="""
     Retrieve the JSON content of the **'feature_data_pointer'** from the shared context. 
-    **CRITICAL:** Extract the 'uri' field from this JSON and pass ONLY that URI string to the `signal_generation_tool`.
-    The tool's output (the raw trading signal JSON/dict) must be returned as your final text output.
+    
+    Extract the 'uri' and 'market' fields from this JSON. 
+    Call the `signal_generation_tool` using the extracted URI and market name.
+    
+    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL. DO NOT ADD ANY DESCRIPTIVE TEXT, PREFIXES, OR JSON WRAPPERS LIKE {"tool_response": ...}. JUST RETURN THE STRING.**
     """,
-    # Use a distinct output key for the raw output from the tool
-    output_key='signal_tool_output' 
+    output_key='signal_file_uri_raw' # Key used to save the raw string
 )
 
 SIGNAL_MODEL_GENERATOR = LlmAgent(
@@ -137,7 +139,7 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         INGESTION_MODEL_GENERATOR,
         FEATURE_TOOL_CALLER,
         FEATURE_MODEL_GENERATOR,
-        #SIGNAL_TOOL_CALLER,
+        SIGNAL_TOOL_CALLER,
         #SIGNAL_MODEL_GENERATOR
     ]
 )
