@@ -6,9 +6,10 @@ import time
 # --- Pydantic Data Models (Communication Protocol) ---
 # Pydantic models enforce the structure of data passed between agents.
 class DataPointerModel(BaseModel):
-    """A model to pass the location of large data files between agents."""
-    uri: str = Field(description="The storage URI (e.g., GCS path or local file path) for the data.")
-
+    """Pointer to a data file, storing its location and context."""
+    uri: str = Field(description="The file URI (local path or cloud storage) of the data.")
+    market: str = Field(description="The market this data pertains to (e.g., 'Gold Futures').")
+    
 class CftcFutureModel(BaseModel):
     """Model representing a CFTC future search result."""
     future_name: str = Field(alias='name', description="Name of the future contract.")
