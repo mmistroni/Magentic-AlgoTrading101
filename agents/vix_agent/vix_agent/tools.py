@@ -116,7 +116,7 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
                 return save_error_signal("Neutral", 0.0, "No engineered data found in file to generate a signal.")
                 
             latest_row = data_rows[-1]
-            
+            print(f"[SIGNAL AGENT]Latest Row:{latest_row}")
             # Map the latest features (assuming header structure: [0]TS, [1]COT, [2]VIX, [3]COT_Z, [4]VIX_P)
             latest_features = {
                 'COT_Z_Score': float(latest_row[3]), 
@@ -160,9 +160,11 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
         justification=justification # Corrected field name
     )
     
+    json_generated = model_output.model_dump_json(indent=2)
+    print(f"[SIGNAL_AGENT_TOOL] json generated:{json_generated}")
     with open(signal_path, 'w') as outfile:
         # Write the JSON representation of the Pydantic model to the file
-        outfile.write(model_output.model_dump_json(indent=2)) 
+        outfile.write(json_generated) 
         
     print(f"[SIGNAL_AGENT Tool] Signal JSON created at: {signal_path}")
     

@@ -161,7 +161,7 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     assert feature_pointer.uri == expected_feature_uri
     # Assuming DataPointerModel now includes 'market'
     assert feature_pointer.market == "Gold Futures"
-    print("✅ CHECK 4: Final Feature Pydantic DataPointerModel validated.")
+    print(f"✅ CHECK 4: Final Feature Pydantic DataPointerModel validated for \n{feature_pointer_data}")
 
 
 
@@ -182,7 +182,31 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     print(f'signal outp ut is :{signal_uri_string_output} vs expected {expected_signal_uri}')
     assert signal_uri_string_output == expected_signal_uri
     print("✅ CHECK 5: Signal Tool's URI output was successfully saved to context.")
+
+    # SIGNAL MODEL TEST
+    #### FEATURE MODEL
+    # =========================================================================
+    # 7. ASSERT: Feature Pydantic Model Generation
+    # =========================================================================
+
+    # Check 5: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
+    signal_model_data = final_state.get('final_signal_json')
+    print(f"DEBUG 6: 'final_signal_json' context key value (Pydantic dict): {signal_model_data}")
     
+    # Check 6: Pydantic Validation 
+    assert signal_model_data is not None
+
+    try:
+        signal_model = SignalDataModel(**signal_model_data)
+    except Exception as e:
+        pytest.fail(f"SignalDataModel validation failed: {e}")
+        
+    assert signal_model.market == market
+    # Assuming DataPointerModel now includes 'market'
+    assert signal_model.signal == "Neutral"
+    assert signal_model.confidence == 0.4
+    print("✅ CHECK 6: Final SignalDataModelel validated.")
 
 
 
+    
