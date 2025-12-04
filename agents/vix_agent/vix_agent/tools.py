@@ -88,6 +88,8 @@ def ingestion_tool(market: str) -> str:
 
     raw_data = _get_raw_data(market)
 
+    print(f"[INGESTION Tool] RAW data created is: {raw_data}")
+    
     raw_data.to_csv(file_path, header=True)
 
     print(f"[INGESTION Tool] RAW data created at: {file_path}")
@@ -148,23 +150,24 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
 
     # --- 1. READ ENGINEERED DATA ---
     try:
-        with open(input_path, 'r', newline='') as infile:
-            reader = csv.reader(infile)
-            header = next(reader)
-            
-            # Read the last row (latest data point)
-            data_rows = list(reader)
-            if not data_rows:
-                print(f"[SIGNAL_AGENT Tool] No data in engineered file: {input_path}")
-                return save_error_signal("Neutral", 0.0, "No engineered data found in file to generate a signal.")
-                
-            latest_row = data_rows[-1]
-            print(f"[SIGNAL AGENT]Latest Row:{latest_row}")
-            # Map the latest features (assuming header structure: [0]TS, [1]COT, [2]VIX, [3]COT_Z, [4]VIX_P)
-            latest_features = {
-                'COT_Z_Score': float(latest_row[3]), 
-                'VIX_Percentile': float(latest_row[4]) 
-            }
+        df = pd.read_csv(input_path, index_col=0, parse_dates=True)
+        print(f"[SIGNAL_AGENT Tool] DF from file: {df}")
+        # 2. CHECK FOR EMPTY DATA
+        if df.empty:
+            print(f"[SIGNAL_AGENT Tool] No data in engineered file: {input_path}")
+            return save_error_signal("Neutral", 0.0, "No engineered data found in file to generate a signal.")
+
+        # 3. GET LATEST ROW
+        # .iloc[-1] always retrieves the last row of the DataFrame
+        latest_row = df.iloc[-1]
+        
+        # 4. EXTRACT REQUIRED FEATURES
+        cot_z_score = latest_row['COT_Z_Score']
+        vix_percentile = latest_row['VIX_Percentile']
+        latest_features = {
+            'COT_Z_Score': float(cot_z_score), 
+            'VIX_Percentile': float(vix_percentile) 
+        }
             
     except FileNotFoundError:
         print(f"[SIGNAL_AGENT Tool] File not found: {input_path}")
