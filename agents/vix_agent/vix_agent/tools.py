@@ -6,13 +6,13 @@ import os
 import time
 import csv
 from .models import SignalDataModel
-from typing import List, Dict, Any
 from google.adk.tools import FunctionTool
 from google.adk.tools import ToolContext 
 import os
 import csv
 from typing import List, Dict, Union, Any
 import pandas as pd
+import numpy as np
 
 def _get_raw_data(market) -> pd.DataFrame :
     raw_data = [
@@ -27,6 +27,53 @@ def _get_raw_data(market) -> pd.DataFrame :
 
     # 2. Create the initial DataFrame
     return pd.DataFrame(data_rows, columns=header)
+
+
+def _engineer_features_with_pandas(input_path: str) -> pd.DataFrame:
+    """
+    Reads data from a CSV as a DataFrame, calculates Z-Scores and Percentiles,
+    and saves the engineered DataFrame back to a new CSV.
+    
+    Args:
+        input_path (str): Path to the input CSV (e.g., 'vix_cot_data.csv').
+        output_path (str): Path to save the output CSV.
+    """
+    try:
+        # 1. READ CSV AS DATAFRAME
+        # Read the file, treating the first column as the index (Timestamp)
+        # Ensure the numerical columns are correctly cast
+        df = pd.read_csv(
+            input_path, 
+            index_col='Timestamp', 
+            parse_dates=['Timestamp'],
+            dtype={'Raw_COT_Value': np.float64, 'Raw_VIX_Value': np.float64}
+        )
+        print(f"Successfully read input data from {input_path}. Shape: {df.shape}")
+
+        # 2. CALCULATE ACTUAL FEATURES (Core Data Engineering)
+        
+        # Calculate COT Z-Score: (Value - Mean) / Standard Deviation
+        cot_mean = df['Raw_COT_Value'].mean()
+        cot_std = df['Raw_COT_Value'].std()
+        
+        if cot_std == 0:
+             df['COT_Z_Score'] = 0.0 # Handle case where all values are the same
+        else:
+             df['COT_Z_Score'] = (df['Raw_COT_Value'] - cot_mean) / cot_std
+        
+        # Calculate VIX Percentile Rank (0 to 100)
+        # The rank shows the percentage of values in the series less than the current value.
+        df['VIX_Percentile'] = df['Raw_VIX_Value'].rank(pct=True) * 100
+
+        # 3. SAVE ENGINEERED DATAFRAME TO CSV
+        return df
+
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred during processing: {e}")
+        return None
 
     
 def ingestion_tool(market: str) -> str:
@@ -57,34 +104,18 @@ def feature_engineering_tool(raw_data_uri: str) -> str:
     
     input_path = raw_data_uri
     engineered_path = "./temp_data/engineered_data.csv"
-    engineered_data = []
+    engineered_data_df = None
     
     try:
-        with open(input_path, 'r', newline='') as infile:
-            reader = csv.reader(infile)
-            header = next(reader)
-            
-            # Write new header with calculated features
-            engineered_data.append(header + ['COT_Z_Score', 'VIX_Percentile'])
-            
-            # 2. ADD FEW LINES / CALCULATE FEATURES (Mock Logic)
-            for row_num, row in enumerate(reader, start=1):
-                # Mock calculation: Z-Score = 0.5 + (row_num * 0.1)
-                z_score = 0.5 + (row_num * 0.1)
-                # Mock calculation: Percentile = 95 - (row_num * 5)
-                percentile = 95 - (row_num * 5)
-                
-                engineered_data.append(row + [f"{z_score:.2f}", f"{percentile:.2f}"])
+
+        engineered_data_df = _engineer_features_with_pandas(input_path)
                 
     except FileNotFoundError:
         print(f"Error: Input file not found at {input_path}")
         raise Exception(f"Error: Input file not found at {input_path}")
 
     # 3. WRITE OUTPUT FILE
-    with open(engineered_path, 'w', newline='') as outfile:
-        writer = csv.writer(outfile)
-        writer.writerows(engineered_data)
-        
+    engineered_data_df.to_csv(engineered_path, header=True)    
     print(f"[FEATURE_AGENT Tool] ENGINEERED data created at: {engineered_path}")
     return engineered_path
 
