@@ -12,7 +12,23 @@ from google.adk.tools import ToolContext
 import os
 import csv
 from typing import List, Dict, Union, Any
+import pandas as pd
 
+def _get_raw_data(market) -> pd.DataFrame :
+    raw_data = [
+        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
+        ['2025-11-20', '10.5', '90.0'],
+        ['2025-11-21', '11.2', '85.5'],
+        ['2025-11-22', '12.0', '78.0']
+    ]
+
+    header = raw_data[0]
+    data_rows = raw_data[1:]
+
+    # 2. Create the initial DataFrame
+    return pd.DataFrame(data_rows, columns=header)
+
+    
 def ingestion_tool(market: str) -> str:
     """
     TOOL: Creates the RAW data file at a specific URI and returns the URI string.
@@ -22,16 +38,11 @@ def ingestion_tool(market: str) -> str:
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
     # Create RAW data for the pipeline to consume
-    raw_data = [
-        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
-        ['2025-11-20', '10.5', '90.0'],
-        ['2025-11-21', '11.2', '85.5'],
-        ['2025-11-22', '12.0', '78.0']
-    ]
-    with open(file_path, 'w', newline='') as f: 
-        writer = csv.writer(f)
-        writer.writerows(raw_data)
-        
+
+    raw_data = _get_raw_data(market)
+
+    raw_data.to_csv(file_path, header=True)
+
     print(f"[INGESTION Tool] RAW data created at: {file_path}")
     
     # 💥 CRITICAL FIX: Return the file path string directly.
