@@ -115,6 +115,7 @@ def feature_engineering_tool(raw_data_uri: str) -> str:
         raise Exception(f"Error: Input file not found at {input_path}")
 
     # 3. WRITE OUTPUT FILE
+    print(f"[FEATURE_AGENT Tool] ENGINEERED DF: {engineered_data_df}")
     engineered_data_df.to_csv(engineered_path, header=True)    
     print(f"[FEATURE_AGENT Tool] ENGINEERED data created at: {engineered_path}")
     return engineered_path
