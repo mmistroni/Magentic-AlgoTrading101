@@ -13,6 +13,7 @@ import csv
 from typing import List, Dict, Union, Any
 import pandas as pd
 import numpy as np
+import json
 
 def _get_raw_data(market) -> pd.DataFrame :
     raw_data = [
@@ -24,7 +25,7 @@ def _get_raw_data(market) -> pd.DataFrame :
 
     header = raw_data[0]
     data_rows = raw_data[1:]
-
+    
     # 2. Create the initial DataFrame
     return pd.DataFrame(data_rows, columns=header)
 
@@ -64,7 +65,7 @@ def _engineer_features_with_pandas(input_path: str) -> pd.DataFrame:
         # Calculate VIX Percentile Rank (0 to 100)
         # The rank shows the percentage of values in the series less than the current value.
         df['VIX_Percentile'] = df['Raw_VIX_Value'].rank(pct=True) * 100
-
+        print(f'Generating----\n{df}')
         # 3. SAVE ENGINEERED DATAFRAME TO CSV
         return df
 
@@ -107,7 +108,7 @@ def feature_engineering_tool(raw_data_uri: str) -> str:
     input_path = raw_data_uri
     engineered_path = "./temp_data/engineered_data.csv"
     engineered_data_df = None
-    
+    print(f'--------- calling feat eng ...')
     try:
 
         engineered_data_df = _engineer_features_with_pandas(input_path)
@@ -217,6 +218,15 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     # --- 4. RETURN THE URI ---
     return signal_path
 
+def read_signal_file_tool(uri: str) -> dict:
+    """Reads the JSON file content and returns it as a dictionary."""
+    try:
+        with open(uri, 'r') as f:
+            return json.load(f)
+    except Exception:
+        # Handle error case gracefully in the pipeline
+        return {"market": "Error", "signal": "Error", "confidence": 0.0, "justification": "File read failure."}
+
 
 
 # --------------------------------------------------------------------------
@@ -242,6 +252,8 @@ def vix_data_tool() -> Dict[str, Any]:
 # --------------------------------------------------------------------------
 # These are kept separate to clearly show which tools are used by the agents.
 # We are only using the real tools now.
+
+
 
 REAL_INGESTION_TOOL = FunctionTool(ingestion_tool) # Updated to use the new ingestion_tool
 REAL_FEATURE_TOOL = FunctionTool(feature_engineering_tool)

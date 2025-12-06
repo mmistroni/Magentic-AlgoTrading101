@@ -6,7 +6,8 @@ from vix_agent.tools import (
     ingestion_tool,
     vix_data_tool, # Used for Ingestion (if COT data is not used)
     feature_engineering_tool, 
-    signal_generation_tool
+    signal_generation_tool,
+    read_signal_file_tool
 )
 from vix_agent.models import RawDataModel, FeatureDataModel, SignalDataModel, DataPointerModel
 
@@ -14,6 +15,8 @@ from vix_agent.models import RawDataModel, FeatureDataModel, SignalDataModel, Da
 INGESTION_FT = FunctionTool(vix_data_tool) # Using vix_data_tool as a stand-in for ingestion
 FEATURE_FT = FunctionTool(feature_engineering_tool)
 SIGNAL_FT = FunctionTool(signal_generation_tool)
+READER_FT = FunctionTool(read_signal_file_tool)
+
 
 # --- STAGE 1: DATA INGESTION ---
 # --- STAGE 1: DATA INGESTION ---
@@ -131,6 +134,18 @@ SIGNAL_MODEL_GENERATOR = LlmAgent(
     output_key='final_signal_json' # The key holding the actual Signal JSON
 )
 
+SIGNAL_READER_AGENT = LlmAgent(
+    name="SignalReaderAgent",
+    model='gemini-2.5-flash',
+    instruction="""
+    Retrieve the raw URI string from the shared context key **'signal_file_uri_raw'**. 
+    Use the `read_signal_file_tool` to read the JSON file content at that URI.
+    **CRITICAL:** Your final output must be **ONLY** the dictionary (JSON object) returned by the tool.
+    """,
+    tools=[READER_FT],
+    output_key='signal_json_content_raw' # New key to hold the actual dict
+)
+
 # --- THE PIPELINE ---
 COT_WORKFLOW_PIPELINE = SequentialAgent(
     name="COTTradingSignalPipeline",
@@ -140,6 +155,7 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         FEATURE_TOOL_CALLER,
         FEATURE_MODEL_GENERATOR,
         SIGNAL_TOOL_CALLER,
+        SIGNAL_READER_AGENT,
         SIGNAL_MODEL_GENERATOR
     ]
 )
