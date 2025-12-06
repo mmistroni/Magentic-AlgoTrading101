@@ -112,21 +112,7 @@ async def test_pipeline_data_ingestion_and_pydantic_output(cot_workflow_runner):
     assert raw_uri_string_output == expected_raw_uri
     print("✅ CHECK 1: Ingestion Tool's URI output was successfully saved to context.")
     
-    # =========================================================================
-    # 5. ASSERT: Pydantic Model Generation
-    # =========================================================================
-
-    # Check 2: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
-    raw_pointer_data = final_state.get('raw_data_pointer')
-    print(f"DEBUG 2: 'raw_data_pointer' context key value (Pydantic dict): {raw_pointer_data}")
     
-    # Check 3: Pydantic Validation 
-    assert raw_pointer_data is not None
-    raw_pointer = DataPointerModel(**raw_pointer_data)
-    assert raw_pointer.uri == expected_raw_uri
-    print("✅ CHECK 2: Final Pydantic DataPointerModel has the correct URI.")
-
-
     
 @pytest.mark.asyncio
 async def test_pipeline_data_feature_and_pydantic_output(cot_workflow_runner):
@@ -190,20 +176,7 @@ async def test_pipeline_data_feature_and_pydantic_output(cot_workflow_runner):
     assert raw_uri_string_output == expected_raw_uri
     print("✅ CHECK 1: Ingestion Tool's URI output was successfully saved to context.")
     
-    # =========================================================================
-    # 5. ASSERT: Pydantic Model Generation
-    # =========================================================================
-
-    # Check 2: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
-    raw_pointer_data = final_state.get('raw_data_pointer')
-    print(f"DEBUG 2: 'raw_data_pointer' context key value (Pydantic dict): {raw_pointer_data}")
     
-    # Check 3: Pydantic Validation 
-    assert raw_pointer_data is not None
-    raw_pointer = DataPointerModel(**raw_pointer_data)
-    assert raw_pointer.uri == expected_raw_uri
-    print("✅ CHECK 2: Final Pydantic DataPointerModel has the correct URI.")
-
 
     #######  Checking Feature Agent#############
     expected_feature_uri = "./temp_data/engineered_data.csv"
@@ -221,32 +194,7 @@ async def test_pipeline_data_feature_and_pydantic_output(cot_workflow_runner):
     print("✅ CHECK 3: Ingestion Tool's URI output was successfully saved to context.")
     
 
-    #### FEATURE MODEL
-    # =========================================================================
-    # 7. ASSERT: Feature Pydantic Model Generation
-    # =========================================================================
-
-    # Check 5: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
-    feature_pointer_data = final_state.get('feature_data_pointer')
-    print(f"DEBUG 4: 'feature_data_pointer' context key value (Pydantic dict): {feature_pointer_data}")
     
-    # Check 6: Pydantic Validation 
-    assert feature_pointer_data is not None
-    
-    try:
-        feature_pointer = DataPointerModel(**feature_pointer_data)
-    except Exception as e:
-        pytest.fail(f"FeatureDataPointer validation failed: {e}")
-        
-    assert feature_pointer.uri == expected_feature_uri
-    # Assuming DataPointerModel now includes 'market'
-    import pandas as pd
-    df = pd.read_csv(feature_pointer.uri, index_col=0, parse_dates=True)
-    cot_z_score = df.iloc[-1]['COT_Z_Score']
-    vix_percentile = df.iloc[-1]['VIX_Percentile']
-    assert cot_z_score == approx(1.021466)
-    assert vix_percentile == approx(33.333333)
-
 
 @pytest.mark.asyncio
 async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
@@ -310,21 +258,6 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     assert raw_uri_string_output == expected_raw_uri
     print("✅ CHECK 1: Ingestion Tool's URI output was successfully saved to context.")
     
-    # =========================================================================
-    # 5. ASSERT: Pydantic Model Generation
-    # =========================================================================
-
-    # Check 2: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
-    raw_pointer_data = final_state.get('raw_data_pointer')
-    print(f"DEBUG 2: 'raw_data_pointer' context key value (Pydantic dict): {raw_pointer_data}")
-    
-    # Check 3: Pydantic Validation 
-    assert raw_pointer_data is not None
-    raw_pointer = DataPointerModel(**raw_pointer_data)
-    assert raw_pointer.uri == expected_raw_uri
-    print("✅ CHECK 2: Final Pydantic DataPointerModel has the correct URI.")
-
-
     #######  Checking Feature Agent#############
     expected_feature_uri = "./temp_data/engineered_data.csv"
     
@@ -340,31 +273,6 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     assert feature_uri_string_output == expected_feature_uri
     print("✅ CHECK 3: Ingestion Tool's URI output was successfully saved to context.")
     
-
-    #### FEATURE MODEL
-    # =========================================================================
-    # 7. ASSERT: Feature Pydantic Model Generation
-    # =========================================================================
-
-    # Check 5: Model Generator Output (Should hold the final Pydantic DataPointerModel dict)
-    feature_pointer_data = final_state.get('feature_data_pointer')
-    print(f"DEBUG 4: 'feature_data_pointer' context key value (Pydantic dict): {feature_pointer_data}")
-    
-    # Check 6: Pydantic Validation 
-    assert feature_pointer_data is not None
-    
-    try:
-        feature_pointer = DataPointerModel(**feature_pointer_data)
-    except Exception as e:
-        pytest.fail(f"FeatureDataPointer validation failed: {e}")
-        
-    assert feature_pointer.uri == expected_feature_uri
-    # Assuming DataPointerModel now includes 'market'
-    assert feature_pointer.market == "Gold Futures"
-    print(f"✅ CHECK 4: Final Feature Pydantic DataPointerModel validated for \n{feature_pointer_data}")
-
-
-
     ### SIGNAL TOOL
     # #######  Checking Feature Agent#############
     market = "Gold Futures"

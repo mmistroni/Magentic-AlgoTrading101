@@ -9,98 +9,55 @@ from vix_agent.tools import (
     signal_generation_tool,
     read_signal_file_tool
 )
-from vix_agent.models import RawDataModel, FeatureDataModel, SignalDataModel, DataPointerModel
+from vix_agent.models import SignalDataModel, DataPointerModel 
+# Note: RawDataModel and FeatureDataModel are not used in the simplified flow.
 
-# --- Utility: Wrap Real Tools (Use the core logic, not the mocks) ---
-INGESTION_FT = FunctionTool(vix_data_tool) # Using vix_data_tool as a stand-in for ingestion
+# --- FunctionTool Wrappers (No Change) ---
+# Using ingestion_tool for the primary ingestion call
+INGESTION_FT = FunctionTool(ingestion_tool) 
 FEATURE_FT = FunctionTool(feature_engineering_tool)
 SIGNAL_FT = FunctionTool(signal_generation_tool)
 READER_FT = FunctionTool(read_signal_file_tool)
 
 
-# --- STAGE 1: DATA INGESTION ---
-# --- STAGE 1: DATA INGESTION ---
+## 🚀 STAGE 1: DATA INGESTION (Simplified)
+# The output is now a raw URI string, not a Pydantic dict.
 
-# 1. INGESTION_TOOL_CALLER
-# Instruction focuses on calling the tool, which now handles state saving internally 
-# to a separate key ('ingestion_file_uri') via ToolContext. The output_key is removed 
-# as the tool's return value (an acknowledgement) is now irrelevant.
-
-INGESTION_FT = FunctionTool(ingestion_tool) 
-# Assuming DataPointerModel is imported:
-# from vix_agent.models import DataPointerModel 
-
-# --- STAGE 1: DATA INGESTION ---
-
-### 1. The Tool Caller Agent (LlmAgent)
-
-# This agent calls the tool and relies on its 'output_key' to save the URI.
 INGESTION_TOOL_CALLER = LlmAgent(
     name="IngestionToolCaller",
     model='gemini-2.5-flash',
     instruction=f"""
     Use the `ingestion_tool` to fetch the latest data for the requested market. The tool returns the storage URI string.
     **CRITICAL:** Your final text output must be **ONLY** the URI string returned by the tool.
-    This string will be saved automatically to the shared context using the output key.
     """,
-    # Pass the FunctionTool wrapper
     tools=[INGESTION_FT], 
-    # 💥 FIX: The tool's return value (the URI) is captured and saved to this key.
-    output_key='ingestion_raw_output' 
+    output_key='ingestion_raw_output' # Saves the raw URI string
 )
 
-### 2. The Model Generator Agent (LlmAgent)
+# ***REMOVED***: INGESTION_MODEL_GENERATOR
 
-# This agent reads the URI from the key set by the first agent and wraps it in Pydantic JSON.
-INGESTION_MODEL_GENERATOR = LlmAgent(
-    name="IngestionModelGenerator",
-    model='gemini-2.5-flash',
-    instruction=f"""
-    Retrieve the raw URI string from the shared context key **'ingestion_raw_output'**. 
-    Convert this string into a valid JSON object matching the DataPointerModel schema.
-    The URI should be mapped to the 'uri' field.
-    The final JSON output must be returned to be saved as the DataPointerModel under 
-    the key 'raw_data_pointer'.
-    """,
-    tools=[], 
-    output_schema=DataPointerModel,
-    output_key='raw_data_pointer'
-)
+# ---
 
-
-# --- STAGE 2: FEATURE ENGINEERING ---
+## 🛠️ STAGE 2: FEATURE ENGINEERING (UPDATED to read raw URI)
 
 FEATURE_TOOL_CALLER = LlmAgent(
     name="FeatureToolCaller",
     model='gemini-2.5-flash',
     instruction=f"""
-    Retrieve the JSON content from the shared context key **'raw_data_pointer'**.
-    
-    Extract the **'uri'** field from that JSON object. 
+    Retrieve the **raw URI string** from the shared context key **'ingestion_raw_output'**.
     Call the **`feature_engineering_tool`** passing ONLY the extracted URI string to the `raw_data_uri` argument.
     
-    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL. DO NOT ADD ANY DESCRIPTIVE TEXT, PREFIXES, OR ADDITIONAL PHRASES.**
+    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL.**
     """,
     tools=[FEATURE_FT], 
-    output_key='feature_tool_raw_output'
+    output_key='feature_tool_raw_output' # Saves the engineered URI string
 )
 
-FEATURE_MODEL_GENERATOR = LlmAgent(
-    # ... (Model Generator remains the same) ...
-    name="FeatureModelGenerator",
-    model='gemini-2.5-flash',
-    instruction=f"""
-    Retrieve the raw URI string from the shared context key **'feature_tool_raw_output'** (this is the engineered data URI).
-    Convert this URI string into a valid JSON object matching the {DataPointerModel.__name__} schema.
-    The URI should be mapped to the 'uri' field.
-    The final JSON output must be returned and will be saved to the key 'feature_data_pointer'.
-    """,
-    tools=[],
-    output_schema=DataPointerModel,
-    output_key='feature_data_pointer'
-)
+# ***REMOVED***: FEATURE_MODEL_GENERATOR
 
-# --- STAGE 3: SIGNAL GENERATION ---
+# ---
+
+## 🚦 STAGE 3: SIGNAL GENERATION (UPDATED to read raw URI)
 
 SIGNAL_TOOL_CALLER = LlmAgent(
     name="SignalToolCallerAgent",
@@ -108,54 +65,58 @@ SIGNAL_TOOL_CALLER = LlmAgent(
     description="Calls the signal generation tool with the feature data URI and saves the raw signal output.",
     tools=[SIGNAL_FT],
     instruction="""
-    Retrieve the JSON content of the **'feature_data_pointer'** from the shared context. 
-    
-    Extract the 'uri' and 'market' fields from this JSON. 
+    Retrieve the engineered data URI string from the shared context key **'feature_tool_raw_output'**.
+    Retrieve the market name from the shared context key **'market'**.
     Call the `signal_generation_tool` using the extracted URI and market name.
     
-    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL. DO NOT ADD ANY DESCRIPTIVE TEXT, PREFIXES, OR JSON WRAPPERS LIKE {"tool_response": ...}. JUST RETURN THE STRING.**
+    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL.**
     """,
-    output_key='signal_file_uri_raw' # Key used to save the raw string
+    output_key='signal_file_uri_raw' # Key used to save the raw signal URI string
 )
 
-SIGNAL_MODEL_GENERATOR = LlmAgent(
-    name="SignalModelGenerator",
-    model='gemini-2.5-flash',
-    instruction=f"""
-    Retrieve the raw URI string from the shared context key **'signal_file_uri_raw'**. 
-    
-    **CRITICAL:** The URI points to a JSON file containing the final trading signal. You must instruct the environment to **read the content of this JSON file**.
-    
-    Then, take the content of that file and use it to construct a new JSON object that strictly adheres to the **{SignalDataModel.__name__}** schema.
-    The final JSON output (representing the signal itself) must be returned.
-    """,
-    tools=[], 
-    output_schema=SignalDataModel, # The desired final output type
-    output_key='final_signal_json' # The key holding the actual Signal JSON
-)
+# ---
+
+## ✅ FINAL STEP: FILE READING AND MODEL VALIDATION (New/Updated Agents)
 
 SIGNAL_READER_AGENT = LlmAgent(
     name="SignalReaderAgent",
     model='gemini-2.5-flash',
     instruction="""
     Retrieve the raw URI string from the shared context key **'signal_file_uri_raw'**. 
-    Use the `read_signal_file_tool` to read the JSON file content at that URI.
-    **CRITICAL:** Your final output must be **ONLY** the dictionary (JSON object) returned by the tool.
+    Use the **`read_signal_file_tool`** to read the JSON file content at that URI.
+    
+    **CRITICAL:** Your final output must be **ONLY** the JSON dictionary returned by the tool.
     """,
     tools=[READER_FT],
-    output_key='signal_json_content_raw' # New key to hold the actual dict
+    output_key='signal_json_content_raw' # New key to hold the actual signal DICT content
 )
 
-# --- THE PIPELINE ---
+SIGNAL_MODEL_GENERATOR = LlmAgent(
+    name="SignalModelGenerator",
+    model='gemini-2.5-flash',
+    instruction=f"""
+    Retrieve the final signal JSON dictionary directly from the shared context key **'signal_json_content_raw'**.
+    The content is already a valid JSON dictionary from the file. **Do not modify it or add analysis.**
+    Convert this dictionary into a new JSON object that strictly adheres to the **{SignalDataModel.__name__}** schema.
+    """,
+    tools=[], 
+    output_schema=SignalDataModel, 
+    output_key='final_signal_json' # The key holding the final validated Signal JSON
+)
+
+# ---
+
+## 🎯 THE SIMPLIFIED PIPELINE DEFINITION
+
 COT_WORKFLOW_PIPELINE = SequentialAgent(
-    name="COTTradingSignalPipeline",
+    name="COTTradingSignalPipeline_Simplified",
     sub_agents=[
-        INGESTION_TOOL_CALLER,
-        INGESTION_MODEL_GENERATOR,
-        FEATURE_TOOL_CALLER,
-        FEATURE_MODEL_GENERATOR,
-        SIGNAL_TOOL_CALLER,
-        SIGNAL_READER_AGENT,
-        SIGNAL_MODEL_GENERATOR
+        INGESTION_TOOL_CALLER,          # 1. Gets raw URI
+        FEATURE_TOOL_CALLER,            # 2. Uses raw URI, gets engineered URI
+        SIGNAL_TOOL_CALLER,             # 3. Uses engineered URI, gets signal file URI
+        SIGNAL_READER_AGENT,            # 4. Uses signal file URI, gets signal JSON dict
+        SIGNAL_MODEL_GENERATOR          # 5. Uses signal JSON dict, validates Pydantic model
     ]
 )
+
+# You should now use COT_WORKFLOW_PIPELINE_SIMPLIFIED in your tests!
