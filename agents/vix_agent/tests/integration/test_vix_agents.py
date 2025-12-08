@@ -66,7 +66,9 @@ async def test_pipeline_data_ingestion_and_pydantic_output(cot_workflow_runner):
 
     # Define the file path the tool will create and return.
     expected_raw_uri = "./temp_data/raw_data_test.csv"
-    
+    expected_vix_raw_uri = "./temp_data/vix_raw_data_test.csv"
+
+
     # Manually execute the ingestion tool to create the file on disk.
     # The tool's return value (the URI) is ignored in this manual call.
     ingestion_tool("Gold Futures") 
@@ -108,8 +110,13 @@ async def test_pipeline_data_ingestion_and_pydantic_output(cot_workflow_runner):
     raw_uri_string_output = final_state.get('ingestion_raw_output')
     print(f"DEBUG 1: 'ingestion_raw_output' context key value (URI string): '{raw_uri_string_output}'")
     
+    vix_uri_string_output = final_state.get('vix_raw_output_uri')
+    print(f"DEBUG 1.5: 'vix_ingestion_raw_output' context key value (URI string): '{vix_uri_string_output}'")
+    
     # This assertion verifies the LlmAgent successfully captured the tool's return value (the URI).
     assert raw_uri_string_output == expected_raw_uri
+    assert vix_uri_string_output == expected_vix_raw_uri
+    
     print("✅ CHECK 1: Ingestion Tool's URI output was successfully saved to context.")
     
     

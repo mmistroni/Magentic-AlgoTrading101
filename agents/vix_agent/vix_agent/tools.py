@@ -29,6 +29,21 @@ def _get_raw_data(market) -> pd.DataFrame :
     # 2. Create the initial DataFrame
     return pd.DataFrame(data_rows, columns=header)
 
+def _get_vix_raw_data() -> pd.DataFrame :
+    raw_data = [
+        ['date', 'open', 'high', 'low', 'close', 'volume'],
+    ['2025-11-20', 16.670000076293945,17.559999465942383,15.239999771118164,15.239999771118164,1000],
+    ['2025-11-21', 15.229999542236328,15.720000267028809,14.539999961853027,14.600000381469727,10000],
+    ['2025-11-21', 14.949999809265137,15.029999732971191,13.880000114440918,14.100000381469727,10000]
+    ]
+    
+    header = raw_data[0]
+    data_rows = raw_data[1:]
+    
+    # 2. Create the initial DataFrame
+    return pd.DataFrame(data_rows, columns=header)
+
+
 
 def _engineer_features_with_pandas(input_path: str) -> pd.DataFrame:
     """
@@ -98,14 +113,38 @@ def ingestion_tool(market: str) -> str:
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
 
-
-def feature_engineering_tool(raw_data_uri: str) -> str:
+def vix_ingestion_tool() -> str:
     """
-    Reads the RAW file, adds features, and writes the ENGINEERED file.
-    Returns the URI of the engineered file.
+    TOOL: Creates the RAW data file at a specific URI and returns the URI string.
+    This relies on the LlmAgent's output_key to save the result to state.
     """
+    file_path = "./temp_data/vix_raw_data_test.csv"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
+    # Create RAW data for the pipeline to consume
+
+    raw_data = _get_vix_raw_data()
+
+    print(f"[INGESTION Tool] VIX RAW data created is: {raw_data}")
+    
+    raw_data.to_csv(file_path, header=True)
+
+    print(f"[INGESTION Tool] VIX RAW data created at: {file_path}")
+    
+    # 💥 CRITICAL FIX: Return the file path string directly.
+    return file_path
+
+
+
+def feature_engineering_tool(raw_data_uri: str, vix_data_uri: str) -> str:
+    # 1. Read COT data from raw_data_uri
+    # 2. Read VIX data from vix_data_uri
+    # 3. COMBINE the two datasets and calculate the combined features
+    # 4. Save the new combined feature data
+    # 5. Return the URI of the new combined file
+        
     input_path = raw_data_uri
+    vix_input_path = vix_data_uri
     engineered_path = "./temp_data/engineered_data.csv"
     engineered_data_df = None
     print(f'--------- calling feat eng ...')

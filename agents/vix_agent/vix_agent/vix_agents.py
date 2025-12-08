@@ -4,7 +4,7 @@ from google.adk.tools import FunctionTool
 # Assuming these imports contain the actual tool logic for the pipeline
 from vix_agent.tools import (
     ingestion_tool,
-    vix_data_tool, # Used for Ingestion (if COT data is not used)
+    vix_ingestion_tool, 
     feature_engineering_tool, 
     signal_generation_tool,
     read_signal_file_tool
@@ -14,7 +14,8 @@ from vix_agent.models import SignalDataModel, DataPointerModel
 
 # --- FunctionTool Wrappers (No Change) ---
 # Using ingestion_tool for the primary ingestion call
-INGESTION_FT = FunctionTool(ingestion_tool) 
+INGESTION_FT = FunctionTool(ingestion_tool)
+VIX_INGESTION_FT = FunctionTool(vix_ingestion_tool) 
 FEATURE_FT = FunctionTool(feature_engineering_tool)
 SIGNAL_FT = FunctionTool(signal_generation_tool)
 READER_FT = FunctionTool(read_signal_file_tool)
@@ -34,7 +35,17 @@ INGESTION_TOOL_CALLER = LlmAgent(
     output_key='ingestion_raw_output' # Saves the raw URI string
 )
 
-# ***REMOVED***: INGESTION_MODEL_GENERATOR
+VIX_INGESTION_TOOL_CALLER = LlmAgent(
+    name="VIXIngestionAgent",
+    model='gemini-2.5-flash',
+    instruction=f"""
+    Use the **`vix_ingestion_tool`** to fetch the latest VIX price data. The tool returns the storage URI string.
+    **CRITICAL:** Your final text output must be **ONLY** the URI string returned by the tool.
+    """,
+    tools=[VIX_INGESTION_FT], 
+    output_key='vix_raw_output_uri' # Saves the raw VIX URI string
+)
+
 
 # ---
 
@@ -44,10 +55,14 @@ FEATURE_TOOL_CALLER = LlmAgent(
     name="FeatureToolCaller",
     model='gemini-2.5-flash',
     instruction=f"""
-    Retrieve the **raw URI string** from the shared context key **'ingestion_raw_output'**.
-    Call the **`feature_engineering_tool`** passing ONLY the extracted URI string to the `raw_data_uri` argument.
+    Retrieve the **COT URI string** from the shared context key **'ingestion_raw_output'**.
+    Retrieve the **VIX URI string** from the shared context key **'vix_raw_output_uri'**.
     
-    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL.**
+    Call the **`feature_engineering_tool`** passing:
+    1. The COT URI string to the **`raw_data_uri`** argument.
+    2. The VIX URI string to a new argument, perhaps **`vix_data_uri`**.
+    
+    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL** (which should now be the URI of the combined, engineered data).
     """,
     tools=[FEATURE_FT], 
     output_key='feature_tool_raw_output' # Saves the engineered URI string
@@ -112,7 +127,11 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
     name="COTTradingSignalPipeline_Simplified",
     sub_agents=[
         INGESTION_TOOL_CALLER,          # 1. Gets raw URI
-        FEATURE_TOOL_CALLER,            # 2. Uses raw URI, gets engineered URI
+        # 2. VIX Data Ingestion (NEW AGENT)
+        VIX_INGESTION_TOOL_CALLER,            # Output: 'vix_raw_output_uri' (VIX URI) 
+        # 3. FEATURE ENGINEERING (MUST BE UPDATED TO USE BOTH URIs)
+        FEATURE_TOOL_CALLER,            
+        # 4. Signal Generation, Reading, and Model Validation (Rest of the flow remains the same)
         SIGNAL_TOOL_CALLER,             # 3. Uses engineered URI, gets signal file URI
         SIGNAL_READER_AGENT,            # 4. Uses signal file URI, gets signal JSON dict
         SIGNAL_MODEL_GENERATOR          # 5. Uses signal JSON dict, validates Pydantic model
