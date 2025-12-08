@@ -68,6 +68,29 @@ FEATURE_TOOL_CALLER = LlmAgent(
     output_key='feature_tool_raw_output' # Saves the engineered URI string
 )
 
+NEW_FEATURE_TOOL_CALLER = LlmAgent(
+    name="FeatureToolCaller",
+    model='gemini-2.5-flash',
+    instruction=f"""
+    **Task 1: Analyze and Define Extremity (The 'Smarter' Part)**
+    
+    1.  Retrieve the COT URI string from **'ingestion_raw_output'** and the VIX URI string from **'vix_raw_output_uri'**.
+    2.  **Hypothesize** the required features for predicting a 'huge drop in VIX prices' (i.e., resolution of extreme fear). These must include measures of:
+        * **VIX Extremity:** A quantitative measure of how far VIX is from its recent historical average (e.g., a Z-score threshold).
+        * **COT Extremity:** A quantitative measure of extreme speculative positioning (Non-Commercial Net Position) relative to its historical range (e.g., a percentile threshold).
+    3.  **Define the Specific Thresholds:** Based on general market knowledge (e.g., Z-score > 2.0, Percentile < 10%), determine the explicit numerical criteria for a 'hot' point.
+
+    **Task 2: Instruct the Tool Call**
+    
+    Call the **`feature_engineering_tool`** passing the two URIs AND the **explicit, numerically defined thresholds** needed to calculate the 'Extreme VIX' and 'Extreme COT' binary signals.
+    
+    The tool must return **ONLY** the URI string of the file containing the final engineered features.
+    """,
+    tools=[FEATURE_FT], 
+    output_key='feature_tool_raw_output'
+)
+
+
 # ***REMOVED***: FEATURE_MODEL_GENERATOR
 
 # ---
