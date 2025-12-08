@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Union, Any
 import random
 import time
+from datetime import date
 
 # --- Pydantic Data Models (Communication Protocol) ---
 # Pydantic models enforce the structure of data passed between agents.
@@ -36,4 +37,46 @@ class SignalDataModel(BaseModel):
     signal: str = Field(..., description="The final trading signal (e.g., 'Strong Buy', 'Neutral', 'Sell').")
     confidence: float = Field(..., description="Confidence level (0.0 to 1.0).")
     justification: str = Field(..., description="Detailed explanation for the signal.")
+
+from pydantic import BaseModel, Field
+from datetime import date
+
+class NewFeatureDataModel(BaseModel):
+    """
+    Defines the structure of the engineered data output by the feature_engineering_tool.
+    This model includes calculated features and the final binary signals.
+    """
+    
+    # --- 🔑 Identity and Date ---
+    trade_date: date = Field(description="The date corresponding to the feature calculation.")
+    
+    # --- 📈 VIX Technical Features ---
+    # These are the calculated features, NOT the raw price.
+    vix_index_level: float = Field(description="The VIX Index closing price on the trade_date.")
+    vix_zscore_60d: float = Field(description="VIX Z-Score relative to its 60-day mean/std deviation.")
+    vix_vix3m_ratio: float = Field(description="Ratio of VIX Index to VIX 3-Month Future (Term Structure measure).")
+    
+    # --- 🐻 COT Fundamental Features ---
+    # These are the calculated features, NOT the raw Net Position.
+    cot_net_position_index: float = Field(
+        description="Non-Commercial Net Position normalized to its historical (e.g., 3-year) range (0 to 1)."
+    )
+    
+    # --- 🔥 Dynamic Binary Signals (The LLM's Strategy) ---
+    # These are the final signals created using the LLM-defined thresholds (e.g., Z > 2.5, P < 0.05).
+    extreme_vix_signal: int = Field(
+        description="Binary signal (1 or 0) indicating VIX Z-Score crossed the LLM-defined threshold.",
+        ge=0, le=1
+    )
+    extreme_cot_signal: int = Field(
+        description="Binary signal (1 or 0) indicating COT Index crossed the LLM-defined percentile threshold.",
+        ge=0, le=1
+    )
+    
+    # --- 🎯 Combined Prediction Feature ---
+    # A feature that combines both criteria, ready for the Signal Agent to use.
+    vix_crash_trigger: int = Field(
+        description="Final combined trigger signal (1 or 0): True when both Extreme VIX and Extreme COT signals are active.",
+        ge=0, le=1
+    )
 
