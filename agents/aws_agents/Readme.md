@@ -1,4 +1,4 @@
-# This folder contains client code to invoke an AWS AgentCore for managing provisions
+# This folder contains agents written using AWS Bedrock
+Youtube:  https://www.youtube.com/live/wzIQDPFQx30?si=j41vdyDQqQrGncsk
 
-The original Provision application was deployed as a React application invoking an API Gateway
-Now instead of using a GUI we will use an agent
+https://github.com/awslabs/amazon-bedrock-agentcore-samples
