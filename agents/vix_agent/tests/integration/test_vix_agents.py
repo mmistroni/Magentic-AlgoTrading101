@@ -11,10 +11,48 @@ from vix_agent.models import DataPointerModel, SignalDataModel
 from vix_agent.vix_agents import COT_WORKFLOW_PIPELINE 
 # 2. Import the ingestion tool for manual file creation
 from vix_agent.tools import ingestion_tool 
+import pandas as pd
 
 # -----------------------------------------------------------------------------
 # --- FIXTURES ---
 # -----------------------------------------------------------------------------
+
+@pytest.fixture
+def mock_vix_data():
+    """Returns a mock DataFrame for the daily VIX price data."""
+    raw_data = [
+        ['date', 'open', 'high', 'low', 'close', 'volume'],
+    ['2025-11-20', 16.670000076293945,17.559999465942383,15.239999771118164,15.239999771118164,1000],
+    ['2025-11-21', 15.229999542236328,15.720000267028809,14.539999961853027,14.600000381469727,10000],
+    ['2025-11-22', 14.949999809265137,15.029999732971191,13.880000114440918,14.100000381469727,10000]
+    ]
+    
+    header = raw_data[0]
+    data_rows = raw_data[1:]
+    
+    # 2. Create the initial DataFrame
+    return pd.DataFrame(data_rows, columns=header)
+
+
+@pytest.fixture
+def mock_cot_data():
+    """Returns a mock DataFrame for the weekly COT data, forcing an extreme rank."""
+    raw_data = [
+        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
+        ['2025-11-20', '10.5', '90.0'],
+        ['2025-11-21', '11.2', '85.5'],
+        ['2025-11-22', '12.0', '78.0']
+    ]
+
+    header = raw_data[0]
+    data_rows = raw_data[1:]
+    
+    # 2. Create the initial DataFrame
+    return pd.DataFrame(data_rows, columns=header)
+
+
+
+
 
 @pytest.fixture(scope="module")
 def cleanup_temp_data():
@@ -51,12 +89,21 @@ def cot_workflow_runner(cleanup_temp_data):
 # -----------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_pipeline_data_ingestion_and_pydantic_output(cot_workflow_runner):
+async def test_pipeline_data_ingestion_and_pydantic_output(mocker, 
+                                                           mock_vix_data, 
+                                                           mock_cot_data,
+                                                           cot_workflow_runner):
     """
     Tests the pipeline execution, verifying state passing and Pydantic validation 
     for the ingestion stage using the output_key mechanism.
     """
     runner, session_service = cot_workflow_runner 
+
+    mocker.patch('vix_agent.tools._get_raw_data', return_value=mock_cot_data)
+    mocker.patch('vix_agent.tools._get_vix_raw_data', return_value=mock_vix_data)
+
+
+
     session_id = "test_session_123"
     user_id = "test_user"
     app_name = "COTAnalysisTradingApp"
@@ -122,7 +169,10 @@ async def test_pipeline_data_ingestion_and_pydantic_output(cot_workflow_runner):
     
     
 @pytest.mark.asyncio
-async def test_pipeline_data_feature_and_pydantic_output(cot_workflow_runner):
+async def test_pipeline_data_feature_and_pydantic_output(mocker, 
+                                                           mock_vix_data, 
+                                                           mock_cot_data,
+                                                           cot_workflow_runner):
     """
     Tests the pipeline execution, verifying state passing and Pydantic validation 
     for the ingestion stage using the output_key mechanism.
@@ -132,6 +182,10 @@ async def test_pipeline_data_feature_and_pydantic_output(cot_workflow_runner):
     user_id = "test_user"
     app_name = "COTAnalysisTradingApp"
     test_prompt = "Start the trading signal generation workflow for Gold Futures now."
+
+    mocker.patch('vix_agent.tools._get_raw_data', return_value=mock_cot_data)
+    mocker.patch('vix_agent.tools._get_vix_raw_data', return_value=mock_vix_data)
+
 
     # --- 1. SETUP EXPECTED DATA AND FILE I/O ---
 
@@ -204,7 +258,10 @@ async def test_pipeline_data_feature_and_pydantic_output(cot_workflow_runner):
     
 
 @pytest.mark.asyncio
-async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
+async def test_pipeline_data_flow_and_pydantic_output(mocker, 
+                                                           mock_vix_data, 
+                                                           mock_cot_data,
+                                                           cot_workflow_runner):
     """
     Tests the pipeline execution, verifying state passing and Pydantic validation 
     for the ingestion stage using the output_key mechanism.
@@ -214,6 +271,9 @@ async def test_pipeline_data_flow_and_pydantic_output(cot_workflow_runner):
     user_id = "test_user"
     app_name = "COTAnalysisTradingApp"
     test_prompt = "Start the trading signal generation workflow for Gold Futures now."
+    mocker.patch('vix_agent.tools._get_raw_data', return_value=mock_cot_data)
+    mocker.patch('vix_agent.tools._get_vix_raw_data', return_value=mock_vix_data)
+
 
     # --- 1. SETUP EXPECTED DATA AND FILE I/O ---
 
