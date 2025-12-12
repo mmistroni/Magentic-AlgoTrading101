@@ -13,19 +13,24 @@ from vix_agent.vix_agents import COT_WORKFLOW_PIPELINE
 from vix_agent.tools import ingestion_tool 
 import pandas as pd
 from pathlib import Path
-
+import re
+from typing import Union, Optional
 
 # -----------------------------------------------------------------------------
 # --- FIXTURES ---
 # -----------------------------------------------------------------------------
 # --- Helper Function for Date Parsing (Include this in your module) ---
-def parse_cftc_report_week(report_week_str: str) -> Union[pd.Timestamp, type(pd.NaT)]:
-    """Converts a CFTC report string (e.g., '2004 Report Week 30') into a usable Friday date."""
+def parse_cftc_report_week(report_week_str: str) -> Optional[pd.Timestamp]:
+    """
+    Converts a CFTC report string (e.g., '2004 Report Week 30') into a usable Friday date.
+    Returns None if parsing fails.
+    """
     
     # Use regex to safely extract the Year and the Week Number
     match = re.search(r'(\d{4}) Report Week (\d+)', report_week_str)
     if not match:
-        return pd.NaT
+        # Return None on failure to align with Optional[pd.Timestamp] hint
+        return None 
         
     year = int(match.group(1))
     week_num = int(match.group(2))
@@ -34,11 +39,24 @@ def parse_cftc_report_week(report_week_str: str) -> Union[pd.Timestamp, type(pd.
         # Construct a string like '2004-30-5' (Year-WeekNumber-DayOfWeek Friday=5)
         # Using ISO week format (%W) for consistency.
         date_str = f"{year}-{week_num}-5"
-        return pd.to_datetime(date_str, format='%Y-%W-%w', errors='coerce') 
+        
+        # When errors='coerce' is used, pd.to_datetime returns pd.NaT on failure,
+        # which pandas correctly handles when applied to a series.
+        date_result = pd.to_datetime(date_str, format='%Y-%W-%w', errors='coerce') 
+        
+        # We explicitly check for NaT and convert to None if necessary, 
+        # though pd.apply often handles the pd.NaT return fine.
+        if pd.isna(date_result):
+            return None
+            
+        return date_result
+        
     except ValueError:
         # Catch cases where the week number might be invalid for the year
-        return pd.NaT
+        return None # Return None on exception
 
+# --- No changes needed to clean_and_standardize_cot_data (it will correctly 
+# handle the NaNs resulting from the parse function when applied to the Series) ---
 # --- Core Ingestion Agent Logic Snippet ---
 
 def clean_and_standardize_cot_data(raw_cot_df: pd.DataFrame) -> pd.DataFrame:
@@ -458,7 +476,3 @@ import pytest
 # -----------------------------------------------------------------------------
 # --- FIXTURES ---
 # -----------------------------------------------------------------------------
-
-def test_df():
-    
-    print(vix_real_df.head(10))

@@ -5,6 +5,7 @@ from google.adk.tools import FunctionTool
 from vix_agent.tools import (
     ingestion_tool,
     vix_ingestion_tool, 
+    merge_vix_and_cot_features_tool,
     feature_engineering_tool, 
     signal_generation_tool,
     read_signal_file_tool
@@ -16,6 +17,8 @@ from vix_agent.models import SignalDataModel, DataPointerModel
 # Using ingestion_tool for the primary ingestion call
 INGESTION_FT = FunctionTool(ingestion_tool)
 VIX_INGESTION_FT = FunctionTool(vix_ingestion_tool) 
+MERGE_INGESTION_FT = FunctionTool(merge_vix_and_cot_features_tool) 
+
 FEATURE_FT = FunctionTool(feature_engineering_tool)
 SIGNAL_FT = FunctionTool(signal_generation_tool)
 READER_FT = FunctionTool(read_signal_file_tool)
@@ -46,27 +49,28 @@ VIX_INGESTION_TOOL_CALLER = LlmAgent(
     output_key='vix_raw_output_uri' # Saves the raw VIX URI string
 )
 
+MERGE_ALIGNMENT_TOOL_CALLER = LlmAgent(
+    name="DataAlignmentAgent", # Renamed for clarity: Focus on ALIGNMENT/MERGING
+    model='gemini-2.5-flash',
+    instruction=f"""
+    **CRITICAL TASK:** Your job is to merge two time-series datasets: 
+    1. The daily **Clean VIX Data** located at: **{{vix_raw_output_uri}}**
+    2. The weekly **Clean COT Data** located at: **{{ingestion_raw_output}}**
+    
+    Use the **`merge_vix_and_cot_features`** tool. You must pass both input URIs and define a new output URI (e.g., 'vix_cot_merged.csv').
+    
+    **CRITICAL:** Your final text output must be **ONLY** the URI string returned by the tool 
+    (the path to the newly created merged data file).
+    """,
+    # This assumes the LLM Agent is executed with the URIs passed as context variables.
+    tools=[MERGE_INGESTION_FT], 
+    output_key='vix_cot_merged_output_uri' # Remains the correct output key
+)
+
 
 # ---
 
 ## 🛠️ STAGE 2: FEATURE ENGINEERING (UPDATED to read raw URI)
-
-FEATURE_TOOL_CALLER = LlmAgent(
-    name="FeatureToolCaller",
-    model='gemini-2.5-flash',
-    instruction=f"""
-    Retrieve the **COT URI string** from the shared context key **'ingestion_raw_output'**.
-    Retrieve the **VIX URI string** from the shared context key **'vix_raw_output_uri'**.
-    
-    Call the **`feature_engineering_tool`** passing:
-    1. The COT URI string to the **`raw_data_uri`** argument.
-    2. The VIX URI string to a new argument, perhaps **`vix_data_uri`**.
-    
-    **CRITICAL: YOUR FINAL OUTPUT MUST BE ONLY THE RAW URI STRING RETURNED BY THE TOOL** (which should now be the URI of the combined, engineered data).
-    """,
-    tools=[FEATURE_FT], 
-    output_key='feature_tool_raw_output' # Saves the engineered URI string
-)
 
 NEW_FEATURE_TOOL_CALLER = LlmAgent(
     name="FeatureToolCaller",
@@ -74,7 +78,7 @@ NEW_FEATURE_TOOL_CALLER = LlmAgent(
     instruction=f"""
     **Task 1: Analyze and Define Extremity (The 'Smarter' Part)**
     
-    1.  Retrieve the COT URI string from **'ingestion_raw_output'** and the VIX URI string from **'vix_raw_output_uri'**.
+    1.  The necessary VIX and COT data is **merged and aligned** in the file located at: **{{vix_cot_merged_output_uri}}**.
     2.  **Hypothesize** the required features for predicting a 'huge drop in VIX prices' (i.e., resolution of extreme fear). These must include measures of:
         * **VIX Extremity:** A quantitative measure of how far VIX is from its recent historical average (e.g., a Z-score threshold).
         * **COT Extremity:** A quantitative measure of extreme speculative positioning (Non-Commercial Net Position) relative to its historical range (e.g., a percentile threshold).
@@ -82,7 +86,7 @@ NEW_FEATURE_TOOL_CALLER = LlmAgent(
 
     **Task 2: Instruct the Tool Call**
     
-    Call the **`feature_engineering_tool`** passing the two URIs AND the **explicit, numerically defined thresholds** needed to calculate the 'Extreme VIX' and 'Extreme COT' binary signals.
+    Call the **`feature_engineering_tool`** passing the **merged URI** AND the **explicit, numerically defined thresholds** needed to calculate the 'Extreme VIX' and 'Extreme COT' binary signals.
     
     The tool must return **ONLY** the URI string of the file containing the final engineered features.
     """,
@@ -153,11 +157,11 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         # 2. VIX Data Ingestion (NEW AGENT)
         VIX_INGESTION_TOOL_CALLER,            # Output: 'vix_raw_output_uri' (VIX URI) 
         # 3. FEATURE ENGINEERING (MUST BE UPDATED TO USE BOTH URIs)
-        FEATURE_TOOL_CALLER,            
+        MERGE_ALIGNMENT_TOOL_CALLER,            
         # 4. Signal Generation, Reading, and Model Validation (Rest of the flow remains the same)
-        SIGNAL_TOOL_CALLER,             # 3. Uses engineered URI, gets signal file URI
-        SIGNAL_READER_AGENT,            # 4. Uses signal file URI, gets signal JSON dict
-        SIGNAL_MODEL_GENERATOR          # 5. Uses signal JSON dict, validates Pydantic model
+        #SIGNAL_TOOL_CALLER,             # 3. Uses engineered URI, gets signal file URI
+        #SIGNAL_READER_AGENT,            # 4. Uses signal file URI, gets signal JSON dict
+        #SIGNAL_MODEL_GENERATOR          # 5. Uses signal JSON dict, validates Pydantic model
     ]
 )
 

@@ -130,7 +130,60 @@ def vix_ingestion_tool() -> str:
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
 
+def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
+    """
+    Merges daily VIX data with weekly COT data using forward-filling to align frequencies.
+    
+    Args:
+        vix_path: Daily VIX DataFrame path, indexed by daily date.
+        cot_clean_path: Weekly COT DataFrame path, indexed by weekly (Friday release) date.
+        
+    Returns:
+        A daily DataFrame containing both VIX and the forward-filled COT features.
+    """
+    print("Feature Agent: Starting VIX/COT frequency alignment and merge...")
+    
+    # --- Step 1: Align COT to Daily Frequency using Forward Fill (ffill) ---
+    file_path = "./temp_data/vix_cot_merged.csv"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    # Create a new index spanning the entire date range of the VIX data
+    vix_df = _engineer_features_with_pandas(vix_path)
+    cot_clean_df = _engineer_features_with_pandas(cot_clean_path)
+    start_date = vix_df.index.min()
+    end_date = vix_df.index.max()
+    daily_index = pd.date_range(start=start_date, end=end_date, freq='D')
+    merged_path = "./temp_data/vix_and_cot_merged.csv"
 
+    # Reindex the weekly COT data to this full daily range. 
+    # This introduces NaN for all non-reporting days (Sat-Thu).
+    cot_daily_filled = cot_clean_df.reindex(daily_index)
+    
+    # The crucial step: Forward-fill the weekly COT values to every day until the next report.
+    cot_daily_filled = cot_daily_filled.ffill()
+    
+    # --- Step 2: Merge the two datasets ---
+    
+    # Outer join to ensure we keep all trading days from the VIX data.
+    # The index (Date) is shared.
+    merged_df = vix_df.merge(
+        cot_daily_filled, 
+        left_index=True, 
+        right_index=True, 
+        how='outer'
+    )
+    
+    # Drop rows where VIX data is missing (i.e., weekends/holidays that were in the daily_index)
+    # assuming VIX is the authoritative list of trading days.
+    # Assuming 'vix_close' is a column in vix_df:
+    merged_df.dropna(subset=[vix_df.columns[0]], inplace=True) 
+    
+    # We now have a daily dataset where COT data changes only once per week (on Friday)
+    print(f"Feature Agent: Merge complete. Final daily shape: {merged_df.shape}")
+    merged_df.to_csv(merged_path, header=True)
+    return merged_path
+
+    
 
 def feature_engineering_tool(raw_data_uri: str, vix_data_uri: str) -> str:
     # 1. Read COT data from raw_data_uri
