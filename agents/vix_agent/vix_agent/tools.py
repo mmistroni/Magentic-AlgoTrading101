@@ -39,7 +39,15 @@ def _get_vix_raw_data() -> pd.DataFrame :
     # 2. Create the initial DataFrame
     return pd.DataFrame(data_rows, columns=header)
 
-
+def _read_data_from_pandas(input_path:str) -> pd.DataFrame :
+    # 1. READ CSV AS DATAFRAME
+    # Read the file, treating the first column as the index (Timestamp)
+    # Ensure the numerical columns are correctly cast
+    return pd.read_csv(
+        input_path, 
+        )
+    
+    
 
 def _engineer_features_with_pandas(input_path: str) -> pd.DataFrame:
     """
@@ -148,8 +156,8 @@ def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
     # Create a new index spanning the entire date range of the VIX data
-    vix_df = _engineer_features_with_pandas(vix_path)
-    cot_clean_df = _engineer_features_with_pandas(cot_clean_path)
+    vix_df = _read_data_from_pandas(vix_path)
+    cot_clean_df = _read_data_from_pandas(cot_clean_path)
     start_date = vix_df.index.min()
     end_date = vix_df.index.max()
     daily_index = pd.date_range(start=start_date, end=end_date, freq='D')
