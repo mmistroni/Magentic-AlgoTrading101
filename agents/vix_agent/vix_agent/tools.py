@@ -193,31 +193,43 @@ def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
 
     
 
-def feature_engineering_tool(raw_data_uri: str, vix_data_uri: str) -> str:
-    # 1. Read COT data from raw_data_uri
-    # 2. Read VIX data from vix_data_uri
-    # 3. COMBINE the two datasets and calculate the combined features
-    # 4. Save the new combined feature data
-    # 5. Return the URI of the new combined file
+# The actual Tool Function (This runs on your side)
+def calculate_features(
+    cot_vix_path: str,  # Assumed to be passed internally
+    net_position_column: str, 
+    lookback_weeks: List[int]
+) -> str:
+    """
+    Generates the COT Index features for multiple lookback periods.
+    """
+    
+    df = _read_data_from_pandas(cot_vix_path).copy()
+    file_path = "./temp_data/vix_cot_features.csv"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+
+    for WEEKS in lookback_weeks:
+        # (Internal logic is the same efficient pandas code as before)
+        COL_INDEX = f'COT_Index_{WEEKS}W'
         
-    input_path = raw_data_uri
-    vix_input_path = vix_data_uri
-    engineered_path = "./temp_data/engineered_data.csv"
-    engineered_data_df = None
-    print(f'--------- calling feat eng ...')
-    try:
+        rolling_stats = df[net_position_column].rolling(window=WEEKS, min_periods=1)
+        rolling_min = rolling_stats.min()
+        rolling_max = rolling_stats.max()
+        
+        # Min-Max Normalization (COT Index Formula)
+        df[COL_INDEX] = (
+            (df[net_position_column] - rolling_min) / 
+            (rolling_max - rolling_min)
+        ) * 100
+        
+        # Handle division by zero
+        df.loc[rolling_max == rolling_min, COL_INDEX] = 50.0
 
-        engineered_data_df = _engineer_features_with_pandas(input_path)
-                
-    except FileNotFoundError:
-        print(f"Error: Input file not found at {input_path}")
-        raise Exception(f"Error: Input file not found at {input_path}")
+    df.to_csv(file_path, header=True)
+    return file_path
 
-    # 3. WRITE OUTPUT FILE
-    print(f"[FEATURE_AGENT Tool] ENGINEERED DF: {engineered_data_df}")
-    engineered_data_df.to_csv(engineered_path, header=True)    
-    print(f"[FEATURE_AGENT Tool] ENGINEERED data created at: {engineered_path}")
-    return engineered_path
+    
+    return df # Return the DataFrame with the new feature columns
 
 def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     """
