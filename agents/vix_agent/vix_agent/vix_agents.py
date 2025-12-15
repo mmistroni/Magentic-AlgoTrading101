@@ -6,7 +6,7 @@ from vix_agent.tools import (
     ingestion_tool,
     vix_ingestion_tool, 
     merge_vix_and_cot_features_tool,
-    feature_engineering_tool, 
+    calculate_features_tool, 
     signal_generation_tool,
     read_signal_file_tool
 )
@@ -19,7 +19,7 @@ INGESTION_FT = FunctionTool(ingestion_tool)
 VIX_INGESTION_FT = FunctionTool(vix_ingestion_tool) 
 MERGE_INGESTION_FT = FunctionTool(merge_vix_and_cot_features_tool) 
 
-FEATURE_FT = FunctionTool(feature_engineering_tool)
+FEATURE_FT = FunctionTool(calculate_features_tool)
 SIGNAL_FT = FunctionTool(signal_generation_tool)
 READER_FT = FunctionTool(read_signal_file_tool)
 
@@ -86,7 +86,7 @@ NEW_FEATURE_TOOL_CALLER = LlmAgent(
 
     **Task 2: Instruct the Tool Call**
     
-    Call the **`feature_engineering_tool`** passing the **merged URI** AND the **explicit, numerically defined thresholds** needed to calculate the 'Extreme VIX' and 'Extreme COT' binary signals.
+    Call the **`calculate_feature`** passing the **merged URI** AND the **explicit, numerically defined thresholds** needed to calculate the 'Extreme VIX' and 'Extreme COT' binary signals.
     
     The tool must return **ONLY** the URI string of the file containing the final engineered features.
     """,
@@ -157,7 +157,8 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         # 2. VIX Data Ingestion (NEW AGENT)
         VIX_INGESTION_TOOL_CALLER,            # Output: 'vix_raw_output_uri' (VIX URI) 
         # 3. FEATURE ENGINEERING (MUST BE UPDATED TO USE BOTH URIs)
-        MERGE_ALIGNMENT_TOOL_CALLER,            
+        MERGE_ALIGNMENT_TOOL_CALLER,     
+        NEW_FEATURE_TOOL_CALLER       
         # 4. Signal Generation, Reading, and Model Validation (Rest of the flow remains the same)
         #SIGNAL_TOOL_CALLER,             # 3. Uses engineered URI, gets signal file URI
         #SIGNAL_READER_AGENT,            # 4. Uses signal file URI, gets signal JSON dict

@@ -323,5 +323,7 @@ async def test_pipeline_data_flow_and_pydantic_output(mocker,
 
     print(f"---- Test Vix AGent. Merge  is:{merges.head(4)}")
     
+    from pprint import pprint
+    pprint(merges.columns)
 
 

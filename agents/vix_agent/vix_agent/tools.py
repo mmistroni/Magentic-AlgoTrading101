@@ -189,12 +189,14 @@ def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
     # We now have a daily dataset where COT data changes only once per week (on Friday)
     print(f"Feature Agent: Merge complete. Final daily shape: {merged_df.shape}")
     merged_df.to_csv(merged_path, header=True)
+    print(f"[ FEAture - {merged_df.columns}")
+    
     return merged_path
 
     
 
 # The actual Tool Function (This runs on your side)
-def calculate_features(
+def calculate_features_tool(
     cot_vix_path: str,  # Assumed to be passed internally
     net_position_column: str, 
     lookback_weeks: List[int]
@@ -202,8 +204,12 @@ def calculate_features(
     """
     Generates the COT Index features for multiple lookback periods.
     """
-    
+    print(f'### net position col is:{net_position_column}')
+
     df = _read_data_from_pandas(cot_vix_path).copy()
+    
+    print(f'### input df cols are:{df.columns}')
+    
     file_path = "./temp_data/vix_cot_features.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -226,10 +232,10 @@ def calculate_features(
         df.loc[rolling_max == rolling_min, COL_INDEX] = 50.0
 
     df.to_csv(file_path, header=True)
-    return file_path
 
+    print(f"[Feature Agent]: new df : {df.head(5)}")
     
-    return df # Return the DataFrame with the new feature columns
+    return file_path
 
 def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     """
@@ -364,5 +370,5 @@ def vix_data_tool() -> Dict[str, Any]:
 
 
 REAL_INGESTION_TOOL = FunctionTool(ingestion_tool) # Updated to use the new ingestion_tool
-REAL_FEATURE_TOOL = FunctionTool(feature_engineering_tool)
+REAL_FEATURE_TOOL = FunctionTool(calculate_features_tool)
 REAL_SIGNAL_TOOL = FunctionTool(signal_generation_tool)
