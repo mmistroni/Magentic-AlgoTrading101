@@ -281,14 +281,21 @@ def calculate_features_tool(
 
     
     # 6. Save the final DataFrame and return the new URI string
-    print(f'### input df cols are:{df.columns}')
+    print(f'[Feature Tool] Final col input df cols are:{final_feature_df.columns}')
+    
+    print(f'[Feature Tool] Cot Th:{cot_percentile_threshold} - Vix Z:{vix_zscore_threshold}')
+    
+    
     file_path = "./temp_data/vix_cot_features.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
 
     final_feature_df.to_csv(file_path, header=True)
 
-    print('[FEATURE TOOL. OUtput file:{file_path}')
+    print(f'[FEATURE TOOL]. OUtput file:{file_path}')
+    
+    print(f'[FEATURE TOOL]. :{final_feature_df.head(3)}')
+    
     return file_path
 
 

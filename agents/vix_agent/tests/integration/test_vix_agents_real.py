@@ -328,9 +328,9 @@ async def test_pipeline_data_flow_and_pydantic_output(mocker,
     
     features_output_uri = final_state.get('feature_tool_raw_output')
     assert features_output_uri is not None
-
+    print(f'[PYTEST]:Feature uri is {features_output_uri}')
     featured = _read_data_from_pandas(features_output_uri)
 
-    print(f"---- FEatured Vix AGent. Merge  is:{featured.head(4)}")
+    print(f"---- FEatured Vix AGent. Merge  is:{featured.tail(4)}")
     
 
