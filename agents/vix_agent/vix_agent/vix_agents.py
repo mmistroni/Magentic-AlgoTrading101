@@ -76,26 +76,30 @@ NEW_FEATURE_TOOL_CALLER = LlmAgent(
     name="FeatureToolCaller",
     model='gemini-2.5-flash',
     instruction=f"""
-    **Task 1: Analyze and Define Extremity (The 'Smarter' Part)**
-    
-    1.  The necessary VIX and COT data is **merged and aligned** in the file located at: **{{vix_cot_merged_output_uri}}**.
-    2.  **Hypothesize** the required features for predicting a 'huge drop in VIX prices' (i.e., resolution of extreme fear). These must include measures of:
-        * **VIX Extremity:** A quantitative measure of how far VIX is from its recent historical average (e.g., a Z-score threshold).
-        * **COT Extremity:** A quantitative measure of extreme speculative positioning (Non-Commercial Net Position) relative to its historical range (e.g., a percentile threshold).
-    3.  **Define the Specific Thresholds:** Based on general market knowledge (e.g., Z-score > 2.0, Percentile < 10%), determine the explicit numerical criteria for a 'hot' point.
+    **CRITICAL TASK: CALCULATE ALL REQUIRED FEATURES**
 
-    **Task 2: Instruct the Tool Call**
-    
-    Call the **`calculate_feature`** passing the **merged URI** AND the **explicit, numerically defined thresholds** needed to calculate the 'Extreme VIX' and 'Extreme COT' binary signals.
-    
+    The necessary VIX and COT data is **merged and aligned** in the file located at: **{{vix_cot_merged_output_uri}}**.
+
+    **1. Calculate Net Position:**
+       * You must first calculate the **Net Non-Commercial Position** (often called `net_position`) by subtracting the Non-Commercial Short positions from the Non-Commercial Long positions using the raw COT columns in the merged file.
+
+    **2. Analyze and Define Extremity:**
+       * **Hypothesize** the required features for predicting a 'huge drop in VIX prices' (resolution of extreme fear).
+       * Calculate **VIX Extremity:** A quantitative measure of how far VIX is from its recent historical average (e.g., a Z-score threshold).
+       * Calculate **COT Extremity:** A quantitative measure of extreme speculative positioning using the newly calculated **Net Position** relative to its historical range (e.g., a percentile threshold).
+
+    **3. Define Specific Thresholds:**
+       * Determine the explicit numerical criteria for a 'hot' point (e.g., VIX Z-score > 2.0, Net Position Percentile < 10%).
+
+    **4. Instruct the Tool Call:**
+       * Call the **`calculate_features_tool`** passing the **merged URI** AND the **explicit, numerically defined thresholds** needed to perform **ALL** of the above steps (including the initial Net Position calculation).
+       
     The tool must return **ONLY** the URI string of the file containing the final engineered features.
     """,
     tools=[FEATURE_FT], 
     output_key='feature_tool_raw_output'
 )
 
-
-# ***REMOVED***: FEATURE_MODEL_GENERATOR
 
 # ---
 

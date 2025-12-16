@@ -193,49 +193,106 @@ def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
     
     return merged_path
 
+
+def apply_thresholds_to_features(df: pd.DataFrame, vix_zscore_threshold: float, cot_percentile_threshold: float) -> pd.DataFrame:
+    """
+    Applies the LLM-defined thresholds to VIX Z-Score and COT Percentile 
+    to create binary signal columns (1/0).
+    """
     
+    # --- 1. Apply VIX Extremity Threshold ---
+    # Extreme VIX is defined by a Z-Score HIGHER than the threshold (e.g., Z > 2.5)
+    
+    # We use a numpy/pandas where/condition approach for speed
+    df['Extreme_VIX_Signal'] = (df['VIX_ZScore'] > vix_zscore_threshold).astype(int)
+    
+    # --- 2. Apply COT Extremity Threshold ---
+    # Extreme COT is defined by a Percentile LOWER than the threshold (e.g., P < 0.10, or 10%)
+    # This means Commercial traders are extremely net-short (a contrarian sign of market bottoms)
+    
+    df['Extreme_COT_Signal'] = (df['COT_Percentile'] < cot_percentile_threshold).astype(int)
+
+    # --- 3. (Optional) Create a Combined Feature ---
+    # While the Signal Agent will handle the final logic, it's often useful 
+    # to combine the feature in the feature engineering step.
+    
+    # The combined signal is 1 only when BOTH conditions are met (the contrarian setup)
+    df['Combined_Feature_Signal'] = (
+        (df['Extreme_VIX_Signal'] == 1) & 
+        (df['Extreme_COT_Signal'] == 1)
+    ).astype(int)
+    
+    # Fill NaN values (e.g., from rolling window startup) with 0 for safety
+    df[['Extreme_VIX_Signal', 'Extreme_COT_Signal', 'Combined_Feature_Signal']] = \
+        df[['Extreme_VIX_Signal', 'Extreme_COT_Signal', 'Combined_Feature_Signal']].fillna(0)
+    
+    return df
+
 
 # The actual Tool Function (This runs on your side)
 def calculate_features_tool(
-    cot_vix_path: str,  # Assumed to be passed internally
-    net_position_column: str, 
-    lookback_weeks: List[int]
-) -> str:
+    merged_data_uri: str,
+    vix_zscore_threshold: float,
+    cot_percentile_threshold: float) -> str:
     """
-    Generates the COT Index features for multiple lookback periods.
+    Performs all feature engineering, including Net Position calculation, 
+    Z-score/Percentile calculation, and applying the LLM-defined thresholds.
+    Returns the URI of the final feature file.
     """
-    print(f'### net position col is:{net_position_column}')
+    # 1. Load data from merged_data_uri:
+    print(f'[FEATURES TOOL: VixZ:{vix_zscore_threshold}|CotPcNt:{cot_percentile_threshold}]')
+    df = _read_data_from_pandas(merged_data_uri).copy()
+    
+    # 2. calculate net position
+    # Assuming 'df' is your loaded merged DataFrame
+    df['net_position'] = df['comm_positions_long_all'] - df['comm_positions_short_all']
 
-    df = _read_data_from_pandas(cot_vix_path).copy()
+    # 3. Calculate VIX Z-Score (using a lookback window)
+    # Define a window (e.g., 252 trading days = approx. 1 year)
+    window = 252  
+
+    # Calculate Rolling Mean and Standard Deviation
+    df['VIX_Rolling_Mean'] = df['close'].rolling(window=window).mean()
+    df['VIX_Rolling_Std'] = df['close'].rolling(window=window).std()
+
+    # Calculate the Z-Score
+    df['VIX_ZScore'] = (df['close'] - df['VIX_Rolling_Mean']) / df['VIX_Rolling_Std']
+
+    # 4. Calculate COT Percentile Rank (using a lookback window)
+    # Define a long window (e.g., 1250 trading days = approx. 5 years)
+    long_window = 1250 
+
+    # Calculate Rolling Max and Min for the Net Position
+    df['COT_Rolling_Max'] = df['net_position'].rolling(window=long_window).max()
+    df['COT_Rolling_Min'] = df['net_position'].rolling(window=long_window).min()
+
+    # Calculate the COT Oscillator (Percentile Rank)
+    df['COT_Percentile'] = (df['net_position'] - df['COT_Rolling_Min']) / \
+                        (df['COT_Rolling_Max'] - df['COT_Rolling_Min'])
+    # 5. Apply thresholds to create binary signals:
+    #    Extreme_VIX_Signal = 1 if VIX_ZScore > vix_zscore_threshold
+    #    Extreme_COT_Signal = 1 if COT_Percentile < cot_percentile_threshold
+    # --- Example of function call inside calculate_features_tool ---
+    final_feature_df = apply_thresholds_to_features(
+                                 df, 
+                                 vix_zscore_threshold=vix_zscore_threshold, 
+                                 cot_percentile_threshold=cot_percentile_threshold
+                        )
+
     
+    # 6. Save the final DataFrame and return the new URI string
     print(f'### input df cols are:{df.columns}')
-    
     file_path = "./temp_data/vix_cot_features.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
 
-    for WEEKS in lookback_weeks:
-        # (Internal logic is the same efficient pandas code as before)
-        COL_INDEX = f'COT_Index_{WEEKS}W'
-        
-        rolling_stats = df[net_position_column].rolling(window=WEEKS, min_periods=1)
-        rolling_min = rolling_stats.min()
-        rolling_max = rolling_stats.max()
-        
-        # Min-Max Normalization (COT Index Formula)
-        df[COL_INDEX] = (
-            (df[net_position_column] - rolling_min) / 
-            (rolling_max - rolling_min)
-        ) * 100
-        
-        # Handle division by zero
-        df.loc[rolling_max == rolling_min, COL_INDEX] = 50.0
+    final_feature_df.to_csv(file_path, header=True)
 
-    df.to_csv(file_path, header=True)
-
-    print(f"[Feature Agent]: new df : {df.head(5)}")
-    
+    print('[FEATURE TOOL. OUtput file:{file_path}')
     return file_path
+
+
+
 
 def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     """
