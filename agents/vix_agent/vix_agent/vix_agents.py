@@ -110,52 +110,73 @@ SIGNAL_TOOL_CALLER = LlmAgent(
 
 # ---
 
-## ✅ FINAL STEP: FILE READING AND MODEL VALIDATION (New/Updated Agents)
+## 🚦 STAGE 3: SIGNAL GENERATION (UPDATED to pick LAST ROW)
 
+## 🚦 STAGE 3: SIGNAL GENERATION (Updated for 7-Day Lookback)
+SIGNAL_TOOL_CALLER = LlmAgent(
+    name="SignalToolCallerAgent",
+    model='gemini-2.5-flash',
+    description="Calls the tool to generate a signal report for the last 7 trading days.",
+    tools=[SIGNAL_FT],
+    instruction="""
+    1. Retrieve the engineered data URI from **'feature_tool_raw_output'**.
+    2. Retrieve the market name from **'market'**.
+    
+    **CRITICAL:** Instruct the `signal_generation_tool` to process the **LAST 7 ROWS** of the data. 
+    This provides a weekly view of the VIX Z-score and COT Percentile trends.
+    
+    Your final output must be **ONLY** the raw URI string for the generated signal file.
+    """,
+    output_key='signal_file_uri_raw' 
+)
+
+# ---
+
+## ✅ FINAL STEP: FILE READING AND BATCH VALIDATION
 SIGNAL_READER_AGENT = LlmAgent(
     name="SignalReaderAgent",
     model='gemini-2.5-flash',
     instruction="""
-    Retrieve the raw URI string from the shared context key **'signal_file_uri_raw'**. 
-    Use the **`read_signal_file_tool`** to read the JSON file content at that URI.
+    Retrieve the raw URI string from **'signal_file_uri_raw'**. 
+    Use the **`read_signal_file_tool`** to extract the data.
     
-    **CRITICAL:** Your final output must be **ONLY** the JSON dictionary returned by the tool.
+    **CRITICAL:** The output will be a JSON LIST of 7 objects. Return the raw JSON list content.
     """,
     tools=[READER_FT],
-    output_key='signal_json_content_raw' # New key to hold the actual signal DICT content
+    output_key='signal_json_content_raw'
 )
 
 SIGNAL_MODEL_GENERATOR = LlmAgent(
     name="SignalModelGenerator",
     model='gemini-2.5-flash',
     instruction=f"""
-    Retrieve the final signal JSON dictionary directly from the shared context key **'signal_json_content_raw'**.
-    The content is already a valid JSON dictionary from the file. **Do not modify it or add analysis.**
-    Convert this dictionary into a new JSON object that strictly adheres to the **{SignalDataModel.__name__}** schema.
+    1. Retrieve the JSON list from **'signal_json_content_raw'**.
+    2. Convert each item in the list into a **{SignalDataModel.__name__}** object.
+    3. Analyze the trend: If the 'Sell' signals are increasing in confidence over the 7 days, highlight this in the final justification.
+    
+    **OUTPUT REQUIREMENT:** Return a list of validated SignalDataModels.
     """,
-    tools=[], 
-    output_schema=SignalDataModel, 
-    output_key='final_signal_json' # The key holding the final validated Signal JSON
+    # Note: If your framework requires a single object, wrap this in a List[SignalDataModel] 
+    # or a container model like 'WeeklyReportModel'.
+    output_schema=list[SignalDataModel], 
+    output_key='final_signal_json' 
 )
+
 
 # ---
 
-## 🎯 THE SIMPLIFIED PIPELINE DEFINITION
+## 🎯 THE UPDATED PIPELINE DEFINITION
 
 COT_WORKFLOW_PIPELINE = SequentialAgent(
-    name="COTTradingSignalPipeline_Simplified",
+    name="COTTradingSignalPipeline_V3",
     sub_agents=[
-        INGESTION_TOOL_CALLER,          # 1. Gets raw URI
-        # 2. VIX Data Ingestion (NEW AGENT)
-        VIX_INGESTION_TOOL_CALLER,            # Output: 'vix_raw_output_uri' (VIX URI) 
-        # 3. FEATURE ENGINEERING (MUST BE UPDATED TO USE BOTH URIs)
+        INGESTION_TOOL_CALLER,          
+        VIX_INGESTION_TOOL_CALLER,            
         MERGE_ALIGNMENT_TOOL_CALLER,     
-        NEW_FEATURE_TOOL_CALLER       
-        # 4. Signal Generation, Reading, and Model Validation (Rest of the flow remains the same)
-        #SIGNAL_TOOL_CALLER,             # 3. Uses engineered URI, gets signal file URI
-        #SIGNAL_READER_AGENT,            # 4. Uses signal file URI, gets signal JSON dict
-        #SIGNAL_MODEL_GENERATOR          # 5. Uses signal JSON dict, validates Pydantic model
+        NEW_FEATURE_TOOL_CALLER,
+        SIGNAL_TOOL_CALLER,       # Added back with 'last row' logic
+        SIGNAL_READER_AGENT,      # Added back
+        SIGNAL_MODEL_GENERATOR    # Final Pydantic validation
     ]
 )
-
 # You should now use COT_WORKFLOW_PIPELINE_SIMPLIFIED in your tests!
