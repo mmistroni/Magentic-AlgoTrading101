@@ -10,7 +10,7 @@ from vix_agent.tools import (
     signal_generation_tool,
     read_signal_file_tool
 )
-from vix_agent.models import SignalDataModel, DataPointerModel 
+from vix_agent.models import SignalDataModel, DataPointerModel, WeeklySignalReport
 # Note: RawDataModel and FeatureDataModel are not used in the simplified flow.
 
 # --- FunctionTool Wrappers (No Change) ---
@@ -150,15 +150,13 @@ SIGNAL_MODEL_GENERATOR = LlmAgent(
     name="SignalModelGenerator",
     model='gemini-2.5-flash',
     instruction=f"""
-    1. Retrieve the JSON list from **'signal_json_content_raw'**.
-    2. Convert each item in the list into a **{SignalDataModel.__name__}** object.
-    3. Analyze the trend: If the 'Sell' signals are increasing in confidence over the 7 days, highlight this in the final justification.
-    
-    **OUTPUT REQUIREMENT:** Return a list of validated SignalDataModels.
+    1. You will receive a JSON list containing 7 days of data.
+    2. Map this list to the 'signals' field in the **{WeeklySignalReport.__name__}**.
+    3. Evaluate the 7-day trend: identify if the COT positioning is becoming more extreme or mean-reverting.
+    4. Provide a final 'weekly_trend' summary.
     """,
-    # Note: If your framework requires a single object, wrap this in a List[SignalDataModel] 
-    # or a container model like 'WeeklyReportModel'.
-    output_schema=list[SignalDataModel], 
+    tools=[], 
+    output_schema=WeeklySignalReport, # Using the WRAPPER here
     output_key='final_signal_json' 
 )
 

@@ -38,6 +38,11 @@ class SignalDataModel(BaseModel):
     confidence: float = Field(..., description="Confidence level (0.0 to 1.0).")
     justification: str = Field(..., description="Detailed explanation for the signal.")
 
+class WeeklySignalReport(BaseModel):
+    """The final wrapper model returned by the Agent."""
+    signals: List[SignalDataModel] = Field(description="List of 7 daily signals")
+    weekly_trend: str = Field(description="Analysis of the momentum over the week")
+
 from pydantic import BaseModel, Field
 from datetime import date
 

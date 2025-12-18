@@ -310,10 +310,19 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     
     try:
         df = pd.read_csv(input_path, index_col=0, parse_dates=True)
+        df.index = pd.to_datetime(df.index)
         
+        print(f'SignalTool[Head ]\n{df.head(7)}')
+        print('----------------------------')
+        print(f'SignalTool[Tail ]\n{df.tail(7)}')
+        
+
         # Ensure we don't crash if there are fewer than 7 rows
-        target_rows = df.tail(7)
-        
+        target_rows = df.head(7)
+    
+        print(f'[SiGNal Tool]\n{target_rows}')
+
+
         signals_list = []
 
         for timestamp, row in target_rows.iterrows():
@@ -337,6 +346,8 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
                 "confidence": conf,
                 "justification": f"VIX Z: {vix_z:.2f} | COT %: {cot_p:.2f}"
             })
+
+        print(f'[SIGNAL TOOL] signal json:\n{signals_list}')
 
         # Save as a JSON list
         with open(signal_path, 'w') as outfile:
