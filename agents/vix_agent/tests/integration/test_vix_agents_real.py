@@ -324,7 +324,7 @@ async def test_pipeline_data_flow_and_pydantic_output(mocker,
     print(f"---- Test Vix AGent. Merge  is:{merges.head(4)}")
     
     from pprint import pprint
-    pprint(merges.columns)
+    pprint(merges.head(5))
     
     features_output_uri = final_state.get('feature_tool_raw_output')
     assert features_output_uri is not None

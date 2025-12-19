@@ -49,53 +49,6 @@ def _read_data_from_pandas(input_path:str) -> pd.DataFrame :
     
     
 
-def _engineer_features_with_pandas(input_path: str) -> pd.DataFrame:
-    """
-    Reads data from a CSV as a DataFrame, calculates Z-Scores and Percentiles,
-    and saves the engineered DataFrame back to a new CSV.
-    
-    Args:
-        input_path (str): Path to the input CSV (e.g., 'vix_cot_data.csv').
-        output_path (str): Path to save the output CSV.
-    """
-    try:
-        # 1. READ CSV AS DATAFRAME
-        # Read the file, treating the first column as the index (Timestamp)
-        # Ensure the numerical columns are correctly cast
-        df = pd.read_csv(
-            input_path, 
-            index_col='Timestamp', 
-            parse_dates=['Timestamp'],
-            dtype={'Raw_COT_Value': np.float64, 'Raw_VIX_Value': np.float64}
-        )
-        print(f"Successfully read input data from {input_path}. Shape: {df.shape}")
-
-        # 2. CALCULATE ACTUAL FEATURES (Core Data Engineering)
-        
-        # Calculate COT Z-Score: (Value - Mean) / Standard Deviation
-        cot_mean = df['Raw_COT_Value'].mean()
-        cot_std = df['Raw_COT_Value'].std()
-        
-        if cot_std == 0:
-             df['COT_Z_Score'] = 0.0 # Handle case where all values are the same
-        else:
-             df['COT_Z_Score'] = (df['Raw_COT_Value'] - cot_mean) / cot_std
-        
-        # Calculate VIX Percentile Rank (0 to 100)
-        # The rank shows the percentage of values in the series less than the current value.
-        df['VIX_Percentile'] = df['Raw_VIX_Value'].rank(pct=True) * 100
-        print(f'Generating----\n{df}')
-        # 3. SAVE ENGINEERED DATAFRAME TO CSV
-        return df
-
-    except FileNotFoundError:
-        print(f"Error: Input file not found at {input_path}")
-        return None
-    except Exception as e:
-        print(f"An unexpected error occurred during processing: {e}")
-        return None
-
-    
 def ingestion_tool(market: str) -> str:
     """
     TOOL: Creates the RAW data file at a specific URI and returns the URI string.
@@ -108,12 +61,8 @@ def ingestion_tool(market: str) -> str:
 
     raw_data = _get_raw_data(market)
 
-    print(f"[INGESTION Tool] RAW data created is: {raw_data}")
-    
     raw_data.to_csv(file_path, header=True)
 
-    print(f"[INGESTION Tool] RAW data created at: {file_path}")
-    
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
 
@@ -129,12 +78,8 @@ def vix_ingestion_tool() -> str:
 
     raw_data = _get_vix_raw_data()
 
-    print(f"[INGESTION Tool] VIX RAW data created is: {raw_data}")
-    
     raw_data.to_csv(file_path, header=True)
 
-    print(f"[INGESTION Tool] VIX RAW data created at: {file_path}")
-    
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
 
@@ -157,7 +102,16 @@ def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
     
     # Create a new index spanning the entire date range of the VIX data
     vix_df = _read_data_from_pandas(vix_path)
+
+    print(f'[Merge]. vix columns are:{vix_df.columns}')
+
+
+
     cot_clean_df = _read_data_from_pandas(cot_clean_path)
+    
+    print(f'[Merge]. cot clean df  clumns are:{cot_clean_df.columns}')
+
+    
     start_date = vix_df.index.min()
     end_date = vix_df.index.max()
     daily_index = pd.date_range(start=start_date, end=end_date, freq='D')
@@ -187,10 +141,7 @@ def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
     merged_df.dropna(subset=[vix_df.columns[0]], inplace=True) 
     
     # We now have a daily dataset where COT data changes only once per week (on Friday)
-    print(f"Feature Agent: Merge complete. Final daily shape: {merged_df.shape}")
     merged_df.to_csv(merged_path, header=True)
-    print(f"[ FEAture - {merged_df.columns}")
-    
     return merged_path
 
 
@@ -247,6 +198,8 @@ def calculate_features_tool(
     # Assuming 'df' is your loaded merged DataFrame
     df['net_position'] = df['comm_positions_long_all'] - df['comm_positions_short_all']
 
+    print(f"Net position not none:{df[df['net_position'].notna()]}")
+
     # 3. Calculate VIX Z-Score (using a lookback window)
     # Define a window (e.g., 252 trading days = approx. 1 year)
     window = 252  
@@ -281,21 +234,18 @@ def calculate_features_tool(
 
     
     # 6. Save the final DataFrame and return the new URI string
-    print(f'[Feature Tool] Final col input df cols are:{final_feature_df.columns}')
-    
-    print(f'[Feature Tool] Cot Th:{cot_percentile_threshold} - Vix Z:{vix_zscore_threshold}')
-    
-    
+    print(f"[FEATURE TOOL EXTREMe VIX]\n{df[df['Extreme_VIX_Signal'] == 1]}")
+
+    print(f"\n[FEATURE TOOL EXTREMe COT]\n{df[df['Extreme_COT_Signal'] == 1]}")
+
+
+
+
     file_path = "./temp_data/vix_cot_features.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-
     final_feature_df.to_csv(file_path, header=True)
 
-    print(f'[FEATURE TOOL]. OUtput file:{file_path}')
-    
-    print(f'[FEATURE TOOL]. :{final_feature_df.head(3)}')
-    
     return file_path
 
 
@@ -309,7 +259,7 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     os.makedirs(os.path.dirname(signal_path), exist_ok=True)
     
     try:
-        df = pd.read_csv(input_path, index_col=0, parse_dates=True)
+        df = pd.read_csv(input_path, index_col='date', parse_dates=True)
         df.index = pd.to_datetime(df.index)
         
         print(f'SignalTool[Head ]\n{df.head(7)}')

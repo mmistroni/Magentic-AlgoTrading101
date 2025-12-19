@@ -172,9 +172,9 @@ COT_WORKFLOW_PIPELINE = SequentialAgent(
         VIX_INGESTION_TOOL_CALLER,            
         MERGE_ALIGNMENT_TOOL_CALLER,     
         NEW_FEATURE_TOOL_CALLER,
-        SIGNAL_TOOL_CALLER,       # Added back with 'last row' logic
-        SIGNAL_READER_AGENT,      # Added back
-        SIGNAL_MODEL_GENERATOR    # Final Pydantic validation
+        #SIGNAL_TOOL_CALLER,       # Added back with 'last row' logic
+        #SIGNAL_READER_AGENT,      # Added back
+        #SIGNAL_MODEL_GENERATOR    # Final Pydantic validation
     ]
 )
 # You should now use COT_WORKFLOW_PIPELINE_SIMPLIFIED in your tests!
