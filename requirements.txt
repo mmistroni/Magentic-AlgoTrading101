@@ -145,6 +145,7 @@ numexpr==2.10.2
 numpy==2.2.5
 oauthlib==3.2.2
 openai==1.75.0
+openbb
 openbb_benzinga
 openbb_bls
 openbb_cftc
