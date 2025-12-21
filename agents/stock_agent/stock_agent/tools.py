@@ -5,7 +5,7 @@ from google.cloud import bigquery
 import os
 from google.cloud import bigquery
 
-def discover_technical_schema():
+def discover_technical_schema_tool():
     """Returns a list of available technical indicators and their types."""
     # SDK automatically pulls project from your environment/ADC
     client = bigquery.Client()
@@ -20,7 +20,7 @@ def discover_technical_schema():
     # We return a simple dict or string for the agent to parse
     return {field.name: field.field_type for field in table.schema}
 
-def fetch_today_technical_snapshot():
+def fetch_today_technical_snapshot_tool():
     """Queries BigQuery for the current day's technical data."""
     client = bigquery.Client()
     dataset_id = os.getenv("BQ_DATASET_ID")
