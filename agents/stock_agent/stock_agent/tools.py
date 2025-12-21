@@ -11,12 +11,17 @@ def discover_technical_schema_tool():
     client = bigquery.Client()
     
     # Use environment variables for your specific location
-    dataset_id = 'shareloader'
-    table_id = 'finviz-selection'
+    dataset_id = 'gcp_shareloader'
+    table_id = 'finviz-premarket'
     table_ref = f"{client.project}.{dataset_id}.{table_id}"
+
+    print(f'====TAbleREf={table_ref}|')
+
 
     table = client.get_table(table_ref)
     
+    print('===============Now getting ll fields')
+
     # We return a simple dict or string for the agent to parse
     return {field.name: field.field_type for field in table.schema}
 
