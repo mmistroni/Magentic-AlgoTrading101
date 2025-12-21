@@ -1,0 +1,6 @@
+google-adk
+openbb_core
+openbb_fmp
+openbb_cftc
+pydantic
+# Add any other dependencies your agent needs
