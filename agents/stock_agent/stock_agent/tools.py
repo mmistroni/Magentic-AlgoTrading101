@@ -23,8 +23,8 @@ def discover_technical_schema_tool():
 def fetch_today_technical_snapshot_tool():
     """Queries BigQuery for the current day's technical data."""
     client = bigquery.Client()
-    dataset_id = os.getenv("BQ_DATASET_ID")
-    table_id = os.getenv("BQ_TABLE_ID")
+    dataset_id = 'gcp_shareloader'
+    table_id = 'finviz-premarket'
     table_ref = f"{client.project}.{dataset_id}.{table_id}"
 
     # Standard SQL using CURRENT_DATE() for the snapshot
