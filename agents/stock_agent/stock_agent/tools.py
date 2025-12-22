@@ -33,7 +33,7 @@ def fetch_today_technical_snapshot_tool():
     # Standard SQL using CURRENT_DATE() for the snapshot
     query = f"""
         SELECT * FROM `{table_ref}`
-        WHERE date = CURRENT_DATE()
+        WHERE cob = CURRENT_DATE()
     """
     
     # to_dataframe() is the most efficient way to pass data to an LLM
