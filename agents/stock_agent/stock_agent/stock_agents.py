@@ -56,9 +56,9 @@ QUANT_ANALYZER = LlmAgent(
     model='gemini-2.5-flash', # Optimized for Dec 2025 multi-step reasoning
     instruction=AUTONOMOUS_QUANT_INSTRUCTION,
     tools=[
-        #FunctionTool(fetch_today_technical_snapshot_tool)
+        FunctionTool(fetch_today_technical_snapshot_tool)
         ],
-    output_schema=TrendSignal, # Enforces the Pydantic contract we defined
+    #output_schema=TrendSignal, # Enforces the Pydantic contract we defined
     output_key='final_trade_signal'
 )
 
@@ -69,7 +69,7 @@ TREND_PIPELINE = SequentialAgent(
     name="TrendPipeline",
     sub_agents=[
         SCHEMA_DISCOVERY_AGENT,
-        SCHEMA_FORMATTER_AGENT 
-        #QUANT_ANALYZER
+        SCHEMA_FORMATTER_AGENT, 
+        QUANT_ANALYZER
     ]
 )

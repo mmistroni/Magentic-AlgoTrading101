@@ -165,6 +165,11 @@ async def test_pipeline_data_ingestion_and_pydantic_output(mocker,
     for key in tech_keys_to_check:
         assert key in pyd_available_schema.indicators, f"{key} missing from indicators"
 
+    print(f'----------- TEsting Signal now........')    
+    print(f'---- DEBUG 2 Geting Signal....')
+    signal_result = final_state.get('final_trade_signal')
+    print(f'======== Signal REsult is :\n {signal_result}')
+    
 
     
     
