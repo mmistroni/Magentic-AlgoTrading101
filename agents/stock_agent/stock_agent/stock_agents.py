@@ -4,20 +4,31 @@ from stock_agent.tools import (
     discover_technical_schema_tool,
     fetch_today_technical_snapshot_tool
 )
+from stock_agent.models import TechnicalSchema
 from stock_agent.models import TrendSignal
 
 # 1. Specialized Schema Agent
 # Its only job is to discover WHAT we can analyze
-SCHEMA_AGENT = LlmAgent(
-    name="SchemaExplorer",
-    model='gemini-3-flash', # Upgraded to the new Dec 2025 standard
-    instruction="""
-    Call the discover_technical_schema_tool to find all available columns in the BigQuery table.
-    Output only the list of technical indicators found.
-    """,
+SCHEMA_DISCOVERY_AGENT = LlmAgent(
+    name="SchemaDiscovery",
+    model='gemini-2.5-flash',
+    instruction="Call `discover_technical_schema_tool` and list every column name found. Just list them clearly.",
     tools=[FunctionTool(discover_technical_schema_tool)],
-    output_key="available_schema" # Saved to state for the next agent
+    output_key="raw_discovery_results" # Stored as a raw string
 )
+
+SCHEMA_FORMATTER_AGENT = LlmAgent(
+    name="SchemaFormatter",
+    model='gemini-2.5-flash',
+    instruction="""
+    Take the list of columns from {raw_discovery_results}.
+    Map them into the TechnicalSchema format. 
+    Ensure 'price' and 'volume' fields are separated from technical indicators like 'RSI'.
+    """,
+    output_schema=TechnicalSchema, # <--- Robust validation happens here
+    output_key="available_schema"  # This is what the QuantAnalyzer will eventually read
+)
+
 
 # 2. Specialized Analysis Agent
 # It picks up the {available_schema} from the state
@@ -42,9 +53,11 @@ AUTONOMOUS_QUANT_INSTRUCTION = """
 # --- Updated Agent Configuration ---
 QUANT_ANALYZER = LlmAgent(
     name="QuantAnalyzer",
-    model='gemini-3-flash', # Optimized for Dec 2025 multi-step reasoning
+    model='gemini-2.5-flash', # Optimized for Dec 2025 multi-step reasoning
     instruction=AUTONOMOUS_QUANT_INSTRUCTION,
-    tools=[FunctionTool(fetch_today_technical_snapshot_tool)],
+    tools=[
+        #FunctionTool(fetch_today_technical_snapshot_tool)
+        ],
     output_schema=TrendSignal, # Enforces the Pydantic contract we defined
     output_key='final_trade_signal'
 )
@@ -54,5 +67,9 @@ QUANT_ANALYZER = LlmAgent(
 # This ensures step 1 happens before step 2
 TREND_PIPELINE = SequentialAgent(
     name="TrendPipeline",
-    sub_agents=[SCHEMA_AGENT, QUANT_ANALYZER]
+    sub_agents=[
+        SCHEMA_DISCOVERY_AGENT,
+        SCHEMA_FORMATTER_AGENT 
+        #QUANT_ANALYZER
+    ]
 )
