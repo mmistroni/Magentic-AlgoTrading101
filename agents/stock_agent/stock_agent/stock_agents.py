@@ -21,48 +21,39 @@ SCHEMA_FORMATTER_AGENT = LlmAgent(
     name="SchemaFormatter",
     model='gemini-2.5-flash',
     instruction="""
-    SYSTEM MANDATE: You are a JSON converter.
-    INPUT DATA: {raw_discovery_results}
-    
-    TASK: Take the keys from the INPUT DATA and place them into the TechnicalSchema.
-    
-    STRICT RULES:
-    1. USE ONLY the literal strings found in the input. 
-    2. NEVER use generic words like 'stock' or 'technical indicators'.
-    3. If the input contains 'RSI', the output must contain 'RSI'.
-    4. Metadata MUST include the specific field name for the stock identity (e.g., 'symbol' or 'ticker').
-    
-    If you cannot find specific field names in {raw_discovery_results}, stop and report that the input is empty.
+    1. Retrieve the raw column names from the context key: **{raw_discovery_results}**.
+    2. Map these literal strings into the TechnicalSchema.
+    3. DO NOT look at the user's trading request. Focus ONLY on the data in {raw_discovery_results}.
     """,
     output_schema=TechnicalSchema,
-    output_key="available_schema"
+    output_key="available_schema" # This key is now the 'Source of Truth'
 )
 
 # 2. Specialized Analysis Agent
 # It picks up the {available_schema} from the state
 # --- The Refined Autonomous Instructions ---
 AUTONOMOUS_QUANT_INSTRUCTION = """
-**Role**: Senior Quantitative Technical Strategist (Autonomous).
-**Objective**: Identify trade candidates by mapping a dynamic schema and analyzing session data.
+**Role**: Senior Quantitative Technical Strategist.
+**Objective**: Fetch raw market data and interpret it using the pre-defined Technical Schema.
 
 **Operational Mandate**:
-1. **Autonomous Schema Mapping**:
-   - You are provided a schema in {available_schema}. You must categorize these fields into 'indicators', 'metadata', and 'volume_flow'.
-   - **Identity Rule**: Every technical snapshot REQUIRES a unique identifier (e.g., a symbol or ticker). You must find the field in the schema that represents the stock identity and include it in your 'metadata' list.
-   - **Confluence Rule**: To perform a valid analysis, you must identify at least TWO (2) fields that represent technical trends or momentum.
+1. **The Map**: Retrieve the validated schema from: **{available_schema}**. 
+   - This object contains the list of `indicators` and the `metadata` identity field you must use.
 
-2. **Temporal Logic**:
-   - Use `fetch_technical_snapshot_tool` with `target_date='today'` (default) or `target_date='yesterday'`.
-   - Do not query specific calendar dates.
+2. **The Data**: Call `fetch_technical_snapshot_tool` to get the raw BigQuery results.
 
-3. **Analysis Protocol**:
-   - Once the schema is mapped, fetch the data.
-   - Cross-reference price action against your identified indicators. 
-   - Issue 'BUY' or 'SELL' only if there is confluence. Issue 'HOLD' if the data is contradictory or the identity field is missing.
+3. **The Interpretation (CRITICAL)**:
+   - Look at the columns in the tool's result that match the names in `{available_schema}.indicators`.
+   - Use these specific columns to evaluate your trading signals.
+   - **Identity Rule**: Use the column name found in `{available_schema}.metadata` to identify which stock corresponds to which row of data.
 
-**Constraint**: Your output MUST satisfy the Pydantic schema validation. If you provide 'price' without an accompanying 'symbol' or 'ticker', the analysis will be rejected.
+4. **Trading Logic**:
+   - Apply your strategy (Fundamentals + Technicals) to the specific columns identified in Step 3.
+   - Issue 'BUY' or 'SELL' only if there is confluence between at least TWO (2) indicators from the schema.
+   - Issue 'HOLD' if the identity field is missing or data is inconclusive.
+
+**Constraint**: You must explicitly mention which indicators from the `{available_schema}` led to your final recommendation.
 """
-
 
 # --- Updated Agent Configuration ---
 QUANT_ANALYZER = LlmAgent(
