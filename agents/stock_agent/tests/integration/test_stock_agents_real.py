@@ -165,11 +165,93 @@ async def test_pipeline_data_ingestion_and_pydantic_output(mocker,
     for key in tech_keys_to_check:
         assert key in pyd_available_schema.indicators, f"{key} missing from indicators"
 
+@pytest.mark.asyncio
+async def test_pipeline_full_run(mocker, 
+                                                           mock_schema_data, 
+                                                           mock_snapshot_data,
+                                                           trend_workflow_runner):
+    """
+    Tests the pipeline execution, verifying state passing and Pydantic validation 
+    for the ingestion stage using the output_key mechanism.
+    """
+    runner, session_service = trend_workflow_runner 
+
+    mocker.patch('stock_agent.tools.discover_technical_schema_tool', return_value=mock_schema_data)
+    mocker.patch('stock_agent.tools.fetch_today_technical_snapshot_tool', return_value=mock_snapshot_data)
+
+    session_id = "test_session_123"
+    user_id = "test_user"
+    app_name = "TrendPipelineApp"
+    test_prompt = "Run a technical analysis for today's stock picks and give me your recommendations."
+
+    # --- 1. SETUP EXPECTED DATA AND FILE I/O ---
+
+    # Define the file path the tool will create and return.
+    expected_raw_uri = "./temp_data/raw_data_test.csv"
+    expected_vix_raw_uri = "./temp_data/vix_raw_data_test.csv"
+
+
+    # 2. CREATE AND INITIALIZE THE SESSION
+    await session_service.create_session(
+        app_name=app_name, 
+        session_id=session_id,
+        user_id=user_id, 
+        state={'market': 'Gold Futures'} 
+    )
+    
+    # 3. ACT: Run the agent pipeline
+    user_content = types.Content(role='user', parts=[types.Part.from_text(text=test_prompt)])
+    final_events_generator = runner.run_async( 
+        user_id=user_id, 
+        session_id=session_id,
+        new_message=user_content 
+    )
+    
+    # Consume the async generator
+    final_events = [event async for event in final_events_generator]
+
+    # Retrieve the final session state
+    final_session = await session_service.get_session( 
+        app_name=app_name,
+        user_id=user_id,
+        session_id=session_id
+    )
+    final_state = final_session.state
+    
+    print("\n\n--- DEBUGGING: Ingestion Pipeline ---")
+
+    # =========================================================================
+    # 4. ASSERT: Tool Output Verification
+    # =========================================================================
+
+    # Check 1: Tool Caller Output. The URI is saved to 'ingestion_raw_output' via the agent's output_key.
+    available_schema = final_state.get('available_schema')
+    print(f"DEBUG 1: 'schema check'\n:{available_schema}")
+    print(type(available_schema))
+
+    assert available_schema is not None
+    
+    
+    metadata_keys_to_check = ['symbol', 'price', 'selection']
+    tech_keys_to_check = ["ADX", "RSI", "SMA20", "SMA200", "SMA50"]
+
+
+    # Re-cast it back to the Pydantic object
+    pyd_available_schema = TechnicalSchema.model_validate(available_schema)
+
+    # Check metadata
+    for key in metadata_keys_to_check:
+        assert key in pyd_available_schema.metadata, f"{key} missing from metadata"
+
+    # Check technical indicators
+    for key in tech_keys_to_check:
+        assert key in pyd_available_schema.indicators, f"{key} missing from indicators"
+
     print(f'----------- TEsting Signal now........')    
     print(f'---- DEBUG 2 Geting Signal....')
     signal_result = final_state.get('final_trade_signal')
     print(f'======== Signal REsult is :\n {signal_result}')
-    
+
 
     
     
