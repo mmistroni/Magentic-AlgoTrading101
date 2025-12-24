@@ -10,7 +10,7 @@ from pytest import approx
 from stock_agent.stock_agents import TREND_PIPELINE 
 from stock_agent.models import TechnicalSchema
 # 2. Import the ingestion tool for manual file creation
-from stock_agent.tools import discover_technical_schema_tool, fetch_today_technical_snapshot_tool
+from stock_agent.tools import discover_technical_schema_tool, fetch_technical_snapshot_tool
 import pandas as pd
 from pathlib import Path
 import re
@@ -95,7 +95,7 @@ async def test_pipeline_data_ingestion_and_pydantic_output(mocker,
     runner, session_service = trend_workflow_runner 
 
     mocker.patch('stock_agent.tools.discover_technical_schema_tool', return_value=mock_schema_data)
-    mocker.patch('stock_agent.tools.fetch_today_technical_snapshot_tool', return_value=mock_snapshot_data)
+    mocker.patch('stock_agent.tools.fetch_technical_snapshot_tool', return_value=mock_snapshot_data)
 
     session_id = "test_session_123"
     user_id = "test_user"
@@ -177,7 +177,7 @@ async def test_pipeline_full_run(mocker,
     runner, session_service = trend_workflow_runner 
 
     mocker.patch('stock_agent.tools.discover_technical_schema_tool', return_value=mock_schema_data)
-    mocker.patch('stock_agent.tools.fetch_today_technical_snapshot_tool', return_value=mock_snapshot_data)
+    mock_snapshot  =mocker.patch('stock_agent.tools.fetch_technical_snapshot_tool', return_value=mock_snapshot_data)
 
     session_id = "test_session_123"
     user_id = "test_user"
@@ -251,6 +251,8 @@ async def test_pipeline_full_run(mocker,
     print(f'---- DEBUG 2 Geting Signal....')
     signal_result = final_state.get('final_trade_signal')
     print(f'======== Signal REsult is :\n {signal_result}')
+
+    mock_snapshot.assert_called_once_with(target_date='yesterday')
 
 
     
