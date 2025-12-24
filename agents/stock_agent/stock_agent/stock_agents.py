@@ -2,7 +2,7 @@ from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.tools import FunctionTool
 from stock_agent.tools import (
     discover_technical_schema_tool,
-    fetch_today_technical_snapshot_tool
+    fetch_technical_snapshot_tool
 )
 from stock_agent.models import TechnicalSchema
 from stock_agent.models import TrendSignal
@@ -35,18 +35,19 @@ SCHEMA_FORMATTER_AGENT = LlmAgent(
 # --- The Refined Autonomous Instructions ---
 AUTONOMOUS_QUANT_INSTRUCTION = """
 **Role**: Senior Quantitative Technical Strategist (Autonomous).
-**Objective**: Identify trade candidates (BUY/SELL) by synthesizing price-action trends with volume-flow confirmation.
+**Objective**: Identify trade candidates (BUY/SELL) by synthesizing price-action trends with volume-flow confirmation for a requested period.
 
 **Operational Mandate**:
-1. **Dynamic Data Mapping**: You are given a schema in {available_schema}. You must autonomously identify which fields represent 'Trend' (e.g., SMAs, slope), 'Momentum' (e.g., RSI, ADX), and 'Volume Flow' (e.g., CMF, OBV).
-2. **Analysis Protocol**:
-   - Cross-reference today's snapshot from `fetch_today_technical_snapshot_tool` against your identified categories.
-   - Prioritize **Confluence**: A strong signal requires alignment across different indicator types.
-   - Identify **Divergence**: If price indicators suggest one direction but volume flow suggests another, you MUST flag this as a 'HOLD' with a high-risk warning.
-3. **Professional Justification**: In your reasoning, do not just list values. Explain the *relationship* between the metrics (e.g., "Bullish trend confirmed as current price sits above all SMAs, supported by accelerating OBV").
-4. **Identity Filtering**: Treat non-technical fields (Exchange, Country, Timestamps) as metadata for reporting only; they must not influence your core trade thesis.
+1. **Dynamic Data Mapping**: Use the schema in {available_schema} to identify 'Trend', 'Momentum', and 'Volume Flow' fields.
+2. **Temporal Analysis Protocol**:
+   - **Contextual Querying**: Use `fetch_technical_snapshot` to retrieve data. If the user mentions "yesterday," "today," or a specific date, you MUST pass that specific timeframe to the tool.
+   - **Snapshot Interpretation**: Cross-reference the retrieved snapshot against your identified categories.
+   - **Prioritize Confluence**: A strong signal requires alignment across different indicator types for the period analyzed.
+   - **Identify Divergence**: If price indicators suggest one direction but volume flow suggests another, you MUST flag this as a 'HOLD'.
+3. **Professional Justification**: Explain the *relationship* between metrics (e.g., "As of [Date], bullish trend is confirmed..."). Always state the date of the data you are analyzing to ensure transparency.
+4. **Identity Filtering**: Treat metadata (Exchange, Country) as reporting context only.
 
-**Constraint**: You have full autonomy over the logic. If the data is insufficient or contradictory, use your expertise to issue a 'HOLD' rather than a low-quality 'BUY/SELL'.
+**Constraint**: You have full autonomy. If data for the requested date is missing or contradictory, issue a 'HOLD'.
 """
 
 
@@ -56,7 +57,7 @@ QUANT_ANALYZER = LlmAgent(
     model='gemini-2.5-flash', # Optimized for Dec 2025 multi-step reasoning
     instruction=AUTONOMOUS_QUANT_INSTRUCTION,
     tools=[
-        FunctionTool(fetch_today_technical_snapshot_tool)
+        FunctionTool(fetch_technical_snapshot_tool)
         ],
     #output_schema=TrendSignal, # Enforces the Pydantic contract we defined
     output_key='final_trade_signal'
