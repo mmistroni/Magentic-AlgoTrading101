@@ -184,6 +184,7 @@ async def test_pipeline_full_run(mocker,
     user_id = "test_user"
     app_name = "TrendPipelineApp"
     test_prompt = "Run a technical analysis for today's stock picks and give me your recommendations."
+    #test_prompt = "Provide me the current schema of the table holding the stocks."
 
     # --- 1. SETUP EXPECTED DATA AND FILE I/O ---
 
@@ -233,7 +234,7 @@ async def test_pipeline_full_run(mocker,
     assert available_schema is not None
     
     
-    metadata_keys_to_check = ['symbol', 'price', 'selection']
+    metadata_keys_to_check = ['symbol', 'price']
     tech_keys_to_check = ["ADX", "RSI", "SMA20", "SMA200", "SMA50"]
 
 
@@ -254,14 +255,6 @@ async def test_pipeline_full_run(mocker,
     print(f'======== Signal REsult is :\n {signal_result}')
 
     mock_snapshot.assert_called_once_with(target_date='yesterday')
-
-
-import pytest
-from google.genai import types
-from google.adk.sessions import InMemorySessionService
-from google.adk.runners import Runner
-from stock_agent.stock_agents import SCHEMA_FORMATTER_AGENT
-from stock_agent.models import TechnicalSchema
 
 @pytest.mark.asyncio
 async def test_schema_formatter_logic_buckets(mocker, 

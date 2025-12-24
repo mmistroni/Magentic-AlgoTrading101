@@ -21,22 +21,22 @@ SCHEMA_FORMATTER_AGENT = LlmAgent(
     name="SchemaFormatter",
     model='gemini-2.5-flash',
     instruction="""
-    ROLE: You are a strict DATA TRANSFORMATION layer. 
-    TASK: Regardless of what the user eventually wants to analyze, you MUST map the keys found in {raw_discovery_results} into the TechnicalSchema.
-    COLUMNS TO PROCESS: {raw_discovery_results}
-    Identify and categorize the columns from {raw_discovery_results} using these logic rules:
+    SYSTEM MANDATE: You are a JSON converter.
+    INPUT DATA: {raw_discovery_results}
     
-    1. **Metadata**: Any field that identifies the stock (e.g., ticker, symbol, name) or basic price info (price, open, close).
-    2. **Indicators**: Any field that represents a technical study. Usually these are uppercase (RSI, ADX) or contain numbers (SMA20, EMA50). If you are unsure and it's a numeric technical value, put it here.
-    3. **Volume**: Anything containing 'volume', 'obv', or 'flow'.
+    TASK: Take the keys from the INPUT DATA and place them into the TechnicalSchema.
     
-    **Constraint**: You MUST NOT return empty lists. If columns exist in the input, they MUST be categorized.
+    STRICT RULES:
+    1. USE ONLY the literal strings found in the input. 
+    2. NEVER use generic words like 'stock' or 'technical indicators'.
+    3. If the input contains 'RSI', the output must contain 'RSI'.
+    4. Metadata MUST include the specific field name for the stock identity (e.g., 'symbol' or 'ticker').
     
+    If you cannot find specific field names in {raw_discovery_results}, stop and report that the input is empty.
     """,
-    output_schema=TechnicalSchema, # <--- Robust validation happens here
-    output_key="available_schema"  # This is what the QuantAnalyzer will eventually read
+    output_schema=TechnicalSchema,
+    output_key="available_schema"
 )
-
 
 # 2. Specialized Analysis Agent
 # It picks up the {available_schema} from the state
@@ -79,11 +79,23 @@ QUANT_ANALYZER = LlmAgent(
 
 # 3. The Orchestrator
 # This ensures step 1 happens before step 2
-TREND_PIPELINE = SequentialAgent(
-    name="TrendPipeline",
+TREND_PIPELINE = LlmAgent(
+    name="TrendStrategist",
+    model='gemini-2.5-flash',
+    instruction="""
+    You are the Lead Investment Strategist. Your goal is to fulfill the user's request.
+    
+    EXECUTION PLAN:
+    1. First, call 'SchemaDiscovery' to find the available data.
+    2. Second, call 'SchemaFormatter' to organize that data into our TechnicalSchema.
+    3. Finally, call 'QuantAnalyzer' to perform the analysis the user requested.
+    
+    CRITICAL: You must complete the schema mapping (Steps 1 & 2) before attempting the analysis.
+    """,
+    # By listing agents here, the Master can delegate to them like tools
     sub_agents=[
-        SCHEMA_DISCOVERY_AGENT,
+        SCHEMA_DISCOVERY_AGENT, 
         SCHEMA_FORMATTER_AGENT, 
-        QUANT_ANALYZER
+        #QUANT_ANALYZER
     ]
 )
