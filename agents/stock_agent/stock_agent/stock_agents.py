@@ -21,9 +21,17 @@ SCHEMA_FORMATTER_AGENT = LlmAgent(
     name="SchemaFormatter",
     model='gemini-2.5-flash',
     instruction="""
-    Take the list of columns from {raw_discovery_results}.
-    Map them into the TechnicalSchema format. 
-    Ensure 'price' and 'volume' fields are separated from technical indicators like 'RSI'.
+    ROLE: You are a strict DATA TRANSFORMATION layer. 
+    TASK: Regardless of what the user eventually wants to analyze, you MUST map the keys found in {raw_discovery_results} into the TechnicalSchema.
+    COLUMNS TO PROCESS: {raw_discovery_results}
+    Identify and categorize the columns from {raw_discovery_results} using these logic rules:
+    
+    1. **Metadata**: Any field that identifies the stock (e.g., ticker, symbol, name) or basic price info (price, open, close).
+    2. **Indicators**: Any field that represents a technical study. Usually these are uppercase (RSI, ADX) or contain numbers (SMA20, EMA50). If you are unsure and it's a numeric technical value, put it here.
+    3. **Volume**: Anything containing 'volume', 'obv', or 'flow'.
+    
+    **Constraint**: You MUST NOT return empty lists. If columns exist in the input, they MUST be categorized.
+    
     """,
     output_schema=TechnicalSchema, # <--- Robust validation happens here
     output_key="available_schema"  # This is what the QuantAnalyzer will eventually read

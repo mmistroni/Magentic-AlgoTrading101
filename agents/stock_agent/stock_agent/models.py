@@ -6,7 +6,7 @@ from datetime import date
 from pydantic import BaseModel, Field
 from typing import Literal, List
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional
 
 class TechnicalSchema(BaseModel):
@@ -33,6 +33,21 @@ class TechnicalSchema(BaseModel):
         if not any(item.lower() in ['ticker', 'symbol'] for item in v):
             raise ValueError("Identity field (ticker/symbol) missing from schema.")
         return v
+    
+
+    @model_validator(mode='before')
+    @classmethod
+    def debug_input_data(cls, data):
+        # This will print the raw data the agent is trying to validate
+        print(f"DEBUG: ======Pydantic receiving data: {data}")
+        return data
+    
+    @model_validator(mode='after')
+    def check_for_empty_discovery(self):
+        if not self.indicators and not self.metadata:
+            # This will show up in your test logs immediately
+            raise ValueError("The Agent failed to map any columns from the discovery tool.")
+        return self
 class TrendSignal(BaseModel):
     ticker: str
     signal: Literal["BUY", "SELL", "HOLD"]

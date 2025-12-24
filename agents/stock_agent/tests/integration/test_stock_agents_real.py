@@ -15,6 +15,7 @@ import pandas as pd
 from pathlib import Path
 import re
 from typing import Union, Optional
+from stock_agent.stock_agents import SCHEMA_FORMATTER_AGENT
 
 # -----------------------------------------------------------------------------
 # --- FIXTURES ---
@@ -255,7 +256,72 @@ async def test_pipeline_full_run(mocker,
     mock_snapshot.assert_called_once_with(target_date='yesterday')
 
 
-    
-    
-    
+import pytest
+from google.genai import types
+from google.adk.sessions import InMemorySessionService
+from google.adk.runners import Runner
+from stock_agent.stock_agents import SCHEMA_FORMATTER_AGENT
+from stock_agent.models import TechnicalSchema
 
+@pytest.mark.asyncio
+async def test_schema_formatter_logic_buckets(mocker, 
+                                                           mock_schema_data, 
+                                                           mock_snapshot_data,
+                                                           trend_workflow_runner):
+    
+    """
+    Tests the pipeline execution, verifying state passing and Pydantic validation 
+    for the ingestion stage using the output_key mechanism.
+    """
+    runner, session_service = trend_workflow_runner 
+
+    mocker.patch('stock_agent.tools.discover_technical_schema_tool', return_value=mock_schema_data)
+    mocker.patch('stock_agent.tools.fetch_technical_snapshot_tool', return_value=mock_snapshot_data)
+
+    session_id = "test_session_123"
+    user_id = "test_user"
+    app_name = "TrendPipelineApp"
+    test_prompt = "Map the schema."
+    mock_raw_columns = "ticker, price, RSI, ADX, SMA20, volume, CHOP14, KAMA"
+    
+    # 2. CREATE AND INITIALIZE THE SESSION
+    await session_service.create_session(
+        app_name=app_name, 
+        session_id=session_id,
+        user_id=user_id, 
+        state={"raw_discovery_results": mock_raw_columns}
+    
+    )
+    
+    # 3. ACT: Run the agent pipeline
+    user_content = types.Content(role='user', parts=[types.Part.from_text(text=test_prompt)])
+    final_events_generator = runner.run_async( 
+        user_id=user_id, 
+        session_id=session_id,
+        new_message=user_content 
+    )
+    
+    # Consume the async generator
+    final_events = [event async for event in final_events_generator]
+
+    # Retrieve the final session state
+    final_session = await session_service.get_session( 
+        app_name=app_name,
+        user_id=user_id,
+        session_id=session_id
+    )
+    final_state = final_session.state
+    
+    print("\n\n--- DEBUGGING: Ingestion Pipeline ---")
+
+    # =========================================================================
+    # 4. ASSERT: Tool Output Verification
+    # =========================================================================
+
+    # Check 1: Tool Caller Output. The URI is saved to 'ingestion_raw_output' via the agent's output_key.
+    available_schema = final_state.get('available_schema')
+    print(f"DEBUG 1: 'schema check'\n:{available_schema}")
+    print(type(available_schema))
+
+    
+    
