@@ -81,18 +81,13 @@ QUANT_ANALYZER = LlmAgent(
 )
 
 
-# 3. The Orchestrator
-# This ensures step 1 happens before step 2
-TREND_PIPELINE = LlmAgent(
+# 3. The Unstoppable Pipeline
+# We replace the LlmAgent 'TrendStrategist' with a SequentialAgent.
+# This FORCES the handoff without needing an orchestrator prompt.
+TREND_PIPELINE = SequentialAgent(
     name="TrendStrategist",
-    model='gemini-2.5-flash',
-    instruction="""
-    You are the Lead Investment Strategist.
-    
-    1. Call 'SchemaUnit' to discover and map the database columns.
-    2. Once 'SchemaUnit' returns the 'available_schema', call 'QuantAnalyzer' to perform the analysis.
-    
-    CRITICAL: You MUST use the 'SchemaUnit' first. Do not attempt to guess columns.
-    """,
-    sub_agents=[SCHEMA_UNIT, QUANT_ANALYZER]
+    sub_agents=[
+        SCHEMA_UNIT,   # Step 1: Discover & Format
+        QUANT_ANALYZER # Step 2: Analyze (will now finally be called)
+    ]
 )
