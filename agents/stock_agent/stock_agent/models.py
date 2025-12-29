@@ -11,13 +11,16 @@ from typing import List, Optional
 
 class TechnicalSchema(BaseModel):
     indicators: List[str] = Field(
-        description="List of technical indicators like RSI, ADX, SMA."
+        description="List of technical indicators like RSI, ADX, SMA.",
+        default_factory=list
     )
     volume_metrics: List[str] = Field(
-        description="Fields related to volume like OBV or CMF."
+        description="Fields related to volume like OBV or CMF.",
+        default_factory=list
     )
     metadata: List[str] = Field(
-        description="Core fields like ticker, exchange, or timestamps."
+        description="Core fields like ticker, exchange, or timestamps.",
+        default_factory=list
     )
     
     @field_validator('indicators')

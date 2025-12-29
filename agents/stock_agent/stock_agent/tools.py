@@ -7,9 +7,8 @@ from datetime import date, timedelta
 import os
 from google.cloud import bigquery
 
-def discover_technical_schema_tool():
-    """Returns a list of available technical indicators and their types."""
-    # SDK automatically pulls project from your environment/ADC
+
+def _get_table_schema():
     client = bigquery.Client()
     
     # Use environment variables for your specific location
@@ -23,6 +22,13 @@ def discover_technical_schema_tool():
 
     # We return a simple dict or string for the agent to parse
     return {field.name: field.field_type for field in table.schema}
+
+def discover_technical_schema_tool():
+    """Returns a list of available technical indicators and their types."""
+    # SDK automatically pulls project from your environment/ADC
+    print(f'[SCHEMA DISCOVERY] === Gettign schema...')
+    return _get_table_schema()
+    
 
 def fetch_technical_snapshot_tool(target_date: str = "today"):
     """

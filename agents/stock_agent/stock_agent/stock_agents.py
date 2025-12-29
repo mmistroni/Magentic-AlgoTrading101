@@ -21,13 +21,26 @@ SCHEMA_FORMATTER_AGENT = LlmAgent(
     name="SchemaFormatter",
     model='gemini-2.5-flash',
     instruction="""
-    1. Retrieve the raw column names from the context key: **{raw_discovery_results}**.
-    2. Map these literal strings into the TechnicalSchema.
-    3. DO NOT look at the user's trading request. Focus ONLY on the data in {raw_discovery_results}.
+    Convert the raw columns into a TechnicalSchema JSON. 
+    OUTPUT ONLY VALID JSON. NO PREAMBLE. NO EXPLANATION.
+    If you cannot find indicators, return an empty list for indicators.
     """,
     output_schema=TechnicalSchema,
-    output_key="available_schema" # This key is now the 'Source of Truth'
+    output_key="available_schema"
 )
+
+SCHEMA_UNIT = SequentialAgent(
+    name="SchemaUnit",
+    sub_agents=[
+        SCHEMA_DISCOVERY_AGENT, 
+        SCHEMA_FORMATTER_AGENT
+    ]
+    # In a SequentialAgent, the final state of the last sub-agent 
+    # (available_schema) is what gets returned to the caller.
+)
+
+
+
 
 # 2. Specialized Analysis Agent
 # It picks up the {available_schema} from the state
@@ -74,19 +87,12 @@ TREND_PIPELINE = LlmAgent(
     name="TrendStrategist",
     model='gemini-2.5-flash',
     instruction="""
-    You are the Lead Investment Strategist. Your goal is to fulfill the user's request.
+    You are the Lead Investment Strategist.
     
-    EXECUTION PLAN:
-    1. First, call 'SchemaDiscovery' to find the available data.
-    2. Second, call 'SchemaFormatter' to organize that data into our TechnicalSchema.
-    3. Finally, call 'QuantAnalyzer' to perform the analysis the user requested.
+    1. Call 'SchemaUnit' to discover and map the database columns.
+    2. Once 'SchemaUnit' returns the 'available_schema', call 'QuantAnalyzer' to perform the analysis.
     
-    CRITICAL: You must complete the schema mapping (Steps 1 & 2) before attempting the analysis.
+    CRITICAL: You MUST use the 'SchemaUnit' first. Do not attempt to guess columns.
     """,
-    # By listing agents here, the Master can delegate to them like tools
-    sub_agents=[
-        SCHEMA_DISCOVERY_AGENT, 
-        SCHEMA_FORMATTER_AGENT, 
-        #QUANT_ANALYZER
-    ]
+    sub_agents=[SCHEMA_UNIT, QUANT_ANALYZER]
 )
