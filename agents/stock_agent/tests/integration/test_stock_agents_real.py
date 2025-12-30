@@ -332,7 +332,7 @@ async def test_pipeline_full_run_with_unit(mocker,
 
     await session_service.create_session(
         app_name=app_name, session_id=session_id, user_id=user_id, 
-        state={'market': 'Gold Futures'} 
+        state={} 
     )
     
     user_content = types.Content(role='user', parts=[types.Part.from_text(text=test_prompt)])
