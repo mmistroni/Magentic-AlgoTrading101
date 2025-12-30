@@ -27,7 +27,7 @@ def load_env():
 def test_all():
     """Test the agent's basic ability on a few examples."""
     AgentEvaluator.evaluate(
-        agent_module="capital_agent",
+        agent_module="stock_agent",
         eval_dataset_file_path_or_dir=str(
             pathlib.Path(__file__).parent / "data"
         ),

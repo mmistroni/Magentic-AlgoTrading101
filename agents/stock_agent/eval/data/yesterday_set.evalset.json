@@ -1,0 +1,20 @@
+{
+  "eval_set_id": "yesterday_set",
+  "name": "yesterday_set",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "case466cb0",
+      "conversation": [],
+      "session_input": {
+        "app_name": "stock_agent",
+        "user_id": "user",
+        "state": {
+          "available_schema": ""
+        }
+      },
+      "creation_timestamp": 1767078786.2659755
+    }
+  ],
+  "creation_timestamp": 1767078781.5150404
+}
