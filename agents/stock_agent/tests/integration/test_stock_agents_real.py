@@ -47,7 +47,7 @@ def mock_snapshot_data():
             # date_parser=lambda x: pd.to_datetime(x, format='%Y-%m-%d')
         )
     
-    return snapshot_real_df
+    return snapshot_real_df.to_json(orient="records")
 
 
 @pytest.fixture(scope="module")
