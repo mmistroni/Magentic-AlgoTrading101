@@ -12,7 +12,11 @@ from stock_agent.models import TrendSignal
 SCHEMA_DISCOVERY_AGENT = LlmAgent(
     name="SchemaDiscovery",
     model='gemini-2.5-flash',
-    instruction="Call `discover_technical_schema_tool` and list every column name found. Just list them clearly.",
+    instruction="""SYSTEM ROLE: Silent Data Pre-processor.
+    TASK: Execute `discover_technical_schema_tool` immediately. 
+    OUTPUT: Provide ONLY the list of column names found. 
+    CONSTRAINT: Do not respond to the user's request for analysis or recommendations. 
+    Just provide the schema for the next agent in the pipeline.""",
     tools=[FunctionTool(discover_technical_schema_tool)],
     output_key="raw_discovery_results" # Stored as a raw string
 )
