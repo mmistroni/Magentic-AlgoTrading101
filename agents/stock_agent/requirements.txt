@@ -1,4 +1,6 @@
 google-adk
-db_dtypes
+google-cloud-bigquery
+db-dtypes
 pydantic
-# Add any other dependencies your agent needs
+pandas
+pyarrow
