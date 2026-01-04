@@ -272,3 +272,4 @@ httpx
 pydantic
 pytest
 pytest-asyncio
+vix_utils
