@@ -28,6 +28,8 @@ def strands_agent_bedrock(payload):
     user_input = payload.get("prompt")
     response = agent(user_input)
     return response.message['content'][0]['text']
+    # '{"prompt": "What is 2 + 2 and what is the weather?"}'
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
