@@ -8,7 +8,7 @@ import httpx
 import sys # ⬅️ ADDED: sys module for version check
 
 # --- Configuration (Dynamic) ---
-APP_URL = "https://stock-agent-service-682143946483.us-central1.run.app"
+APP_URL = os.environ['STOCK_AGENT_URL']
 USER_ID = "user_123"
 # Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
