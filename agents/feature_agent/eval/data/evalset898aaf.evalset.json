@@ -1,0 +1,111 @@
+{
+  "eval_set_id": "evalset898aaf",
+  "name": "evalset898aaf",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "casef83cb1",
+      "conversation": [
+        {
+          "invocation_id": "e-7dc1df18-6610-43e0-baca-96061a70b4e2",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "Run a technical analysis for yesterday's stock picks and give me your recommendations"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "For FSR:\n\n**Analysis:**\n*   **ADX (46.25):** Indicates a strong trend is present.\n*   **RSI (37.13):** Neutral to slightly oversold, not providing a strong buy or sell signal.\n*   **SMA20 (0.032), SMA50 (0.281), SMA200 (3.119):** These Simple Moving Averages are significantly spread out, generally indicative of a strong downtrend. However, the `price` data point is null, making it impossible to compare the current price against these averages directly.\n*   **Change (0.718):** A positive change is noted, but without the current `price`, its context in relation to the overall trend is unclear and cannot be reliably used for a strong signal.\n\n**Recommendation:**\n\n**HOLD** for FSR.\n\n**Reasoning:**\nWhile the ADX indicates a strong trend, the crucial `price` data is missing, which prevents a definitive comparison with the SMA indicators (SMA20, SMA50, SMA200) to confirm the direction and strength of the trend for a clear buy or sell signal. The RSI is neutral. Due to the lack of confluence from at least two actionable indicators, a 'HOLD' recommendation is issued."
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-276170d9-f54d-43aa-aa7a-d8afc08fc7a5",
+                "args": {},
+                "name": "discover_technical_schema_tool"
+              },
+              {
+                "id": "adk-a6536e06-baab-4943-bcb4-94791357bdd7",
+                "args": {
+                  "target_date": "yesterday"
+                },
+                "name": "fetch_technical_snapshot_tool"
+              }
+            ],
+            "intermediate_responses": [
+              [
+                "SchemaDiscovery",
+                [
+                  {
+                    "video_metadata": null,
+                    "thought": null,
+                    "inline_data": null,
+                    "file_data": null,
+                    "thought_signature": null,
+                    "code_execution_result": null,
+                    "executable_code": null,
+                    "function_call": null,
+                    "function_response": null,
+                    "text": "ADX, RSI, SMA20, SMA200, SMA50, asodate, change, cmf_last_20_days, cob, country, current_obv, exchange, highlight, last_cmf, marketCap, obv_last_20_days, open, previousClose, previous_cmf, previous_obv, price, selection, slope, symbol, ticker"
+                  }
+                ]
+              ],
+              [
+                "SchemaFormatter",
+                [
+                  {
+                    "video_metadata": null,
+                    "thought": null,
+                    "inline_data": null,
+                    "file_data": null,
+                    "thought_signature": null,
+                    "code_execution_result": null,
+                    "executable_code": null,
+                    "function_call": null,
+                    "function_response": null,
+                    "text": "{\"indicators\": [\"ADX\", \"RSI\", \"SMA20\", \"SMA200\", \"SMA50\", \"slope\"], \"volume_metrics\": [\"cmf_last_20_days\", \"current_obv\", \"last_cmf\", \"obv_last_20_days\", \"previous_cmf\", \"previous_obv\"], \"metadata\": [\"asodate\", \"change\", \"cob\", \"country\", \"exchange\", \"highlight\", \"marketCap\", \"open\", \"previousClose\", \"price\", \"selection\", \"symbol\", \"ticker\"]}"
+                  }
+                ]
+              ]
+            ]
+          },
+          "creation_timestamp": 1767348111.341984
+        }
+      ],
+      "session_input": {
+        "app_name": "stock_agent",
+        "user_id": "user",
+        "state": {
+          "available_schema": ""
+        }
+      },
+      "creation_timestamp": 1767348214.62638
+    }
+  ],
+  "creation_timestamp": 1767348207.7426162
+}
