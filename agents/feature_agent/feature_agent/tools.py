@@ -1,86 +1,101 @@
 from datetime import date, timedelta
-import yfinance as yf
-from google import genai
-from google.genai import types
 import os
-import requests
 import pandas as pd
 from google.cloud import bigquery
-
+import requests
 
 # --- TOOL 1: BigQuery Historical Consensus ---
 def fetch_consensus_holdings_tool(target_date: str) -> list:
     """
-    Finds the high-conviction 'Elite' picks by running the Sniping Query 
-    for a specific quarter-end date.
-    """
-    # This matches your exact logic from yesterday
-    query = f"""
-                SELECT 
-                map.ticker,
-                MAX(base.issuer_name) as issuer_name,
-                COUNT(DISTINCT base.manager_name) as manager_count
-            FROM (
-                SELECT 
-                    manager_name, 
-                    cusip, 
-                    issuer_name, 
-                    ROW_NUMBER() OVER(PARTITION BY manager_name, filing_date ORDER BY value_usd DESC) as position_rank
-                FROM `datascience-projects.gcp_shareloader.all_holdings_master`
-                WHERE manager_name IN (
-                    SELECT manager_name FROM `datascience-projects.gcp_shareloader.high_conviction_master`
-                    WHERE manager_tier = 'TIER_1_ELITE'
-                )
-                AND filing_date = '{target_date}'
-            ) base
-            JOIN `datascience-projects.gcp_shareloader.map_cusip_ticker` map 
-            ON base.cusip = map.cusip
-            WHERE base.position_rank <= 10
-            -- KEEP THE FILTERS HERE:
-            AND UPPER(base.issuer_name) NOT LIKE '% ETF%'
-            AND UPPER(base.issuer_name) NOT LIKE '% INDEX%'
-            AND UPPER(base.issuer_name) NOT LIKE '% TRUST%'
-            AND UPPER(base.issuer_name) NOT LIKE '% SPDR%'
-            AND UPPER(base.issuer_name) NOT LIKE '% ISHARES%'
-            AND UPPER(base.issuer_name) NOT LIKE '% VANGUARD%'
-            GROUP BY 1
-            HAVING manager_count >= 3
-            ORDER BY manager_count DESC;
-    """
-    # Assuming bq_client is initialized
-    bq_client = bigquery.Client()
+    Step 1: Finds high-conviction 'Elite' picks for a specific quarter-end date.
+    Use this tool FIRST to get the list of tickers to analyze.
     
+    Args:
+        target_date (str): The quarter-end date (e.g., '2024-12-31'). 
+                          Must be in YYYY-MM-DD format.
+    Returns:
+        list: A list of dictionaries containing 'ticker' and 'manager_count'.
+    """
+    bq_client = bigquery.Client()
+    query = f"""
+        SELECT 
+            map.ticker,
+            COUNT(DISTINCT base.manager_name) as manager_count
+        FROM (
+            SELECT manager_name, cusip, 
+            ROW_NUMBER() OVER(PARTITION BY manager_name, filing_date ORDER BY value_usd DESC) as position_rank
+            FROM `datascience-projects.gcp_shareloader.all_holdings_master`
+            WHERE manager_name IN (
+                SELECT manager_name FROM `datascience-projects.gcp_shareloader.high_conviction_master`
+                WHERE manager_tier = 'TIER_1_ELITE'
+            )
+            AND filing_date = '{target_date}'
+        ) base
+        JOIN `datascience-projects.gcp_shareloader.map_cusip_ticker` map ON base.cusip = map.cusip
+        WHERE base.position_rank <= 10
+        GROUP BY 1 HAVING manager_count >= 3
+        ORDER BY manager_count DESC
+    """
     df = bq_client.query(query).to_dataframe()
     return df.to_dict(orient='records')
-    
 
-# --- TOOL 2: Technical Confirmation (yfinance) ---
+# --- TOOL 2: Technical Confirmation ---
 def get_technical_metrics_tool(ticker: str, target_date: str) -> dict:
-    """Verifies if the stock was above 200DMA on the 45-day public date."""
-    fmp_key = os.environ['FMP_KEY']
-    public_date = date.fromisoformat(target_date) + timedelta(days=45)
-    data = yf.download(ticker, start=public_date - timedelta(days=300), end=public_date)
+    """
+    Step 2: Verifies if a stock was above its 200-day Moving Average (DMA).
+    Call this tool for every ticker returned by Step 1.
     
+    CRITICAL: This tool automatically accounts for the 45-day SEC filing lag.
+    Pass the SAME target_date used in Step 1.
+    
+    Args:
+        ticker (str): The stock symbol (e.g., 'PLTR').
+        target_date (str): The quarter-end date in YYYY-MM-DD format.
+    """
+    # Publicly available date is 45 days after quarter end
+    public_date = date.fromisoformat(target_date) + timedelta(days=45)
+    
+    # Download extra data to calculate the 200DMA accurately
+    data = get_latest_prices_fmp(ticker, start=public_date - timedelta(days=300), end=public_date)
+    
+    if data.empty:
+        return {"ticker": ticker, "error": "No price data found"}
+
     current_price = data['Close'].iloc[-1]
     sma_200 = data['Close'].rolling(window=200).mean().iloc[-1]
     
     return {
         "ticker": ticker,
         "is_above_200dma": bool(current_price > sma_200),
-        "price_at_entry": float(current_price)
+        "price_at_entry": round(float(current_price), 2),
+        "sma_200": round(float(sma_200), 2)
     }
 
 # --- TOOL 3: Performance Audit ---
-def get_forward_return_tool(ticker: str, entry_date: str, days_ahead: int = 180) -> dict:
-    """Calculates the ROI after a specific holding period (e.g., 6 months)."""
-    start = date.fromisoformat(entry_date) + timedelta(days=45)
-    end = start + timedelta(days=days_ahead)
-    data = yf.download(ticker, start=start, end=end + timedelta(days=5))
+def get_forward_return_tool(ticker: str, target_date: str, days_ahead: int = 180) -> dict:
+    """
+    Step 3: Calculates the 6-month ROI starting from the public knowledge date.
+    ONLY call this tool if 'is_above_200dma' was True in Step 2.
     
+    Args:
+        ticker (str): The stock symbol.
+        target_date (str): The quarter-end date (the tool adds the 45-day lag).
+        days_ahead (int): Holding period in days. Defaults to 180 (6 months).
+    """
+    start = date.fromisoformat(target_date) + timedelta(days=45)
+    end = start + timedelta(days=days_ahead)
+    
+    data = get_latest_prices_fmp(ticker, start=start, end=end + timedelta(days=7))
+    
+    if len(data) < 2:
+        return {"ticker": ticker, "error": "Insufficient data for return calculation"}
+        
     entry_price = data['Close'].iloc[0]
     exit_price = data['Close'].iloc[-1]
-    return {"ticker": ticker, "return_pct": float((exit_price - entry_price) / entry_price * 100)}
-
+    return {
+        "ticker": ticker, 
+        "return_pct": round(float((exit_price - entry_price) / entry_price * 100), 2)
+    }
 
 def get_latest_prices_fmp(symbol:str, start_date : date, end_date :date) -> pd.DataFrame:
     
@@ -103,41 +118,4 @@ def get_latest_prices_fmp(symbol:str, start_date : date, end_date :date) -> pd.D
     except Exception as e:
         print(f"Connection error for {symbol}: {e}")
         return pd.DataFrame()
-
-# 2. Define Tool Schemas for Google SDK
-feature_tools = [
-    types.FunctionDeclaration(
-        name="fetch_consensus_holdings_tool",
-        description="Fetch historical top picks from Elite Managers.",
-        parameters={
-            "type": "OBJECT",
-            "properties": {"target_date": {"type": "STRING", "description": "YYYY-MM-DD"}},
-            "required": ["target_date"]
-        }
-    ),
-    types.FunctionDeclaration(
-        name="get_technical_metrics_tool",
-        description="Check if a ticker was above its 200-day moving average.",
-        parameters={
-            "type": "OBJECT",
-            "properties": {
-                "ticker": {"type": "STRING"},
-                "target_date": {"type": "STRING"}
-            },
-            "required": ["ticker", "target_date"]
-        }
-    ),
-    types.FunctionDeclaration(
-        name="get_forward_return_tool",
-        description="Calculate the performance of a pick after 6 months.",
-        parameters={
-            "type": "OBJECT",
-            "properties": {
-                "ticker": {"type": "STRING"},
-                "entry_date": {"type": "STRING"}
-            },
-            "required": ["ticker", "entry_date"]
-        }
-    )
-]
 
