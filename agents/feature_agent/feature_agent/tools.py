@@ -44,38 +44,48 @@ import yfinance as yf
 from datetime import date, timedelta
 
 # --- TOOL 2: Technical Confirmation (yf version) ---
-def get_technical_metrics_tool(ticker: str, target_date: str) -> dict:
+def get_technical_metrics_tool(tickers: str, target_date: str) -> list:
     """
-    Step 2: Verifies if a stock was above its 200-day Moving Average (DMA).
-    Call this tool for every ticker returned by Step 1.
+    Step 2: Verifies 200DMA for a LIST of tickers in one single request.
+    Use this to avoid the agent getting stuck in a loop.
     
-    CRITICAL: This tool accounts for the 45-day SEC filing lag.
-    Pass the SAME target_date used in Step 1.
+    Args:
+        tickers: A space-separated string of symbols (e.g. 'PLTR MSFT AAPL')
+        target_date: The quarter-end date YYYY-MM-DD.
     """
-    # Public knowledge date is 45 days after the filing period ends
     public_date = date.fromisoformat(target_date) + timedelta(days=45)
+    ticker_list = tickers.split()
     
-    # Fetch 365 days of data to ensure we have enough for a 200-day window
-    # auto_adjust=True handles splits/dividends for clean technicals
-    data = yf.download(ticker, 
+    # yf.download handles lists of tickers in parallel automatically!
+    data = yf.download(ticker_list, 
                        start=public_date - timedelta(days=365), 
                        end=public_date, 
+                       group_by='ticker',
                        progress=False, 
                        auto_adjust=True)
     
-    if data.empty or len(data) < 200:
-        return {"ticker": ticker, "error": f"Insufficient price history (Rows: {len(data)})"}
+    results = []
+    for ticker in ticker_list:
+        try:
+            # Handle both single and multi-index dataframes from yfinance
+            t_data = data[ticker] if len(ticker_list) > 1 else data
+            if t_data.empty or len(t_data) < 200:
+                results.append({"ticker": ticker, "is_above_200dma": False, "error": "No history"})
+                continue
+                
+            current_price = t_data['Close'].iloc[-1]
+            sma_200 = t_data['Close'].rolling(window=200).mean().iloc[-1]
+            
+            results.append({
+                "ticker": ticker,
+                "is_above_200dma": bool(current_price > sma_200),
+                "price_at_entry": round(float(current_price), 2)
+            })
+        except Exception:
+            results.append({"ticker": ticker, "is_above_200dma": False, "error": "Fail"})
+            
+    return results
 
-    # Use 'Close' column for SMA calculation
-    current_price = data['Close'].iloc[-1]
-    sma_200 = data['Close'].rolling(window=200).mean().iloc[-1]
-    
-    return {
-        "ticker": ticker,
-        "is_above_200dma": bool(current_price > sma_200),
-        "price_at_entry": round(float(current_price), 2),
-        "sma_200": round(float(sma_200), 2)
-    }
 
 # --- TOOL 3: Performance Audit (yf version) ---
 def get_forward_return_tool(ticker: str, target_date: str, days_ahead: int = 180) -> dict:
