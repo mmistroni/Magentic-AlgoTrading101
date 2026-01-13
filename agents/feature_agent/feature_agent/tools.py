@@ -62,8 +62,8 @@ def get_technical_metrics_tool(ticker: str, target_date: str) -> dict:
     if data.empty:
         return {"ticker": ticker, "error": "No price data found"}
 
-    current_price = data['Close'].iloc[-1]
-    sma_200 = data['Close'].rolling(window=200).mean().iloc[-1]
+    current_price = data['close'].iloc[-1]
+    sma_200 = data['close'].rolling(window=200).mean().iloc[-1]
     
     return {
         "ticker": ticker,
@@ -91,8 +91,8 @@ def get_forward_return_tool(ticker: str, target_date: str, days_ahead: int = 180
     if len(data) < 2:
         return {"ticker": ticker, "error": "Insufficient data for return calculation"}
         
-    entry_price = data['Close'].iloc[0]
-    exit_price = data['Close'].iloc[-1]
+    entry_price = data['close'].iloc[0]
+    exit_price = data['close'].iloc[-1]
     return {
         "ticker": ticker, 
         "return_pct": round(float((exit_price - entry_price) / entry_price * 100), 2)
