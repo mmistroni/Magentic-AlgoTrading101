@@ -56,7 +56,8 @@ def get_technical_metrics_tool(ticker: str, target_date: str) -> dict:
     public_date = date.fromisoformat(target_date) + timedelta(days=45)
     
     # Download extra data to calculate the 200DMA accurately
-    data = get_latest_prices_fmp(ticker, start=public_date - timedelta(days=300), end=public_date)
+    data = get_latest_prices_fmp(ticker, start_date = public_date - timedelta(days=300), 
+                                 end_date = public_date)
     
     if data.empty:
         return {"ticker": ticker, "error": "No price data found"}
@@ -85,7 +86,7 @@ def get_forward_return_tool(ticker: str, target_date: str, days_ahead: int = 180
     start = date.fromisoformat(target_date) + timedelta(days=45)
     end = start + timedelta(days=days_ahead)
     
-    data = get_latest_prices_fmp(ticker, start=start, end=end + timedelta(days=7))
+    data = get_latest_prices_fmp(ticker, start_date=start, end_date=end + timedelta(days=7))
     
     if len(data) < 2:
         return {"ticker": ticker, "error": "Insufficient data for return calculation"}
