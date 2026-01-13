@@ -39,31 +39,36 @@ def fetch_consensus_holdings_tool(target_date: str) -> list:
     df = bq_client.query(query).to_dataframe()
     return df.to_dict(orient='records')
 
-# --- TOOL 2: Technical Confirmation ---
+
+import yfinance as yf
+from datetime import date, timedelta
+
+# --- TOOL 2: Technical Confirmation (yf version) ---
 def get_technical_metrics_tool(ticker: str, target_date: str) -> dict:
     """
     Step 2: Verifies if a stock was above its 200-day Moving Average (DMA).
     Call this tool for every ticker returned by Step 1.
     
-    CRITICAL: This tool automatically accounts for the 45-day SEC filing lag.
+    CRITICAL: This tool accounts for the 45-day SEC filing lag.
     Pass the SAME target_date used in Step 1.
-    
-    Args:
-        ticker (str): The stock symbol (e.g., 'PLTR').
-        target_date (str): The quarter-end date in YYYY-MM-DD format.
     """
-    # Publicly available date is 45 days after quarter end
+    # Public knowledge date is 45 days after the filing period ends
     public_date = date.fromisoformat(target_date) + timedelta(days=45)
     
-    # Download extra data to calculate the 200DMA accurately
-    data = get_latest_prices_fmp(ticker, start_date = public_date - timedelta(days=300), 
-                                 end_date = public_date)
+    # Fetch 365 days of data to ensure we have enough for a 200-day window
+    # auto_adjust=True handles splits/dividends for clean technicals
+    data = yf.download(ticker, 
+                       start=public_date - timedelta(days=365), 
+                       end=public_date, 
+                       progress=False, 
+                       auto_adjust=True)
     
-    if data.empty:
-        return {"ticker": ticker, "error": "No price data found"}
+    if data.empty or len(data) < 200:
+        return {"ticker": ticker, "error": f"Insufficient price history (Rows: {len(data)})"}
 
-    current_price = data['close'].iloc[-1]
-    sma_200 = data['close'].rolling(window=200).mean().iloc[-1]
+    # Use 'Close' column for SMA calculation
+    current_price = data['Close'].iloc[-1]
+    sma_200 = data['Close'].rolling(window=200).mean().iloc[-1]
     
     return {
         "ticker": ticker,
@@ -72,31 +77,30 @@ def get_technical_metrics_tool(ticker: str, target_date: str) -> dict:
         "sma_200": round(float(sma_200), 2)
     }
 
-# --- TOOL 3: Performance Audit ---
+# --- TOOL 3: Performance Audit (yf version) ---
 def get_forward_return_tool(ticker: str, target_date: str, days_ahead: int = 180) -> dict:
     """
-    Step 3: Calculates the 6-month ROI starting from the public knowledge date.
+    Step 3: Calculates the ROI starting from the public knowledge date.
     ONLY call this tool if 'is_above_200dma' was True in Step 2.
-    
-    Args:
-        ticker (str): The stock symbol.
-        target_date (str): The quarter-end date (the tool adds the 45-day lag).
-        days_ahead (int): Holding period in days. Defaults to 180 (6 months).
     """
     start = date.fromisoformat(target_date) + timedelta(days=45)
     end = start + timedelta(days=days_ahead)
     
-    data = get_latest_prices_fmp(ticker, start_date=start, end_date=end + timedelta(days=7))
+    # Download small window around entry and exit
+    data = yf.download(ticker, start=start, end=end + timedelta(days=10), 
+                       progress=False, auto_adjust=True)
     
     if len(data) < 2:
         return {"ticker": ticker, "error": "Insufficient data for return calculation"}
         
-    entry_price = data['close'].iloc[0]
-    exit_price = data['close'].iloc[-1]
+    entry_price = data['Close'].iloc[0]
+    exit_price = data['Close'].iloc[-1]
+    
     return {
         "ticker": ticker, 
         "return_pct": round(float((exit_price - entry_price) / entry_price * 100), 2)
     }
+
 
 def get_latest_prices_fmp(symbol:str, start_date : date, end_date :date) -> pd.DataFrame:
     
