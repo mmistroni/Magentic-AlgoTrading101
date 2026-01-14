@@ -6,10 +6,14 @@ from datetime import date, timedelta
 
 import os
 from google.cloud import bigquery
+import google.auth
 
+def get_bigquery_client():
+    credentials, project = google.auth.default()
+    return bigquery.Client(credentials=credentials, project=project)
 
 def _get_table_schema():
-    client = bigquery.Client()
+    client = get_bigquery_client()
     
     # Use environment variables for your specific location
     dataset_id = 'gcp_shareloader'

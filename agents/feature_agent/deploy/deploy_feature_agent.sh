@@ -30,7 +30,7 @@ GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-your-default-gcp-project-id}"
 GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 
 # Service Name (Used in the deploy command)
-SERVICE_NAME="stock-agent-service"
+SERVICE_NAME="feature-agent-service"
 
 # Agent-Specific Environment Variables (Necessary for your service to run)
 # Update 'your-vertex-setting' with 'true' or 'false'
