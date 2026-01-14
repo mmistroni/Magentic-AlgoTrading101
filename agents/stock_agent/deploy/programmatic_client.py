@@ -132,43 +132,52 @@ async def chat(client: httpx.AsyncClient, session_id: str):
 
 # --- Main Logic (ASYNC) ---
 
-async def amain():
-    """Main asynchronous function to set up the session and start the loop."""
-    print(f"\n🤖 Starting Interactive Client with Session ID: **{SESSION_ID}**")
+# --- Updated Main Logic for Single Execution ---
+
+async def amain(message_to_send: str):
+    """Main function to run a single interaction and then cleanup."""
+    print(f"\n🤖 Starting Single-Run Client | Session: **{SESSION_ID}**")
+    
     session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
     current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
     
-    # httpx.AsyncClient is used as a context manager to manage connections
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client: # Increased timeout for tool calls
         
         # 1. Create Session
-        print("\n## 1. Creating Session")
         try:
             await make_request(client, "POST", current_session_endpoint, data=session_data)
-            print(f"✅ Session created successfully. Status 200.")
+            print(f"✅ Session created.")
         except Exception as e:
             print(f"❌ Could not start session: {e}")
             return
 
-        # 2. Start the Interactive Loop
-        await chat(client, SESSION_ID)
+        # 2. Run Single Request
+        print(f"--- 💬 Executing Single Task ---")
+        try:
+            await run_agent_request(client, SESSION_ID, message_to_send)
+        except Exception as e:
+            print(f"❌ Agent execution error: {e}")
         
-        # 3. Cleanup: Delete Session (Best Practice)
+        # 3. Cleanup: Delete Session
+        # Added a tiny sleep to ensure server-side async tasks finish before deletion
+        await asyncio.sleep(1) 
         print(f"\n## 3. Deleting Session: {SESSION_ID}")
         try:
-             await make_request(client, "DELETE", current_session_endpoint)
-             print("✅ Session deleted successfully.")
+            await make_request(client, "DELETE", current_session_endpoint)
+            print("✅ Session deleted successfully.")
         except Exception as e:
-             print(f"⚠️ Warning: Failed to delete session. {e}")
-
+            print(f"⚠️ Warning: Failed to delete session. {e}")
 
 if __name__ == "__main__":
-    # Check for Python version as asyncio.to_thread is Python 3.9+
     if sys.version_info < (3, 9):
-        print("🚨 ERROR: This script requires Python 3.9+ for asyncio.to_thread.")
+        print("🚨 ERROR: Python 3.9+ required.")
         sys.exit(1)
         
+    # Define your single query here
+    QUERY = "Run a technical analysis for yesterday's stock picks and give me your recommendations"
+    
     try:
-        asyncio.run(amain())
-    except RuntimeError as e:
-        print(f"FATAL ASYNC ERROR: {e}")
+        asyncio.run(amain(QUERY))
+    except Exception as e:
+        print(f"FATAL ERROR: {e}")
+
