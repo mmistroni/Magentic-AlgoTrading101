@@ -6,13 +6,15 @@ import requests
 import yfinance as yf
 
 # --- TOOL 1: BigQuery Historical Consensus ---
-def fetch_consensus_holdings_tool(target_date: str) -> list:
+# --- TOOL 1: BigQuery Historical Consensus ---
+def fetch_consensus_holdings_tool(target_date: str, offset: int = 0) -> list:
     """
     Step 1: Retrieve the high-conviction tickers from the Elite 331 managers.
     Use this tool FIRST. 
     
     Args:
         target_date (str): The quarter-end date (YYYY-MM-DD).
+        offset (int): The starting point for the results (default 0). Use increments of 100 to paginate.
     Returns:
         list: A list of dicts. IMPORTANT: Extract all 'ticker' values from this list 
               to pass to the next tool as a SINGLE space-separated string.
@@ -47,22 +49,22 @@ WHERE base.position_rank <= 10
   -- AMENDMENT: Manual Blacklist for trackers that don't have "ETF" in their name
   AND map.ticker NOT IN (
       'SPY', 'IVV', 'VOO', 'QQQ', 'VTI', 'IWM', 'AGG', 'VEA', 'IEFA', 'VWO', 
-      'GLD', 'SLV', 'SCHD', 'IAU', 'BIL', 'JPST', 'SHV', 'SHY', 'TLT', 'IEF'
+      'GLD', 'SLV', 'SCHD', 'IAU', 'BIL', 'JPST', 'SHV', 'SHY', 'TLT', 'IEF',
+      'XLF', 'SCHF', 'EFA'
   )
 GROUP BY 1 
 HAVING manager_count >= 3
 ORDER BY manager_count DESC
--- AMENDMENT: Limit to 40 to prevent "MALFORMED_FUNCTION_CALL" in the LLM
-LIMIT 40
+-- AMENDMENT: Set to 100 for pagination and use offset to sweep the full list
+LIMIT 100 OFFSET {offset}
     """
     df = bq_client.query(query).to_dataframe()
     results = df.to_dict(orient='records')
     
-    print(f"--- DEBUG: FOUND {len(results)} TICKERS ---")
+    print(f"--- DEBUG: FOUND {len(results)} TICKERS AT OFFSET {offset} ---")
     
     # We return the list, but the agent will see the size in its thought process
     return results
-
 
 # --- TOOL 2: Technical Confirmation ---
 import math # Add this at the top
