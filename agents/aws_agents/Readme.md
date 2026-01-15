@@ -3,6 +3,8 @@ Youtube:  https://www.youtube.com/live/wzIQDPFQx30?si=j41vdyDQqQrGncsk
 
 https://github.com/awslabs/amazon-bedrock-agentcore-samples
 
+https://github.com/awslabs/amazon-bedrock-agentcore-samples/
+
 
 # You need to initialize environment using the requirements in aws directory
 
