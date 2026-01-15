@@ -70,20 +70,41 @@ LIMIT 100 OFFSET {offset}
 # --- TOOL 2: Technical Confirmation ---
 import math # Add this at the top
 
-def get_technical_metrics_tool(tickers: str, target_date: str) -> list:
+def get_technical_metrics_tool(tickers: str, target_date: str) -> str:
     """
-    Step 2: Processes bulk tickers. 
-    CLEANSE: Replaces NaN with None to prevent JSON 400 errors.
+    Step 2: Filters a batch of tickers based on the 200-day Simple Moving Average (SMA).
+    Calculates technicals as of the public disclosure date (target_date + 45 days).
+    
+    Args:
+        tickers (str): A single space-separated string of tickers (e.g., "AAPL MSFT TSLA").
+        target_date (str): The quarter-end filing date (YYYY-MM-DD).
+        
+    Returns:
+        str: A space-separated string containing ONLY the tickers that are currently 
+             trading above their 200-day SMA. Use this string for the next tool.
+             Example: "AAPL NVDA MSFT"
     """
+    import math
+    import time
+    start_time = time.time()
+    
     public_date = date.fromisoformat(target_date) + timedelta(days=45)
     ticker_list = tickers.split()
     
+    import time
+    start_time = time.time()
+
+    # threads=True is used here to prevent the 'huge amount of time' delay 
+    # by downloading historical data in parallel.
     data = yf.download(ticker_list, 
                        start=public_date - timedelta(days=365), 
                        end=public_date, 
                        group_by='ticker',
                        progress=False, 
-                       auto_adjust=True)
+                       auto_adjust=True,
+                       threads=True)
+    end_time = time.time()
+    print(f"⏱️ DEBUG: Technical check for {len(ticker_list)} stocks took {round(end_time - start_time, 2)} seconds.")
     
     results = []
     for ticker in ticker_list:
@@ -95,29 +116,30 @@ def get_technical_metrics_tool(tickers: str, target_date: str) -> list:
             current_price = t_data['Close'].iloc[-1]
             sma_200 = t_data['Close'].rolling(window=200).mean().iloc[-1]
             
-            # --- CRITICAL FIX START ---
-            # If values are NaN, replace them with 0.0 or None
+            # --- CRITICAL FIX: NaN Protection ---
             safe_price = float(current_price) if not math.isnan(current_price) else 0.0
             safe_sma = float(sma_200) if not math.isnan(sma_200) else 0.0
-            # --- CRITICAL FIX END ---
             
+            # Trend Filter Logic
             if safe_price > safe_sma and safe_price > 0:
-                results.append({
-                    "ticker": ticker,
-                    "is_above_200dma": True,
-                    "price_at_entry": round(safe_price, 2),
-                    "sma_200": round(safe_sma, 2)
-                })
-        except Exception:
+                results.append(ticker) # We only need the ticker string now
+                
+        except Exception as e:
+            print(f"DEBUG: Error processing {ticker}: {e}")
             continue
-    # --- DEBUGGING ---
+
+    # --- PERFORMANCE & TOKEN DEBUGGING ---
+    end_time = time.time()
+    elapsed = round(end_time - start_time, 2)
+    print(f"⏱️ [STEP 2] Processed {len(ticker_list)} tickers in {elapsed}s.")
     print(f"🔍 [STEP 2] {len(results)} stocks passed the 200DMA filter.")
     
-    # IMPORTANT: Ensure this returns the full list, NOT [:25]        
-    return results
+    # Returning a joined string significantly reduces the context window 
+    # size compared to returning a list of dictionaries.
+    passing_string = " ".join(results)
+    return passing_string
 
 
-# --- TOOL 3: Performance Audit ---
 # --- TOOL 3: Performance Audit ---
 def get_forward_return_tool(tickers: str, target_date: str, days_ahead: int = 180) -> list:
     """
@@ -147,7 +169,7 @@ def get_forward_return_tool(tickers: str, target_date: str, days_ahead: int = 18
     
     # Download all tickers in one block to optimize network calls
     data = yf.download(ticker_list, start=start_dt, end=end_dt + timedelta(days=10), 
-                        group_by='ticker', progress=False, auto_adjust=True)
+                        group_by='ticker', progress=False, auto_adjust=True, threads=True)
     
     results = []
     for ticker in ticker_list:
