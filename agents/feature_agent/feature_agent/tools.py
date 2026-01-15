@@ -61,9 +61,10 @@ LIMIT 100 OFFSET {offset}
     df = bq_client.query(query).to_dataframe()
     results = df.to_dict(orient='records')
     
-    print(f"--- DEBUG: FOUND {len(results)} TICKERS AT OFFSET {offset} ---")
-    
     # We return the list, but the agent will see the size in its thought process
+    # --- DEBUGGING ---
+    print(f"✅ [STEP 1] Found {len(results)} raw candidates at Offset: {offset}")
+    return results
     return results
 
 # --- TOOL 2: Technical Confirmation ---
@@ -109,35 +110,74 @@ def get_technical_metrics_tool(tickers: str, target_date: str) -> list:
                 })
         except Exception:
             continue
-            
-    return results[:25]
+    # --- DEBUGGING ---
+    print(f"🔍 [STEP 2] {len(results)} stocks passed the 200DMA filter.")
+    
+    # IMPORTANT: Ensure this returns the full list, NOT [:25]        
+    return results
 
 
 # --- TOOL 3: Performance Audit ---
-def get_forward_return_tool(ticker: str, target_date: str, days_ahead: int = 180) -> dict:
+# --- TOOL 3: Performance Audit ---
+def get_forward_return_tool(tickers: str, target_date: str, days_ahead: int = 180) -> list:
     """
-    Step 3: Calculates ROI and returns the EXACT date window used.
+    Step 3: Calculates the forward ROI for a list of tickers.
+    USE THIS tool only after tickers have been confirmed by the Technical Tool.
+    
+    Args:
+        tickers (str): A SINGLE space-separated string of tickers (e.g., "AAPL MSFT TSLA").
+        target_date (str): The quarter-end date (YYYY-MM-DD).
+        days_ahead (int): The investment horizon (default 180).
+    Returns:
+        list: A list of dicts containing ROI data, entry, and exit prices.
     """
+    import math
     start_dt = date.fromisoformat(target_date) + timedelta(days=45)
     end_dt = start_dt + timedelta(days=days_ahead)
+    ticker_list = tickers.split()
+
+    # --- DEBUGGING ---
+    print(f"📊 [STEP 3] Running final ROI Audit on {len(ticker_list)} tickers...")
+
+
     
-    # Debugging print for your console
-    print(f"DEBUG: Ticker {ticker} | Entry: {start_dt} | Exit: {end_dt}")
+    # --- CONSOLE DEBUGGING ---
+    print(f"\n[AUDIT START] Target Date: {target_date} | Entry: {start_dt}")
+    print(f"[AUDIT BATCH] Processing {len(ticker_list)} tickers...")
     
-    data = yf.download(ticker, start=start_dt, end=end_dt + timedelta(days=10), 
-                       progress=False, auto_adjust=True)
+    # Download all tickers in one block to optimize network calls
+    data = yf.download(ticker_list, start=start_dt, end=end_dt + timedelta(days=10), 
+                        group_by='ticker', progress=False, auto_adjust=True)
     
-    if len(data) < 2:
-        return {"ticker": ticker, "error": "Insufficient data"}
-        
-    entry_price = data['Close'].iloc[0]
-    exit_price = data['Close'].iloc[-1]
-    
-    return {
-        "ticker": ticker, 
-        "start_date": start_dt.strftime('%Y-%m-%d'), # <--- ADDED
-        "end_date": end_dt.strftime('%Y-%m-%d'),     # <--- ADDED
-        "return_pct": round(float((exit_price - entry_price) / entry_price * 100), 2),
-        "entry_price": round(float(entry_price), 2),
-        "exit_price": round(float(exit_price), 2)
-    }
+    results = []
+    for ticker in ticker_list:
+        try:
+            # Handle single vs multiple ticker dataframe structure
+            t_data = data[ticker] if len(ticker_list) > 1 else data
+            
+            if t_data.empty or len(t_data) < 2:
+                print(f"  - {ticker}: Skipping (Insufficient Data)")
+                continue
+                
+            entry_p = t_data['Close'].iloc[0]
+            exit_p = t_data['Close'].iloc[-1]
+            
+            # --- NAN PROTECTION ---
+            if not math.isnan(entry_p) and not math.isnan(exit_p):
+                roi = round(float((exit_p - entry_p) / entry_p * 100), 2)
+                results.append({
+                    "ticker": ticker,
+                    "return_pct": roi,
+                    "entry_price": round(float(entry_p), 2),
+                    "exit_price": round(float(exit_p), 2),
+                    "start_date": start_dt.strftime('%Y-%m-%d'),
+                    "end_date": end_dt.strftime('%Y-%m-%d')
+                })
+            else:
+                print(f"  - {ticker}: Skipping (NaN values found)")
+        except Exception as e:
+            print(f"  - {ticker}: Error - {e}")
+            continue
+            
+    print(f"[AUDIT COMPLETE] Successfully processed {len(results)}/{len(ticker_list)} tickers.\n")
+    return results
