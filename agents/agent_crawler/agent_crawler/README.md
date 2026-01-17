@@ -1,13 +1,8 @@
-# you need to activate .bashrc
+Crawler Agent to check prices
+Please remember to run this before kicking off process
 
-. ~/.bashrc
+# 1. Install the Chromium browser binaries
+python3 -m playwright install chromium
 
-gcloud auth application-default login
-
-python -m venv myenv && source myenv/bin/activate
-
-gcloud auth application-default login
-
-adk web
-
-https://github.com/bhancockio/
+# 2. Install the necessary Linux system dependencies (requires sudo)
+sudo playwright install-deps
