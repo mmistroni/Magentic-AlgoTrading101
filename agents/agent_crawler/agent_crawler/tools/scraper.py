@@ -6,14 +6,13 @@ from pydantic import BaseModel, Field, field_validator
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
-# --- 1. THE FAIL-SAFE DATA MODEL ---
+# --- 1. THE CORE DATA MODEL (Leveraged from yesterday) ---
 class PriceReport(BaseModel):
-    # We add default values so "Field Required" errors are impossible
-    product_name: str = "Horizon 3.0SC Studio Bike"
+    description: str  # To distinguish between Bike, Glasses, etc.
+    product_name: str = "Unknown"
     current_price: float = 0.0 
     availability: bool = False
     currency: str = "GBP"
-    target_met: bool = False
 
     @field_validator('current_price', mode='before')
     @classmethod
@@ -24,57 +23,57 @@ class PriceReport(BaseModel):
             return float(match.group(1)) if match else 0.0
         return v
 
-    @field_validator('availability', mode='before')
-    @classmethod
-    def clean_availability(cls, v):
-        if not v: return False
-        return "in stock" in str(v).lower()
+# --- 2. SPECIALIZED TOOLS ---
 
-# --- 2. THE CSS SCRAPER (Zero Token Cost) ---
-async def get_price_json():
+async def get_bike_price() -> PriceReport:
+    """Specialized tool for the Horizon 3.0SC Bike."""
     schema = {
-        "name": "FSS_Price",
-        "baseSelector": "body", # Broadest selector to find data anywhere
+        "name": "Bike_Scraper",
+        "baseSelector": "body",
         "fields": [
             {"name": "product_name", "selector": "h1.page-title", "type": "text"},
-            {"name": "current_price", "selector": ".price-wrapper .price, [data-price-amount]", "type": "text"},
+            {"name": "current_price", "selector": ".price-wrapper .price", "type": "text"},
             {"name": "availability", "selector": ".stock.available", "type": "text"}
         ]
     }
-
-    browser_cfg = BrowserConfig(
-        headless=True,
-        extra_args=["--no-sandbox", "--disable-dev-shm-usage"]
-    )
-
-    # NO LLM STRATEGY HERE = NO RATE LIMITS
-    run_cfg = CrawlerRunConfig(
-        extraction_strategy=JsonCssExtractionStrategy(schema),
-        cache_mode=CacheMode.BYPASS
-    )
-
-    async with AsyncWebCrawler(config=browser_cfg) as crawler:
+    
+    async with AsyncWebCrawler() as crawler:
         result = await crawler.arun(
             url="https://www.fitness-superstore.co.uk/horizon-fitness-3-0sc-indoor-cycle.html",
-            config=run_cfg
+            config=CrawlerRunConfig(extraction_strategy=JsonCssExtractionStrategy(schema))
         )
+        data = json.loads(result.extracted_content)[0] if result.success else {}
+        return PriceReport(description="Fitness Bike", **data)
 
-        if result.success and result.extracted_content:
-            raw_list = json.loads(result.extracted_content)
-            if raw_list:
-                # Use the fail-safe model to handle any empty data
-                report = PriceReport(**raw_list[0])
-                
-                # Logic: Check price if we actually found one
-                if 0 < report.current_price < 500.0:
-                    report.target_met = True
-                
-                return report.model_dump_json()
-        
-        return json.dumps({"error": "CSS Extraction failed", "success": False})
+async def get_rayban_price() -> PriceReport:
+    """Specialized tool for Sunglass Hut Meta Wayfarers."""
+    schema = {
+        "name": "RayBan_Scraper",
+        "baseSelector": "body",
+        "fields": [
+            {"name": "product_name", "selector": ".pdp-info__name", "type": "text"},
+            {"name": "current_price", "selector": ".pdp-info__price", "type": "text"},
+            {"name": "availability", "selector": ".pdp-buy-box__availability", "type": "text"}
+        ]
+    }
+    
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(
+            url="https://www.sunglasshut.com/uk/ray-ban-meta/rw4012-8056262721421",
+            config=CrawlerRunConfig(extraction_strategy=JsonCssExtractionStrategy(schema))
+        )
+        data = json.loads(result.extracted_content)[0] if result.success else {}
+        return PriceReport(description="Smart Glasses", **data)
+
+# --- 3. THE AGENT ORCHESTRATOR ---
+async def main():
+    # You can now call these individually without any "if-else" mess
+    bike_info = await get_bike_price()
+    glasses_info = await get_rayban_price()
+
+    print(f"--- Results ---")
+    print(f"{bike_info.description}: {bike_info.current_price}")
+    print(f"{glasses_info.description}: {glasses_info.current_price}")
 
 if __name__ == "__main__":
-    try:
-        print(asyncio.run(get_price_json()))
-    except Exception as e:
-        print(json.dumps({"error": str(e), "success": False}))
+    asyncio.run(main())
