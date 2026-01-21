@@ -1,6 +1,7 @@
 from google.adk.agents import Agent
 from agent_crawler.prompts import ROOT_AGENT_INSTRUCTION
-from agent_crawler.tools.scrapers import get_rayban_price_tool, get_bike_price_tool
+from agent_crawler.tools.scraper_tools import get_bike_price_tool, get_rayban_price_tool
+
 from google.adk.agents import LlmAgent
 
 crawler_agent = Agent(
