@@ -1,5 +1,8 @@
 import asyncio
 import json
+import re
+from typing import Optional, Union
+
 from typing import Dict, Any, Union
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, JsonCssExtractionStrategy
 from crawl4ai import (
