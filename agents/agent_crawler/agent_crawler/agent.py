@@ -7,7 +7,7 @@ from google.adk.agents import LlmAgent
 crawler_agent = Agent(
     name="price_monitoring_agent",
     model="gemini-2.0-flash", 
-    description="Analyzes bike and eyewear prices for automated email reports.",
+    description="Analyzes prices of various products for automated email reports.",
     instruction=ROOT_AGENT_INSTRUCTION,  # Changed to match your variable
     tools=[
         get_bike_price_tool,          # Added your scraping tools
