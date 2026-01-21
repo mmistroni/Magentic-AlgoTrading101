@@ -1,0 +1,7 @@
+crawl4ai
+playwright
+pydantic>=2.0
+pydantic-ai
+google-adk
+uvicorn
+fastapi
