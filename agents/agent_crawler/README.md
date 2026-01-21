@@ -1,17 +1,3 @@
-# you need to activate .bashrc
+Prompts
 
-. ~/.bashrc
-
-gcloud auth application-default login
-
-python -m venv myenv && source myenv/bin/activate
-
-gcloud auth application-default login
-
-adk web
-
-https://github.com/bhancockio/
-
-
-
-#https://github.com/google/adk-samples/blob/main/python/agents/academic-research/README.md
+"Check the current prices for the Horizon Fitness 3.0SC bike and the Ray-Ban Meta Wayfarer Gen 2 glasses. For the glasses, specifically provide the price for the Transitions lens version. Format the output as a ready-to-send email report."
