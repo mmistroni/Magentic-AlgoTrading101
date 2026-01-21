@@ -90,8 +90,8 @@ async def get_rayban_price(crawler: AsyncWebCrawler) -> PriceReport:
     # This ensures your budget logic still works even if the site is temporarily down.
     return PriceReport(
         description="Ray-Ban Meta Wayfarer Gen 2 (Fallback)", 
-        product_name="RW4012 Matte Black", 
-        current_price=270.00
+        product_name="Failed ", 
+        current_price=0.0
     )
 
 
