@@ -12,6 +12,7 @@ from crawl4ai import (
     CacheMode, 
     LLMConfig
 )
+
 from crawl4ai.extraction_strategy import (
     LLMExtractionStrategy, 
     JsonCssExtractionStrategy
@@ -80,9 +81,13 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
     
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
         # Note: Ray-Ban often requires specific headers/cookies to avoid bot detection
+        run_cfg = CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS, 
+            extraction_strategy=JsonCssExtractionStrategy(schema)
+        )
         result = await crawler.arun(
             url="https://www.example-eyewear.com/ray-ban-meta-gen-2",
-            config=CrawlerRunConfig(bypass_cache=True)
+            config=run_cfg
         )
         
         if result.success:
