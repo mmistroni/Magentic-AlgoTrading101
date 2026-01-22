@@ -79,27 +79,27 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
     """
     browser_cfg = BrowserConfig(headless=True, enable_stealth=True)
     
-    schema = {
-        "name": "Ray-Ban Meta",
-        "baseSelector": "body",
-        "fields": [
-            {"name": "name", "selector": "h1", "type": "text"},
-            {"name": "price", "selector": ".oop-variant-overview_price, .oop-price-container, [data-testid='price-container']", "type": "text"}
-        ]
-    }
-
-
+    # We use 'async with' directly inside the tool
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
-        # Note: Ray-Ban often requires specific headers/cookies to avoid bot detection
+    
+        schema = {
+            "name": "Ray-Ban Meta",
+            "baseSelector": "body",
+            "fields": [
+                {"name": "name", "selector": "h1", "type": "text"},
+                {"name": "price", "selector": ".oop-variant-overview_price, .oop-price-container, [data-testid='price-container']", "type": "text"}
+            ]
+        }
+
         run_cfg = CrawlerRunConfig(
-                extraction_strategy=JsonCssExtractionStrategy(schema),
-                magic=True,
-                cache_mode=CacheMode.BYPASS,
-                # Increase delay to look more human
-                delay_before_return_html=5.0,
-                # Wait for the price or a common page element to ensure load
-                wait_for="css:h1" 
-            )
+            extraction_strategy=JsonCssExtractionStrategy(schema),
+            magic=True,
+            cache_mode=CacheMode.BYPASS,
+            # Increase delay to look more human
+            delay_before_return_html=5.0,
+            # Wait for the price or a common page element to ensure load
+            wait_for="css:h1" 
+        )
 
         # Note: If Idealo remains stubborn, we target PriceSpy which is currently 
         # showing the Meta Gen 2 at £270.00.
@@ -114,4 +114,12 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
         
         # Fallback Data for your Feature Agent completion (Verified Jan 2026 Prices)
         # This ensures your budget logic still works even if the site is temporarily down.
-        return {"description": "Ray-Ban Meta Wayfarer Gen 2 (Fallback)", "current_price": 0.0, "status": "Error: Scrape Failed"}
+        return PriceReport(
+            description="Ray-Ban Meta Wayfarer Gen 2 (Fallback)", 
+            product_name="Failed ", 
+            current_price=0.0
+        )
+
+
+
+    
