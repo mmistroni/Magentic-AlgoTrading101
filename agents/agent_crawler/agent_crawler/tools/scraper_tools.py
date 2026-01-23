@@ -77,8 +77,11 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
     Scrapes the price of Ray-Ban Meta Wayfarer Gen 2.
     Includes logic for fallback data if the site blocks the crawler.
     """
-    browser_cfg = BrowserConfig(headless=True, enable_stealth=True)
-    
+    browser_cfg = BrowserConfig(
+        headless=True,  # Set to True first to ensure it works in the container
+        enable_stealth=True,
+        # REMOVE: use_managed_browser=True (This is what causes the 9222 error)
+    )
     # We use 'async with' directly inside the tool
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
     
@@ -95,10 +98,8 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
             extraction_strategy=JsonCssExtractionStrategy(schema),
             magic=True,
             cache_mode=CacheMode.BYPASS,
-            # Increase delay to look more human
-            delay_before_return_html=5.0,
-            # Wait for the price or a common page element to ensure load
-            wait_for="css:h1" 
+            # If you still get blocked, add this header
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         )
 
         # Note: If Idealo remains stubborn, we target PriceSpy which is currently 
@@ -107,18 +108,23 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
         
         result = await crawler.arun(url=url, config=run_cfg)
 
+        if not result.success:
+            # This will tell you if it's a 403 Forbidden, a Timeout, or a Captcha
+            print(f"DEBUG: Scrape failed. Status: {result.status_code}")
+            print(f"DEBUG: Error message: {result.error_message}")
+            return PriceReport(
+            description="Ray-Ban Meta Wayfarer Gen 2 (Fallback)", 
+            product_name=result.error_message, 
+            current_price=0.0
+        )
         if result.success and result.extracted_content:
             raw_data = json.loads(result.extracted_content)
             if raw_data and raw_data[0].get("price"):
                 return PriceReport(description="Ray-Ban Meta Wayfarer Gen 2", **raw_data[0])
-        
+        print(f'--------- RayBan result is:{result}')
         # Fallback Data for your Feature Agent completion (Verified Jan 2026 Prices)
         # This ensures your budget logic still works even if the site is temporarily down.
-        return PriceReport(
-            description="Ray-Ban Meta Wayfarer Gen 2 (Fallback)", 
-            product_name="Failed ", 
-            current_price=0.0
-        )
+        
 
 
 
