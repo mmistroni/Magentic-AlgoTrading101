@@ -72,60 +72,88 @@ async def get_bike_price_tool() -> Dict[str, Any]:
         return {"description": "Bike", "current_price": 0.0, "status": "Error: Scrape Failed"}
 
 # --- 2. RAY-BAN TOOL ---
+import json
+from typing import Dict, Any
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from pydantic import BaseModel
+
+# Assuming PriceReport is defined elsewhere in your project
+class PriceReport(BaseModel):
+    description: str
+    product_name: str
+    current_price: float
+
 async def get_rayban_price_tool() -> Dict[str, Any]:
     """
-    Scrapes the price of Ray-Ban Meta Wayfarer Gen 2.
-    Includes logic for fallback data if the site blocks the crawler.
+    Scrapes the price of Ray-Ban Meta Wayfarer Gen 2 from Argos.
+    Includes robust selectors and fallback data for the Feature Agent.
     """
     browser_cfg = BrowserConfig(
-        headless=True,  # Set to True first to ensure it works in the container
+        headless=True,
         enable_stealth=True,
-        # REMOVE: use_managed_browser=True (This is what causes the 9222 error)
     )
-    # We use 'async with' directly inside the tool
+
+    # Specific URL for the Matte Black Wayfarer Gen 2 to ensure accuracy
+    url = "https://www.argos.co.uk/product/7768895"
+
+    # Argos 2026 uses specific data-test attributes for their price and titles
+    schema = {
+        "name": "Argos Price Scraper",
+        "baseSelector": "main",
+        "fields": [
+            {
+                "name": "product_name", 
+                "selector": "span[data-test='product-title']", 
+                "type": "text"
+            },
+            {
+                "name": "price_text", 
+                "selector": "li[data-test='product-price-primary'] h2", 
+                "type": "text"
+            }
+        ]
+    }
+
+    run_cfg = CrawlerRunConfig(
+        extraction_strategy=JsonCssExtractionStrategy(schema),
+        magic=True,
+        cache_mode=CacheMode.BYPASS
+    )
+
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
-    
-        schema = {
-            "name": "Ray-Ban Meta",
-            "baseSelector": "body",
-            "fields": [
-                {"name": "name", "selector": "h1", "type": "text"},
-                {"name": "price", "selector": ".oop-variant-overview_price, .oop-price-container, [data-testid='price-container']", "type": "text"}
-            ]
-        }
-
-        run_cfg = CrawlerRunConfig(
-            extraction_strategy=JsonCssExtractionStrategy(schema),
-            magic=True,
-            cache_mode=CacheMode.BYPASS,
-            # If you still get blocked, add this header
-            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        )
-
-        # Note: If Idealo remains stubborn, we target PriceSpy which is currently 
-        # showing the Meta Gen 2 at £270.00.
-        url = "https://www.idealo.co.uk/compare/207822748/ray-ban-meta-wayfarer-gen-2-rw4012.html"
-        
         result = await crawler.arun(url=url, config=run_cfg)
 
+        # 1. Handle Failed Connection/Scrape
         if not result.success:
-            # This will tell you if it's a 403 Forbidden, a Timeout, or a Captcha
-            print(f"DEBUG: Scrape failed. Status: {result.status_code}")
-            print(f"DEBUG: Error message: {result.error_message}")
+            print(f"DEBUG: Argos Scrape failed. Status: {result.status_code}")
             return PriceReport(
-            description="Ray-Ban Meta Wayfarer Gen 2 (Fallback)", 
-            product_name=result.error_message, 
-            current_price=0.0
-        )
-        if result.success and result.extracted_content:
+                description="Ray-Ban Meta Wayfarer Gen 2 (Error Fallback)", 
+                product_name="Site Unavailable", 
+                current_price=299.00  # Conservative fallback
+            ).model_dump()
+
+        # 2. Process Extracted Content
+        if result.extracted_content:
             raw_data = json.loads(result.extracted_content)
-            if raw_data and raw_data[0].get("price"):
-                return PriceReport(description="Ray-Ban Meta Wayfarer Gen 2", **raw_data[0])
-        print(f'--------- RayBan result is:{result}')
-        # Fallback Data for your Feature Agent completion (Verified Jan 2026 Prices)
-        # This ensures your budget logic still works even if the site is temporarily down.
-        
+            if raw_data and len(raw_data) > 0:
+                item = raw_data[0]
+                # Clean the price string (e.g., "£299.00" -> 299.0)
+                price_str = item.get("price_text", "0").replace("£", "").replace(",", "")
+                try:
+                    price_val = float(price_str)
+                except ValueError:
+                    price_val = 0.0
 
+                return PriceReport(
+                    description="Live Price from Argos",
+                    product_name=item.get("product_name", "Ray-Ban Meta Wayfarer Gen 2"),
+                    current_price=price_val
+                ).model_dump()
 
-
-    
+        # 3. Fallback for successful crawl but failed extraction
+        return PriceReport(
+            description="Ray-Ban Meta Wayfarer Gen 2 (Extraction Fallback)", 
+            product_name="Manual Check Required", 
+            current_price=299.00
+        ).model_dump()
