@@ -84,76 +84,83 @@ class PriceReport(BaseModel):
     product_name: str
     current_price: float
 
+import json
+import asyncio
+from typing import Dict, Any, List
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+
 async def get_rayban_price_tool() -> Dict[str, Any]:
     """
-    Scrapes the price of Ray-Ban Meta Wayfarer Gen 2 from Argos.
-    Includes robust selectors and fallback data for the Feature Agent.
+    Scrapes Ray-Ban Meta Wayfarer Gen 2 from multiple sources (Argos, Currys, EE).
+    Aggregates results to bypass retailer-specific bot blocks.
     """
-    browser_cfg = BrowserConfig(
-        headless=True,
-        enable_stealth=True,
-    )
+    browser_cfg = BrowserConfig(headless=True, enable_stealth=True)
+    
+    # 1. Define the targets and their unique 2026 CSS selectors
+    sources = [
+        {
+            "name": "Argos",
+            "url": "https://www.argos.co.uk/product/7768895",
+            "selector": "li[data-test='product-price-primary'] h2"
+        },
+        {
+            "name": "Currys",
+            "url": "https://www.currys.co.uk/products/ray-ban-meta-wayfarer-gen-2-glasses-matte-black-with-clear-to-grey-transitions-lenses-large-10291870.html",
+            "selector": ".price-tag, [data-testid='price-value'], .product-price"
+        },
+        {
+            "name": "EE Store",
+            "url": "https://ee.co.uk/wearables/eyewear/brand:Ray-Ban%20Meta",
+            "selector": ".price-big, .product-price, .ee-price"
+        }
+    ]
 
-    # Specific URL for the Matte Black Wayfarer Gen 2 to ensure accuracy
-    url = "https://www.argos.co.uk/product/7768895"
+    async def fetch_source(crawler, source):
+        schema = {
+            "name": f"{source['name']} Scraper",
+            "baseSelector": "body",
+            "fields": [{"name": "price", "selector": source['selector'], "type": "text"}]
+        }
+        run_cfg = CrawlerRunConfig(
+            extraction_strategy=JsonCssExtractionStrategy(schema),
+            magic=True,
+            cache_mode=CacheMode.BYPASS
+        )
+        try:
+            result = await crawler.arun(url=source['url'], config=run_cfg)
+            if result.success and result.extracted_content:
+                data = json.loads(result.extracted_content)
+                if data and data[0].get("price"):
+                    price_str = data[0]["price"].replace("£", "").replace(",", "").strip()
+                    return {"site": source['name'], "price": float(price_str)}
+        except Exception:
+            return None
+        return None
 
-    # Argos 2026 uses specific data-test attributes for their price and titles
-    schema = {
-        "name": "Argos Price Scraper",
-        "baseSelector": "main",
-        "fields": [
-            {
-                "name": "product_name", 
-                "selector": "span[data-test='product-title']", 
-                "type": "text"
-            },
-            {
-                "name": "price_text", 
-                "selector": "li[data-test='product-price-primary'] h2", 
-                "type": "text"
-            }
-        ]
-    }
-
-    run_cfg = CrawlerRunConfig(
-        extraction_strategy=JsonCssExtractionStrategy(schema),
-        magic=True,
-        cache_mode=CacheMode.BYPASS
-    )
-
+    # 2. Run all scrapes in parallel using one browser session
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
-        result = await crawler.arun(url=url, config=run_cfg)
+        tasks = [fetch_source(crawler, s) for s in sources]
+        completed_tasks = await asyncio.gather(*tasks)
+        
+        # Filter for successful results
+        valid_hits = [r for r in completed_tasks if r and r['price'] > 0]
 
-        # 1. Handle Failed Connection/Scrape
-        if not result.success:
-            print(f"DEBUG: Argos Scrape failed. Status: {result.status_code}")
-            return PriceReport(
-                description="Ray-Ban Meta Wayfarer Gen 2 (Error Fallback)", 
-                product_name="Site Unavailable", 
-                current_price=299.00  # Conservative fallback
-            ).model_dump()
-
-        # 2. Process Extracted Content
-        if result.extracted_content:
-            raw_data = json.loads(result.extracted_content)
-            if raw_data and len(raw_data) > 0:
-                item = raw_data[0]
-                # Clean the price string (e.g., "£299.00" -> 299.0)
-                price_str = item.get("price_text", "0").replace("£", "").replace(",", "")
-                try:
-                    price_val = float(price_str)
-                except ValueError:
-                    price_val = 0.0
-
-                return PriceReport(
-                    description="Live Price from Argos",
-                    product_name=item.get("product_name", "Ray-Ban Meta Wayfarer Gen 2"),
-                    current_price=price_val
-                ).model_dump()
-
-        # 3. Fallback for successful crawl but failed extraction
+    # 3. Decision Logic
+    if valid_hits:
+        # Sort by lowest price if multiple sources work (Bonus technical signal!)
+        best_deal = min(valid_hits, key=lambda x: x['price'])
         return PriceReport(
-            description="Ray-Ban Meta Wayfarer Gen 2 (Extraction Fallback)", 
-            product_name="Manual Check Required", 
-            current_price=299.00
+            description=f"Live Price from {best_deal['site']}",
+            product_name="Ray-Ban Meta Wayfarer Gen 2",
+            current_price=best_deal['price'],
+            is_live=True
         ).model_dump()
+
+    # 4. Final Fallback (If all 3 sites block the Cloud Run IP)
+    return PriceReport(
+        description="Ray-Ban Meta Wayfarer Gen 2 (Global Extraction Fallback)",
+        product_name="Manual Check Required",
+        current_price=299.0,
+        is_live=False
+    ).model_dump()
