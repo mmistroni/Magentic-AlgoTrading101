@@ -42,8 +42,8 @@ app: FastAPI = get_fast_api_app(
 async def send_email_via_api(subject: str, body: str):
     """Sends email via a third-party API (Example: SendGrid)"""
     api_key = os.environ.get("EMAIL_API_KEY")
-    sender = os.environ.get("SENDER_EMAIL")
-    recipient = os.environ.get("RECIPIENT_EMAIL")
+    sender = 'gcp_cloud_mm@outlook.com'
+    recipient = 'mmistroni@gmail.com'
     
     if not api_key:
         print("CRITICAL: No EMAIL_API_KEY found in environment variables.")
