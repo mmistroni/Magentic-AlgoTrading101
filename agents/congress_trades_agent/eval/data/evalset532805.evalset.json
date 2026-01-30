@@ -1,0 +1,111 @@
+{
+  "eval_set_id": "evalset532805",
+  "name": "evalset532805",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "case96a1ef",
+      "conversation": [
+        {
+          "invocation_id": "e-8917c72c-1df8-4da6-bf56-870c24743858",
+          "user_content": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "Run a technical analysis for today's stock picks and give me your recommendations"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "video_metadata": null,
+                "thought": null,
+                "inline_data": null,
+                "file_data": null,
+                "thought_signature": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "function_call": null,
+                "function_response": null,
+                "text": "I'm sorry, I was unable to retrieve any technical data for today (2026-01-02). Therefore, I cannot perform a technical analysis or provide any recommendations."
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-48f15ec0-d632-43ad-bb84-408ed62b2929",
+                "args": {},
+                "name": "discover_technical_schema_tool"
+              },
+              {
+                "id": "adk-d966b4e2-bc8e-4b0e-a558-67ecf9fd5c5b",
+                "args": {
+                  "target_date": "today"
+                },
+                "name": "fetch_technical_snapshot_tool"
+              }
+            ],
+            "intermediate_responses": [
+              [
+                "SchemaDiscovery",
+                [
+                  {
+                    "video_metadata": null,
+                    "thought": null,
+                    "inline_data": null,
+                    "file_data": null,
+                    "thought_signature": null,
+                    "code_execution_result": null,
+                    "executable_code": null,
+                    "function_call": null,
+                    "function_response": null,
+                    "text": "ADX, RSI, SMA20, SMA200, SMA50, asodate, change, cmf_last_20_days, cob, country, current_obv, exchange, highlight, last_cmf, marketCap, obv_last_20_days, open, previousClose, previous_cmf, previous_obv, price, selection, slope, symbol, ticker"
+                  }
+                ]
+              ],
+              [
+                "SchemaFormatter",
+                [
+                  {
+                    "video_metadata": null,
+                    "thought": null,
+                    "inline_data": null,
+                    "file_data": null,
+                    "thought_signature": null,
+                    "code_execution_result": null,
+                    "executable_code": null,
+                    "function_call": null,
+                    "function_response": null,
+                    "text": "{\n  \"indicators\": [\n    \"ADX\",\n    \"RSI\",\n    \"SMA20\",\n    \"SMA200\",\n    \"SMA50\"\n  ],\n  \"volume_metrics\": [\n    \"cmf_last_20_days\",\n    \"current_obv\",\n    \"last_cmf\",\n    \"obv_last_20_days\",\n    \"previous_cmf\",\n    \"previous_obv\"\n  ],\n  \"metadata\": [\n    \"asodate\",\n    \"change\",\n    \"cob\",\n    \"country\",\n    \"exchange\",\n    \"highlight\",\n    \"marketCap\",\n    \"open\",\n    \"previousClose\",\n    \"price\",\n    \"selection\",\n    \"slope\",\n    \"symbol\",\n    \"ticker\"\n  ]\n}"
+                  }
+                ]
+              ]
+            ]
+          },
+          "creation_timestamp": 1767348015.040384
+        }
+      ],
+      "session_input": {
+        "app_name": "stock_agent",
+        "user_id": "user",
+        "state": {
+          "available_schema": ""
+        }
+      },
+      "creation_timestamp": 1767348049.3400593
+    }
+  ],
+  "creation_timestamp": 1767348044.3207037
+}
