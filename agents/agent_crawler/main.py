@@ -41,7 +41,7 @@ app: FastAPI = get_fast_api_app(
 
 async def send_email_via_api(subject: str, body: str):
     """Sends email via a third-party API (Example: SendGrid)"""
-    api_key = os.environ.get("c")
+    api_key = os.environ.get("EMAIL_API_KEY")
     sender = 'gcp_cloud_mm@outlook.com'
     recipient = 'mmistroni@gmail.com'
     
