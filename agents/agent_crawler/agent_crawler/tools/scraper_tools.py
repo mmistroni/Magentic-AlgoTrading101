@@ -140,11 +140,16 @@ async def get_rayban_price_tool() -> Dict[str, Any]:
 
     # 2. Run all scrapes in parallel using one browser session
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
+        '''
         tasks = [fetch_source(crawler, s) for s in sources]
         completed_tasks = await asyncio.gather(*tasks)
-        
-        # Filter for successful results
-        valid_hits = [r for r in completed_tasks if r and r['price'] > 0]
+        '''
+        results = []
+        for source in sources:
+            res = await fetch_source(crawler, source)
+            if res: results.append(res)
+                # Filter for successful results
+        valid_hits = [r for r in results if r and r['price'] > 0]
 
     # 3. Decision Logic
     if valid_hits:

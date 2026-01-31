@@ -1,7 +1,6 @@
 FROM python:3.13-slim
 
-# 1. Install system dependencies (needed for Playwright browsers)
-# We include the fix for libasound2t64 here
+# 1. Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -23,22 +22,24 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# 2. Install UV and project dependencies
+# --- CRITICAL FIX: Set Global Playwright Path ---
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# 2. Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir uv && \
     uv pip install --system --no-cache -r requirements.txt
 
-# 3. Install Playwright Browsers (baked into the image)
-# We use --with-deps to ensure the Linux libs are mapped
-RUN playwright install chromium
-RUN playwright install-deps chromium
+# 3. Install Playwright Browsers to the GLOBAL path
+# We run this as root so it can create the folder
+RUN playwright install chromium --with-deps
 
-# 4. Security: Run as non-root user
+# 4. Security: Setup user and fix permissions for the browser folder
 RUN adduser --disabled-password --gecos "" myuser && \
-    chown -R myuser:myuser /app
-USER myuser
+    chown -R myuser:myuser /app && \
+    chown -R myuser:myuser /ms-playwright
 
+USER myuser
 COPY . .
 
-# Cloud Run uses the PORT environment variable
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
