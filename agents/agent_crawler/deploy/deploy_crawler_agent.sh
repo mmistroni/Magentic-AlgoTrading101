@@ -11,7 +11,7 @@ echo "✅ Authenticated."
 
 # --- 2. Configuration Variables ---
 # Replace 'your-project-id' with your actual Google Cloud Project ID
-GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-your-project-id}"
+GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:datascience-projects}"
 GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 SERVICE_NAME="crawler-agent-service"
 
