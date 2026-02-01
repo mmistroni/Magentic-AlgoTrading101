@@ -7,6 +7,9 @@ from functools import lru_cache
 from datetime import date
 import requests
 import os
+import yfinance as yf
+import json
+
 
 def fetch_congress_signals_tool(analysis_date: str):
     """
@@ -14,19 +17,43 @@ def fetch_congress_signals_tool(analysis_date: str):
     Returns JSON list of tickers and transaction types.
     """
     # Mock data for demonstration
-    signals = [
-        {"ticker": "LMT", "rep": "Pelosi", "type": "Purchase", "amount": "500k"},
-        {"ticker": "MSFT", "rep": "Tuberville", "type": "Sale", "amount": "100k"},
-        {"ticker": "NVDA", "rep": "Unknown", "type": "Purchase", "amount": "50k"}
-    ]
+    signals = _get_bq_data(analysis_date)
+    print(f"🔍 Fetched {len(signals)} congress trade signals for date:{analysis_date}")
     return json.dumps(signals)
 
 def check_fundamentals_tool(ticker: str):
     """
-    Checks if a company is fundamentally sound.
+    Fetches the 'Safety Snapshot' for a ticker using Yahoo Finance.
+    Returns a JSON string with Sector, Beta, PE, and Financial Health.
     """
-    return f"Fundamentals for {ticker}: Healthy balance sheet, Sector: Tech."
+    print(f"🔍 Checking fundamentals for: {ticker}")
+    
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info # This fetches the latest metadata
+        
+        # We extract ONLY what the Agent needs to make a decision.
+        # We use .get() to handle missing data gracefully.
+        fundamentals = {
+            "ticker": ticker,
+            "sector": info.get("sector", "Unknown"),
+            "industry": info.get("industry", "Unknown"),
+            "market_cap_B": round(info.get("marketCap", 0) / 1_000_000_000, 2), # In Billions
+            "beta": round(info.get("beta", 1.0), 2),
+            "forward_pe": round(info.get("forwardPE", 0), 2),
+            "debt_to_equity": info.get("debtToEquity", None),
+            "dividend_yield": info.get("dividendYield", 0)
+        }
+        
+        return json.dumps(fundamentals)
 
+    except Exception as e:
+        # If the API fails, return a "Neutral" response so the pipeline doesn't crash
+        return json.dumps({
+            "ticker": ticker, 
+            "error": "Data Unavailable", 
+            "sector": "Unknown"
+        })
 
 def _get_bq_data(analysis_date: str) -> pd.DataFrame:
     bq_client = bigquery.Client()
@@ -117,12 +144,16 @@ def _get_bq_data(analysis_date: str) -> pd.DataFrame:
     """
     df = bq_client.query(qry).to_dataframe()
     # Join with Market Regime
-
-    return df.to_dict(orient='records')
+    df_filtered = df[
+            (df['sale_count'] == 0) &
+            ~df['ticker'].str.contains('DFCEX|VWLUX|LDNXF|TNA|AAL|BRK/B', case=False)  # ↑ More exclusions
+    ]
+    df_filtered['market_uptrend'] = df_filtered['signal_date'].apply(_check_market_regime)
+    return df_filtered.to_dict(orient='records')
 
 def _check_market_regime(row_date:date)-> str:
-    spy_data = _get_spy_data(date.today())
     try:
+        spy_data = _get_spy_data(date.today())
         # 🛠️ FIX 2: Force conversion to Timestamp and strip time/timezone
         target_date = pd.to_datetime(row_date).tz_localize(None)
 
@@ -134,7 +165,7 @@ def _check_market_regime(row_date:date)-> str:
         if idx_loc == -1: return True # Date is before our data starts
 
         # Access by integer location (iloc) which is safer here
-        price = spy_data.iloc[idx_loc]['Adj Close']
+        price = spy_data.iloc[idx_loc]['adjClose']
         sma = spy_data.iloc[idx_loc]['SMA200']
 
         # Handle cases where data might be returned as Series (rare but possible)
@@ -151,9 +182,10 @@ def _check_market_regime(row_date:date)-> str:
         # print(f"Error checking regime: {e}")
         return True
 
+@lru_cache(maxsize=128)
 def _get_spy_data(end_date:date) -> pd.DataFrame :
     fmp_api_key = os.environ['FMP_API_KEY']
-    spx_url = f"https://financialmodelingprep.com/api/v3/historical-price-full/^SPX?from=2024-01-01&to={date.today().strftime('%Y-%m-%d')}&apikey={fmp_api_key}"
+    spx_url = f"https://financialmodelingprep.com/api/v3/historical-price-full/^SPX?from=2024-01-01&to={end_date.strftime('%Y-%m-%d')}&apikey={fmp_api_key}"
     spx_res = requests.get(spx_url).json()['historical'][::-1]
 
     spy_data = pd.DataFrame(data=spx_res)
