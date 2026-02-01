@@ -20,56 +20,141 @@ from crawl4ai.extraction_strategy import (
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 # --- 1. DATA MODEL ---
+import re
+from typing import Annotated
+from pydantic import BaseModel, Field, BeforeValidator, AliasChoices
+
+# 1. Define the cleaning function
+def clean_currency(v: any) -> any:
+    if isinstance(v, str):
+        # Remove anything that isn't a digit, a dot, or a comma
+        cleaned = re.sub(r'[^\d.]', '', v)
+        return cleaned
+    return v
+
+# 2. Update your PriceReport model
 class PriceReport(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
     description: str
-    product_name: str = Field(default="Unknown Product", alias="name")
-    current_price: Union[float, str] = Field(default=0.0, alias="price")
-    availability: bool = Field(default=False)
-    currency: str = "GBP"
+    
+    # Keeps your alias fix from before
+    product_name: str = Field(
+        validation_alias=AliasChoices('product_name', 'name')
+    )
+    
+    # This magic line cleans "£799.00" into "799.00" before validation
+    current_price: Annotated[float, BeforeValidator(clean_currency)] = Field(
+        validation_alias=AliasChoices('current_price', 'price')
+    )
 
-    @field_validator('current_price', mode='before')
-    @classmethod
-    def clean_price(cls, v):
-        if v == "NOT_FOUND" or v is None: return 0.0
-        if isinstance(v, (int, float)): return float(v)
-        # Handle string prices like "£270.00" or "from £270"
-        nums = re.findall(r"\d+\.\d+|\d+", str(v))
-        return float(nums[0]) if nums else 0.0
 
 # --- 1. BIKE TOOL ---
+import json
+import re
+from typing import Dict, Any
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, JsonCssExtractionStrategy
+
+def clean_price_string(price_str: str) -> float:
+    """Helper to turn '£799.00' or 'from £750' into 799.00"""
+    if not price_str:
+        return 0.0
+    cleaned = re.sub(r'[^\d.]', '', price_str)
+    try:
+        return float(cleaned) if cleaned else 0.0
+    except ValueError:
+        return 0.0
+
+import json
+import re
+import os
+from typing import Dict, Any
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, JsonCssExtractionStrategy, CacheMode
+
+def clean_price_string(price_str: str) -> float:
+    if not price_str: return 0.0
+    cleaned = re.sub(r'[^\d.]', '', price_str)
+    try:
+        return float(cleaned) if cleaned else 0.0
+    except ValueError:
+        return 0.0
+
 async def get_bike_price_tool() -> Dict[str, Any]:
-    """
-    Retrieves the current price and availability for the Horizon Fitness 3.0SC Indoor Cycle.
-    
-    Returns:
-        A dictionary containing description, current_price (GBP), and status.
-    """
-    browser_cfg = BrowserConfig(headless=True, enable_stealth=True)
-    
-    # We use 'async with' directly inside the tool
-    async with AsyncWebCrawler(config=browser_cfg) as crawler:
-        schema = {
-            "name": "Bike", 
-            "baseSelector": "body", 
-            "fields": [
-                {"name": "name", "selector": "h1.page-title", "type": "text"},
-                {"name": "price", "selector": ".price-wrapper .price", "type": "text"}
-            ]
+    browser_cfg = BrowserConfig(
+        headless=True,
+        enable_stealth=True,
+        # Real-world User-Agent to bypass "All sources failed"
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        extra_args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-blink-features=AutomationControlled"]
+    )
+
+    sources = [
+        {
+            "name": "PriceSpy",
+            "url": "https://pricespy.co.uk/search?search=Horizon%20Fitness%203.0SC",
+            "selector": {
+                "name": "ComparisonData",
+                "baseSelector": "div[class*='ProductCard'], [data-testid='ProductCard']", # Fuzzy match classes
+                "fields": [
+                    {"name": "name", "selector": "h3", "type": "text"},
+                    {"name": "price", "selector": "[data-testid='PriceLabel'], span[class*='Price']", "type": "text"}
+                ]
+            }
+        },
+        {
+            "name": "Google Shopping",
+            "url": "https://www.google.com/search?tbm=shop&q=Horizon+Fitness+3.0SC+Indoor+Cycle&gl=uk&hl=en",
+            "selector": {
+                "name": "ComparisonData",
+                "baseSelector": ".sh-dgr__content",
+                "fields": [
+                    {"name": "name", "selector": "h3", "type": "text"},
+                    {"name": "price", "selector": "span.a8S3wf, .r0C6Asf", "type": "text"}
+                ]
+            }
         }
-        
-        result = await crawler.arun(
-            url="https://www.fitness-superstore.co.uk/horizon-fitness-3-0sc-indoor-cycle.html",
-            config=CrawlerRunConfig(extraction_strategy=JsonCssExtractionStrategy(schema))
-        )
-        
-        if result.success and result.extracted_content:
-            data = json.loads(result.extracted_content)
-            # We assume your PriceReport model is imported
-            return PriceReport(description="Bike", **data[0]).model_dump()
+    ]
+
+    async with AsyncWebCrawler(config=browser_cfg) as crawler:
+        for source in sources:
+            print(f"--- Attempting {source['name']} ---")
             
-        return {"description": "Bike", "current_price": 0.0, "status": "Error: Scrape Failed"}
+            result = await crawler.arun(
+                url=source["url"],
+                config=CrawlerRunConfig(
+                    extraction_strategy=JsonCssExtractionStrategy(source["selector"]),
+                    wait_until="networkidle",
+                    cache_mode=CacheMode.BYPASS,
+                    # 'wait_for' accepts a CSS selector or a time in seconds (as a string)
+                    wait_for="10", # Wait 5 seconds for JS to settle
+                )
+            )
+
+            # 1. Try CSS Extraction first (Cheap/Fast)
+            if result.success and result.extracted_content:
+                data = json.loads(result.extracted_content)
+                valid_items = [i for i in data if "horizon" in i.get("name", "").lower()]
+                if valid_items:
+                    item = valid_items[0]
+                    return PriceReport(
+                        description=f"Bike (Source: {source['name']})",
+                        product_name=item.get("name"),
+                        current_price=clean_price_string(item.get("price"))
+                    ).model_dump()
+
+            # 2. EMERGENCY FALLBACK: LLM Raw Text Extraction
+            # If CSS failed, use the Markdown result.
+            print(f"⚠️ {source['name']} CSS failed. Trying LLM extraction from Markdown...")
+            if result.success and result.markdown:
+                # We return the raw markdown to the Agent. 
+                # Pydantic AI's Agent will then see this text and can extract the price itself.
+                return {
+                    "description": f"Raw Data from {source['name']}",
+                    "raw_text": result.markdown[:2000], # Send a snippet to save tokens
+                    "status": "CSS Failed - LLM Parsing Required"
+                }
+
+        return {"description": "Bike", "current_price": 0.0, "status": "Error: All sources and fallbacks failed"}
+
+
 
 # --- 2. RAY-BAN TOOL ---
 import json
