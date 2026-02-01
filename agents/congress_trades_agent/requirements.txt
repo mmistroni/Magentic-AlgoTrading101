@@ -1,6 +1,10 @@
 google-adk
-google-cloud-bigquery
 db-dtypes
 pydantic
 pandas
 pyarrow
+google-cloud-aiplatform
+google-cloud-bigquery
+yfinance
+requests
+db-dtypes
