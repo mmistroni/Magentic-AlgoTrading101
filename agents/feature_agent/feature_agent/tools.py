@@ -19,7 +19,7 @@ def fetch_consensus_holdings_tool(target_date: str, offset: int = 0) -> list:
         list: A list of dicts. IMPORTANT: Extract all 'ticker' values from this list 
               to pass to the next tool as a SINGLE space-separated string.
     """
-    bq_client = bigquery.Client()
+    bq_client = bigquery.Client(project="datascience-projects")
     query = f"""
         SELECT 
     map.ticker,
