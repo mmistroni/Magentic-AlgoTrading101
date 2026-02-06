@@ -2,6 +2,11 @@ import asyncio
 import json
 import re
 from typing import Optional, Union
+import os
+import json
+from google.cloud import storage, bigquery
+from google.adk.tools import FunctionTool
+
 
 from google.cloud import storage
 
@@ -65,17 +70,29 @@ def check_price_history(product_name: str, current_price: float) -> dict:
         "status": "success"
     }
 
-import os
-import json
-from google.cloud import storage, bigquery
-from google.adk.tools import FunctionTool
-
 async def track_and_log_price(product_name: str, current_price: float, retailer: str) -> dict:
     """
-    Compares current price to last week and logs the final result to BigQuery.
-    """
+    Performs a weekly price comparison and persists the data to BigQuery and GCS.
+    
+    This tool is a critical second step in the price discovery workflow. It retrieves 
+    historical price data from Google Cloud Storage to determine if the price has 
+    dropped or increased since the last run. It then logs the final verified 
+    discovery—including the current price, previous price, and retailer—into 
+    a permanent BigQuery table for long-term tracking.
+    
+    Args:
+        product_name (str): The specific name or model of the product being tracked.
+        current_price (float): The market low price found during the search phase.
+        retailer (str): The name of the retailer offering the current_price.
+        
+    Returns:
+        dict: A summary of the tracking operation containing:
+            - trend (str): Description of the price movement (DROPPED, INCREASED, Stable).
+            - difference (float): The numerical change in price from last week.
+            - last_week (float or None): The price recorded in the previous session.
+    """    
     # --- Part A: GCS History Check (Weekly Comparison) ---
-    bucket_name = os.getenv("GCS_BUCKET_NAME")
+    bucket_name = os.getenv("GCS_BUCKET_NAME", "mm_dataflow_bucket")
     storage_client = storage.Client()
     blob = storage_client.bucket(bucket_name).blob("weekly_history.json")
     
@@ -92,7 +109,7 @@ async def track_and_log_price(product_name: str, current_price: float, retailer:
 
     # --- Part B: BigQuery Logging (Permanent Record) ---
     bq_client = bigquery.Client()
-    table_id = os.getenv("BQ_TABLE_ID")
+    table_id = os.getenv("BQ_TABLE_ID", "datascience-projects.gcp_shareloader.price_history")
     
     row = [{
         "product_name": product_name,

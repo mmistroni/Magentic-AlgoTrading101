@@ -2,7 +2,7 @@ from agent_crawler.prompts import ROOT_AGENT_INSTRUCTION, RESEARCHER_INSTRUCTION
 from google.adk.agents import Agent
 from google.adk.tools import google_search, FunctionTool
 from google.adk.tools.agent_tool import AgentTool # The "wrapper" for specialists
-from agent_crawler.tools.scraper_tools import check_price_history # Custom function for price history logic
+from agent_crawler.tools.scraper_tools import track_and_log_price# Custom function for price history logic
 
 
 # 1. THE SPECIALIST (Built-in Tool goes here)
@@ -24,6 +24,6 @@ root_agent = Agent(
     instruction=ROOT_AGENT_INSTRUCTION,
     tools=[
         AgentTool(search_specialist), # We wrap the specialist so it looks like a tool
-        FunctionTool(check_price_history) # Custom logic
+        FunctionTool(track_and_log_price) # Custom logic
     ]
 )
