@@ -1,5 +1,9 @@
 {
     "name": "Magentic Algo Trading Environment",
+    "containerEnv": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/GCP_Experiments/gcp_key.json",
+        "GOOGLE_CLOUD_PROJECT": "datascience-projects"
+    },
     "build": {
         "dockerfile": "Dockerfile",
         "context": ".."
@@ -10,15 +14,11 @@
                 "ms-python.python",
                 "ms-vscode.go",
                 "eamodio.gitlens",
-                "ms-toolsai.jupyter" // Add the Jupyter extension here
+                "ms-toolsai.jupyter"
             ],
             "settings": {
-                // Point VS Code to your virtual environment's Python interpreter
                 "python.defaultInterpreterPath": "./.venv/bin/python",
-                // This setting tells the Python extension to activate the environment
-                // when a new terminal is opened.
                 "python.terminal.activateEnvInCurrentTerminal": true,
-                // Ensure bash is the default shell for terminals if it's not already
                 "terminal.integrated.defaultProfile.linux": "bash",
                 "terminal.integrated.profiles.linux": {
                     "bash": {
@@ -28,11 +28,6 @@
             }
         }
     },
-    // Modified postCreateCommand to include ipykernel installation
-    "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt && python3 -m ipykernel install --user --name=magentic_algo_venv --display-name \"Magentic Algo VEnv\"\"",
+    "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt && python3 -m ipykernel install --user --name=magentic_algo_venv --display-name 'Magentic Algo VEnv' && echo $GCP_SA_KEY > /workspaces/GCP_Experiments/gcp_key.json\"",
     "remoteUser": "vscode"
-    // Optional: If you want to run `gcloud init` or `gcloud auth login` interactively later.
-    // "containerEnv": {
-    //     "CLOUDSDK_CORE_DISABLE_PROMPTS": "1" // Set this if you want to suppress interactive prompts during builds
-    // }
 }
