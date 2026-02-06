@@ -11,7 +11,7 @@ search_specialist = Agent(
     name="search_expert",
     model="gemini-2.0-flash",
     description="A specialist that finds current retail prices using Google Search.",
-    instruction="Search for the lowest NEW retail price in the UK. Return the price and store name.",
+    instruction=RESEARCHER_INSTRUCTION,
     tools=[google_search] # The 1 allowed built-in tool
 )
 
@@ -21,7 +21,7 @@ search_specialist = Agent(
 root_agent = Agent(
     name="price_monitoring_agent",
     model="gemini-2.0-flash",
-    instruction="Use your tools to find a price and check its history.",
+    instruction=ROOT_AGENT_INSTRUCTION,
     tools=[
         AgentTool(search_specialist), # We wrap the specialist so it looks like a tool
         FunctionTool(check_price_history) # Custom logic
