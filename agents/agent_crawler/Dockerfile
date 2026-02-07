@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # --- CRITICAL FIX: Set Global Playwright Path ---
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+#ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # 2. Install dependencies
 COPY requirements.txt .
@@ -32,12 +32,12 @@ RUN pip install --no-cache-dir uv && \
 
 # 3. Install Playwright Browsers to the GLOBAL path
 # We run this as root so it can create the folder
-RUN playwright install chromium --with-deps
+#RUN playwright install chromium --with-deps
 
 # 4. Security: Setup user and fix permissions for the browser folder
-RUN adduser --disabled-password --gecos "" myuser && \
-    chown -R myuser:myuser /app && \
-    chown -R myuser:myuser /ms-playwright
+#RUN adduser --disabled-password --gecos "" myuser && \
+#    chown -R myuser:myuser /app && \
+#    chown -R myuser:myuser /ms-playwright
 
 USER myuser
 COPY . .

@@ -8,11 +8,11 @@ import httpx
 import sys # ⬅️ ADDED: sys module for version check
 
 # --- Configuration (Dynamic) ---
-APP_URL = "https://feature-agent-service-682143946483.us-central1.run.app"
+APP_URL = "https://crawler-agent-service-682143946483.us-central1.run.app"
 USER_ID = "user_123"
 # Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
-APP_NAME = "stock_agent"
+APP_NAME = "agent_crawler"
 
 # --- Authentication Function (ASYNC) ---
 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     # Define your single query here
-    QUERY = "Run a technical analysis for yesterday's stock picks and give me your recommendations"
+    QUERY = "What is the current price of Horizon spinning bike?"
     
     try:
         asyncio.run(amain(QUERY))
