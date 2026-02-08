@@ -12,7 +12,7 @@ from .prompts import RESEARCHER_INSTRUCTION, TRADER_INSTRUCTION
 # Its job is to create the "political_context" key for the next agent.
 congress_researcher = LlmAgent(
     name="CongressResearcher",
-    model='gemini-1.5-pro', 
+    model='gemini-2.5-flash',
     instruction=RESEARCHER_INSTRUCTION,
     # In ADK, we usually don't need tools here if it relies on built-in knowledge 
     # or a specific search tool you have available in ADK.
@@ -25,7 +25,7 @@ congress_researcher = LlmAgent(
 # It picks up 'political_context' automatically from the sequential state.
 congress_trader = LlmAgent(
     name="CongressTrader",
-    model='gemini-1.5-pro',
+    model='gemini-2.5-flash',
     instruction=TRADER_INSTRUCTION,
     tools=[
         FunctionTool(fetch_congress_signals_tool),
