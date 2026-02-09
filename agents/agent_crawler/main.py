@@ -1,93 +1,89 @@
 import os
-
 import uvicorn
-from fastapi import FastAPI
-from google.adk.cli.fast_api import get_fast_api_app
-
-# Get the directory where main.py is located
-AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Example session service URI (e.g., SQLite)
-SESSION_SERVICE_URI = "sqlite:///./sessions.db"
-# Example allowed origins for CORS
-ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
-# Set web=True if you intend to serve a web interface, False otherwise
-SERVE_WEB_INTERFACE = True
-
-# Call the function to get the FastAPI app instance
-# Ensure the agent directory name ('capital_agent') matches your agent folder
-app: FastAPI = get_fast_api_app(
-    agents_dir=AGENT_DIR,
-    session_service_uri=SESSION_SERVICE_URI,
-    allow_origins=ALLOWED_ORIGINS,
-    web=SERVE_WEB_INTERFACE,
-)
-
-import os
-import uvicorn
-import httpx # Recommended for API-based email sending
+import httpx
+import asyncio
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-from google.adk.cli.fast_api import get_fast_api_app
+from pydantic import BaseModel
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
-# ... your existing AGENT_DIR and config code ...
+# 1. Import your actual agent object
+# Ensure the folder is named 'agent_crawler' and has an '__init__.py'
+from agent_crawler.agent import root_agent
 
-app: FastAPI = get_fast_api_app(
-    agents_dir=AGENT_DIR,
-    session_service_uri=SESSION_SERVICE_URI,
-    allow_origins=ALLOWED_ORIGINS,
-    web=SERVE_WEB_INTERFACE,
+app = FastAPI()
+
+# 2. Setup the ADK Runner manually
+# This is the "Engine" that will run your agent code
+session_service = InMemorySessionService()
+runner = Runner(
+    app_name="crawler_agent", # <--- THIS WAS MISSING
+    agent=root_agent, 
+    session_service=session_service
 )
+# 3. Define the Request Body for Cloud Scheduler
+class MonitorRequest(BaseModel):
+    query: str
+    subject_line: str = "Price Update"
+    recipient: str = "mmistroni@gmail.com"
 
-# --- NEW EMAIL LOGIC ---
-
-async def send_email_via_api(subject: str, body: str):
-    """Sends email via a third-party API (Example: SendGrid)"""
+async def send_email_via_api(subject: str, body: str, recipient: str):
+    """Sends email via SendGrid HTTP API"""
     api_key = os.environ.get("EMAIL_API_KEY")
-    sender = 'gcp_cloud_mm@outlook.com'
-    recipient = 'mmistroni@gmail.com'
-    
     if not api_key:
-        print("CRITICAL: No EMAIL_API_KEY found in environment variables.")
+        print("CRITICAL: No EMAIL_API_KEY found.")
         return
 
-    # Example for SendGrid HTTP API
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://api.sendgrid.com/v3/mail/send",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "personalizations": [{"to": [{"email": recipient}]}],
-                "from": {"email": sender},
-                "subject": subject,
-                "content": [{"type": "text/plain", "value": body}]
-            }
-        )
-        print(f"Email status: {response.status_code}")
+        try:
+            response = await client.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "personalizations": [{"to": [{"email": recipient}]}],
+                    "from": {"email": "gcp_cloud_mm@outlook.com"},
+                    "subject": subject,
+                    "content": [{"type": "text/plain", "value": body}]
+                }
+            )
+            print(f"Email sent! Status: {response.status_code}")
+        except Exception as e:
+            print(f"Failed to send email: {e}")
 
 @app.post("/trigger-price-monitor")
-async def trigger_monitor(background_tasks: BackgroundTasks):
-    """
-    1. Triggers the agent (you'll need to import your agent instance here)
-    2. Formats the email
-    3. Sends it in the background
-    """
-    # Note: You'll need to import your actual agent object here
-    from agent_crawler.agent import root_agent
-    
+async def trigger_monitor(request: MonitorRequest, background_tasks: BackgroundTasks):
     try:
-        # Run your agent logic
-        result = await root_agent.run("Check Ray-Ban prices")
+        # Create a unique session for this specific run
+        session_id = f"job_{os.urandom(4).hex()}"
+        user_id = "system_scheduler"
         
-        # Extract the content from the LLM's response
-        email_body = result.data # If using Pydantic AI result_type
-        email_subject = "Price Update - Ray-Ban Meta"
+        # Format the message for the ADK Runner
+        content = types.Content(role='user', parts=[types.Part.from_text(text=request.query)])
         
-        background_tasks.add_task(send_email_via_api, email_subject, email_body)
+        final_text = ""
+        # 4. Execute the agent turn
+        async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
+            # Check for the final response event to get the email body
+            if event.is_final_response() and event.content.parts:
+                final_text = event.content.parts[0].text
         
-        return {"message": "Agent monitoring started, email queued."}
+        if final_text:
+            # 5. Queue the email as a background task
+            background_tasks.add_task(
+                send_email_via_api, 
+                request.subject_line, 
+                final_text,
+                request.recipient
+            )
+        
+        return {"status": "success", "session": session_id, "query": request.query}
+    
     except Exception as e:
+        print(f"Error during agent execution: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- END EMAIL LOGIC ---
-
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    # Standard Cloud Run port 8080
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
