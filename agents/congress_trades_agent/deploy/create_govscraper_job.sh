@@ -21,11 +21,16 @@ echo "✅ Authentication successful. Proceeding with deployment..."
 
 # ---
 
-# 2. Define Variables
-# NOTE: The values for these variables will be read from your shell environment.
-# If they are NOT set, the script will use the default values provided below.
+# Check if the job already exists
+if gcloud run jobs describe contract-scraper --region us-central1 > /dev/null 2>&1; then
+    echo "🔄 Job exists. Updating..."
+    COMMAND="update"
+else
+    echo "🆕 Job not found. Creating..."
+    COMMAND="create"
+fi
 
-gcloud run jobs create contract-scraper \
+gcloud run jobs $COMMAND contract-scraper \
   --image gcr.io/datascience-projects/congress-bot:latest \
   --region us-central1 \
   --command python \
