@@ -18,7 +18,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ Authentication successful. Proceeding with deployment..."
-
+gcloud run jobs execute contract-scraper
 # ---
 
 # Check if the job already exists
