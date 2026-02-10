@@ -8,3 +8,4 @@ google-cloud-bigquery
 yfinance
 requests
 db-dtypes
+rapidfuzz 

@@ -5,6 +5,7 @@ import datetime
 from google.cloud import bigquery
 from io import BytesIO
 import zipfile
+from .ticker_mapper import TickerMapper
 
 # CONFIG
 PROJECT_ID = os.environ.get("PROJECT_ID", "datascience-projects")
@@ -14,6 +15,8 @@ TABLE_ID = "contract_signals"
 def fetch_and_store_contracts():
     print("🚀 Starting Government Contract Scraper...")
     
+    mapper = TickerMapper()
+
     # 1. Calculate Date Range (Yesterday's Data)
     # USASpending updates daily. We grab the last 24 hours of signed contracts.
     today = datetime.date.today()
@@ -68,6 +71,13 @@ def fetch_and_store_contracts():
         for _, row in df.iterrows():
             amount = row.get('total_obligation', 0)
             recipient = str(row.get('recipient_name', '')).upper()
+
+            ticker = mapper.find_ticker(recipient)
+        
+            # If no ticker found, it's likely a private company -> Skip
+            if not ticker:
+                continue
+
             
             # Filter 1: Must be a significant amount (> \$500k)
             if amount < 500000: continue
@@ -80,7 +90,7 @@ def fetch_and_store_contracts():
             clean_rows.append({
                 "action_date": date_str,
                 "recipient_name": recipient,
-                "ticker": _guess_ticker(recipient), # Helper to map names
+                "ticker": ticker, # Helper to map names
                 "amount": float(amount),
                 "agency": row.get('awarding_agency_name', 'Unknown'),
                 "description": str(row.get('award_description', ''))[:500]
