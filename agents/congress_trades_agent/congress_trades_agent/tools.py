@@ -88,7 +88,7 @@ def check_fundamentals_tool(ticker: str):
 # ==============================================================================
 
 def _get_bq_data(analysis_date: str) -> list:
-    """Internal: Runs the Net Buy Activity SQL Algorithm."""
+    """Internal: Runs the Net Buy Activity SQL Algorithm with Anti-Spam Logic."""
     bq_client = bigquery.Client()
     
     qry = f"""
@@ -118,6 +118,10 @@ def _get_bq_data(analysis_date: str) -> list:
         COUNTIF(action = 'Buy') AS purchase_count,
         COUNTIF(action = 'Sell') AS sale_count,
         (COUNTIF(action = 'Buy') - COUNTIF(action = 'Sell')) AS net_buy_activity,
+        
+        -- NEW METRIC: Count Distinct Days (The Spam Filter)
+        COUNT(DISTINCT CASE WHEN action='Buy' THEN trade_date END) as buying_days_count,
+        
         MAX(trade_date) AS last_trade_date
     FROM clean_data
     WHERE
@@ -127,11 +131,19 @@ def _get_bq_data(analysis_date: str) -> list:
         )
         AND TRIM(ticker) != ''
         AND ticker IS NOT NULL
+        
+        -- NEW FILTERS: Remove Mutual Funds (5 chars) and weird symbols
+        AND LENGTH(ticker) <= 4 
+        AND NOT REGEXP_CONTAINS(ticker, r'[^a-zA-Z]') 
 
     GROUP BY ticker, run_date
 
     HAVING
-        net_buy_activity >= 15
+        -- 1. Must be bought on at least 2 SEPARATE days (Kills 1-day spam)
+        buying_days_count >= 2
+        
+        -- 2. Net activity must still be positive
+        AND net_buy_activity >= 5
         AND last_trade_date >= DATE_SUB(run_date, INTERVAL 90 DAY)
         AND (
         COUNTIF(action = 'Sell') = 0
@@ -139,7 +151,7 @@ def _get_bq_data(analysis_date: str) -> list:
         (COUNTIF(action = 'Buy') * 1.0 / GREATEST(COUNTIF(action = 'Sell'), 1)) >= 2.0
         )
 
-    ORDER BY net_buy_activity DESC
+    ORDER BY buying_days_count DESC, net_buy_activity DESC
     LIMIT 10;
     """
     
@@ -155,7 +167,6 @@ def _get_bq_data(analysis_date: str) -> list:
     ]
     
     # Enrich with Market Regime
-    # We pass the analysis_date explicitly to check regime AS OF that date
     df_filtered['market_uptrend'] = df_filtered['signal_date'].apply(
         lambda x: _check_market_regime(x, analysis_date)
     )
@@ -164,6 +175,7 @@ def _get_bq_data(analysis_date: str) -> list:
     df_filtered['signal_date'] = df_filtered['signal_date'].astype(str)
     df_filtered['last_trade_date'] = df_filtered['last_trade_date'].astype(str)
     
+    # Return both scores so the Agent can see the quality
     return df_filtered.to_dict(orient='records')
 
 def _check_market_regime(row_date, context_date_str) -> bool:
