@@ -1,5 +1,4 @@
 import requests
-import pandas as pd
 from rapidfuzz import process, fuzz
 
 class TickerMapper:
@@ -14,16 +13,27 @@ class TickerMapper:
         Source: https://www.sec.gov/files/company_tickers.json
         """
         print("📥 Loading SEC Ticker Master List...")
-        headers = {'User-Agent': 'Mozilla/5.0 (Personal Research Project)'}
+        
+        # 🛡️ FIX: SEC requires 'AppName <Email>' format
+        headers = {
+            'User-Agent': 'CongressTradingBot contact@example.com',
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': 'www.sec.gov'
+        }
         
         try:
             url = "https://www.sec.gov/files/company_tickers.json"
             resp = requests.get(url, headers=headers)
+            
+            # Check for 403 Forbidden explicitly
+            if resp.status_code != 200:
+                print(f"❌ SEC blocked request. Status Code: {resp.status_code}")
+                print("💡 Hint: Change 'contact@example.com' to your real email.")
+                return
+
             data = resp.json()
             
             # The SEC JSON is a dictionary of dictionaries. Let's flatten it.
-            # Format: { '0': {'cik_str': 320193, 'ticker': 'AAPL', 'title': 'Apple Inc.'}, ... }
-            
             for _, entry in data.items():
                 ticker = entry['ticker']
                 clean_name = self._clean_string(entry['title'])
@@ -59,7 +69,6 @@ class TickerMapper:
             return self.mapping[clean_input]
 
         # 2. Fuzzy Match (Slower but handles typos/variations)
-        # extractOne returns: (BestMatchString, Score, Index)
         result = process.extractOne(
             clean_input, 
             self.names_list, 
@@ -68,7 +77,7 @@ class TickerMapper:
         
         if result:
             match_name, score, _ = result
-            # 90 is a safe threshold. "Lockheed Martin Missiles" vs "Lockheed Martin" usually scores high.
+            # 88-90 is a safe threshold
             if score >= 88: 
                 return self.mapping[match_name]
         
