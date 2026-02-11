@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 import datetime
 import time
+import argparse
 from google.cloud import bigquery
 from io import BytesIO
 import zipfile
@@ -13,28 +14,39 @@ PROJECT_ID = os.environ.get("PROJECT_ID", "datascience-projects")
 DATASET_ID = "gcp_shareloader"
 TABLE_ID = "contract_signals"
 
-def fetch_and_store_contracts():
-    print("🚀 Starting Government Contract Scraper (Robust Mode)...")
+def fetch_and_store_contracts(days_back=3, end_date_str=None):
+    """
+    Fetches contracts for the past 'days_back' days.
+    If end_date_str is provided, it calculates backwards from that date.
+    """
     
-    # 1. Initialize Ticker Mapper
+    # 1. Determine Dates
+    if end_date_str:
+        try:
+            target_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            print("❌ Error: Invalid date format. Use YYYY-MM-DD.")
+            return
+    else:
+        target_date = datetime.date.today()
+
+    start_date_obj = target_date - datetime.timedelta(days=days_back)
+    
+    # API requires strings
+    end_date_api = target_date.strftime("%Y-%m-%d")
+    start_date_api = start_date_obj.strftime("%Y-%m-%d")
+
+    print(f"🚀 Starting Scraper...")
+    print(f"📅 Requesting window: {start_date_api} to {end_date_api} ({days_back} days)")
+
+    # 2. Initialize Ticker Mapper
     try:
         print("📥 Initializing Ticker Mapper...")
         mapper = TickerMapper() 
-        print("✅ Mapper loaded successfully.")
+        print("✅ Mapper loaded.")
     except Exception as e:
         print(f"❌ Mapper Critical Failure: {e}")
         return
-
-    # 2. Calculate Date Range
-    # NOTE: Your logs showed 2026. If your system clock is wrong, this will fail.
-    today = datetime.date.today()
-    if today.year > 2025:
-        print(f"⚠️ WARNING: System clock is set to {today.year}. API calls may fail if data doesn't exist yet.")
-        
-    end_date_str = today.strftime("%Y-%m-%d")
-    start_date_str = (today - datetime.timedelta(days=3)).strftime("%Y-%m-%d")
-    
-    print(f"📅 Requesting contracts for window: {start_date_str} to {end_date_str}")
 
     # 3. USASpending API Payload
     url = "https://api.usaspending.gov/api/v2/bulk_download/awards/"
@@ -43,8 +55,8 @@ def fetch_and_store_contracts():
             "prime_award_types": ["A", "B", "C", "D"], 
             "date_type": "action_date",
             "date_range": {
-                "start_date": start_date_str,
-                "end_date": end_date_str
+                "start_date": start_date_api,
+                "end_date": end_date_api
             }
         },
         "file_format": "csv"
@@ -69,12 +81,14 @@ def fetch_and_store_contracts():
         if not file_url and status_url:
             print(f"🔄 Polling for file generation...")
             retry_count = 0
-            while retry_count < 20: # Wait up to 100s
+            # Wait longer for larger date ranges
+            max_retries = 30 + (days_back * 2) 
+            
+            while retry_count < max_retries: 
                 time.sleep(5) 
                 try:
                     status_resp = requests.get(status_url).json()
                 except:
-                    print("   ...network glitch, retrying...")
                     continue
 
                 status = status_resp.get('status')
@@ -91,34 +105,50 @@ def fetch_and_store_contracts():
                 retry_count += 1
         
         if not file_url:
-            print("❌ Timed out. The API is busy or the date range has no data.")
+            print("❌ Timed out.")
             return
 
-        # Step C: Download & Parse (With Safety Checks)
+        # Step C: Download with HTML Wait-Page Handling
         print(f"⬇️ Downloading CSV from {file_url}...")
-        csv_resp = requests.get(file_url)
         
-        # --- NEW SAFETY CHECK ---
-        # If the file doesn't start with 'PK' (Magic bytes for Zip), it's likely an error message.
-        if not csv_resp.content.startswith(b'PK'):
-            print("❌ ERROR: Downloaded file is not a valid ZIP.")
-            print(f"   Server Response Content: {csv_resp.text[:500]}") # Print first 500 chars of error
-            return
-        # ------------------------
+        csv_content = None
+        download_attempts = 0
+        
+        while download_attempts < 10:
+            csv_resp = requests.get(file_url)
+            
+            # 1. Success (ZIP Header)
+            if csv_resp.content.startswith(b'PK'):
+                csv_content = csv_resp.content
+                break 
+            
+            # 2. Waiting Room (HTML)
+            elif b'<html' in csv_resp.content.lower():
+                print(f"   ⚠️ Server 'Wait' page detected (Attempt {download_attempts+1}). Sleeping 10s...")
+                time.sleep(10)
+                download_attempts += 1
+            
+            # 3. Unknown Error
+            else:
+                print("❌ ERROR: Download returned unknown content.")
+                print(f"   Preview: {csv_resp.text[:200]}")
+                return
 
+        if not csv_content:
+            print("❌ Failed to retrieve ZIP file.")
+            return
+
+        # Step D: Process ZIP
         clean_rows = []
         try:
-            with zipfile.ZipFile(BytesIO(csv_resp.content)) as z:
-                # API sometimes returns multiple files, usually we want the first CSV
+            with zipfile.ZipFile(BytesIO(csv_content)) as z:
                 csv_filename = z.namelist()[0]
                 print(f"📂 Processing file: {csv_filename}")
                 
                 with z.open(csv_filename) as f:
-                    # Use chunking for large files
                     for chunk in pd.read_csv(f, chunksize=10000, low_memory=False):
                         
-                        # Filter for High Value (> \$500k) FIRST for speed
-                        # Ensure column exists before filtering
+                        # Optimization: Filter by amount first
                         if 'total_obligation' in chunk.columns:
                             chunk = chunk[chunk['total_obligation'] > 500000]
                         
@@ -127,15 +157,12 @@ def fetch_and_store_contracts():
                         for _, row in chunk.iterrows():
                             recipient = str(row.get('recipient_name', '')).upper()
                             
-                            # Heuristic Filter: Must look like a public company
                             if not any(x in recipient for x in [' INC', ' CORP', ' PLC', ' LTD', ' CO']):
                                 continue
 
-                            # Map Ticker
                             ticker = mapper.find_ticker(recipient)
                             if not ticker: continue
                             
-                            # Prepare Row
                             clean_rows.append({
                                 "action_date": row.get('action_date'),
                                 "recipient_name": recipient,
@@ -146,7 +173,7 @@ def fetch_and_store_contracts():
                             })
                             
         except zipfile.BadZipFile:
-            print("❌ ZIP Error: The file was corrupted or incomplete.")
+            print("❌ ZIP Error: The file was corrupted.")
             return
 
         print(f"✨ Found {len(clean_rows)} relevant corporate contracts.")
@@ -164,11 +191,8 @@ def upsert_to_bigquery(rows):
     try:
         client = bigquery.Client(project=PROJECT_ID)
         table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
-        
-        # 1. Temp Table
         temp_table_id = f"{PROJECT_ID}.{DATASET_ID}.temp_contracts_{int(time.time())}"
         
-        # Define Schema explicitly to avoid type errors
         schema = [
             bigquery.SchemaField("action_date", "DATE"),
             bigquery.SchemaField("recipient_name", "STRING"),
@@ -182,8 +206,6 @@ def upsert_to_bigquery(rows):
         job = client.load_table_from_json(rows, temp_table_id, job_config=job_config)
         job.result()
         
-        # 2. Merge (Deduplicate)
-        # We identify duplicates by: Ticker, Date, Amount, and Agency
         query = f"""
         MERGE `{table_id}` T
         USING `{temp_table_id}` S
@@ -198,11 +220,16 @@ def upsert_to_bigquery(rows):
         
         client.query(query).result()
         print(f"✅ Upserted {len(rows)} rows to BigQuery.")
-        
         client.delete_table(temp_table_id, not_found_ok=True)
         
     except Exception as e:
         print(f"❌ BigQuery Error: {e}")
 
 if __name__ == "__main__":
-    fetch_and_store_contracts()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=3, help="Days to look back")
+    parser.add_argument("--end_date", type=str, default=None, help="YYYY-MM-DD (Optional override)")
+    
+    args = parser.parse_args()
+    
+    fetch_and_store_contracts(days_back=args.days, end_date_str=args.end_date)
