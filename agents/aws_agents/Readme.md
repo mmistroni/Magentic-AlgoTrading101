@@ -14,4 +14,4 @@ https://github.com/awslabs/amazon-bedrock-agentcore-samples/blob/main/01-tutoria
 
 
 # To Run strand agent
-python ./strands_claude.py   '{"prompt": "What is 2 + 2 and what is the weather?"}'
+python ./strands_claude.py   '{"prompt": "What is 2 + 4 and what is the weather?"}'

@@ -3,36 +3,51 @@ from strands_tools import calculator # Import the calculator tool
 import argparse
 import json
 from strands.models import BedrockModel
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
 # Create a custom tool 
 @tool
 def weather():
     """ Get weather """ # Dummy implementation
     return "sunny"
+app = BedrockAgentCoreApp()
+agent = None
 
 
-model_id = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
-model = BedrockModel(
-    model_id=model_id,
-)
-agent = Agent(
-    model=model,
-    tools=[calculator, weather],
-    system_prompt="You're a helpful assistant. You can do simple math calculation, and tell the weather."
-)
+def create_agent():
 
-def strands_agent_bedrock(payload):
+    model_id = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    model = BedrockModel(
+        model_id=model_id,
+    )
+    tools=[calculator, weather]
+    
+    return Agent(
+            model=model,
+            tools = tools
+            #system_prompt="You're a helpful assistant. You can do simple math calculation, and tell the weather."
+    )
+
+@app.entrypoint
+async def invoke(payload, context):
     """
     Invoke the agent with a payload
     """
-    user_input = payload.get("prompt")
-    response = agent(user_input)
-    return response.message['content'][0]['text']
-    # '{"prompt": "What is 2 + 2 and what is the weather?"}'
+    global agent
+    user_message = payload.get("prompt")
+    _ = payload["actor_id"]
 
+    session_id = context.session_id
+
+    if not agent:
+        agent = create_agent()
+
+    if not session_id:
+        raise Exception("Content session id is not set")
+
+    async for event in agent.stream_async(user_message):
+        if "data" in event:
+            yield event["data"]
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("payload", type=str)
-    args = parser.parse_args()
-    response = strands_agent_bedrock(json.loads(args.payload))
+    app.run()
