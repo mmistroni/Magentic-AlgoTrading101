@@ -1,35 +1,52 @@
 import datetime
 import time
-from scraper_contracts import fetch_and_store_contracts
+import sys
 
-# CONFIG: How far back to go?
-START_DATE = datetime.date(2023, 1, 1) # Start of 2023
-END_DATE = datetime.date(2024, 11, 20) # Up to today (adjust as needed)
+# Import the scraper function from your existing file
+try:
+    from scraper_contracts import fetch_and_store_contracts
+except ImportError:
+    print("❌ Error: Could not find 'scraper_contracts.py' in this folder.")
+    sys.exit(1)
+
+# --- CONFIGURATION ---
+# We want data from the start of 2024 up to the end of 2024 (or today)
+START_DATE = datetime.date(2024, 1, 1)  
+END_DATE   = datetime.date(2026, 1, 31) 
+# ---------------------
 
 def run_backfill():
-    print(f"🕰️ Starting Historical Backfill from {START_DATE} to {END_DATE}...")
+    print(f"🕰️ Starting Historical Backfill: {START_DATE} -> {END_DATE}")
+    print("------------------------------------------------------")
     
-    current_end = END_DATE
+    # We start at the END and walk backwards to the START
+    current_target = END_DATE
     
-    # We step backwards in 7-day chunks to be safe with API limits
-    while current_end > START_DATE:
-        # Calculate the start of this 7-day chunk
-        current_start = current_end - datetime.timedelta(days=6)
+    while current_target >= START_DATE:
+        # We process 5 days at a time to keep files small and fast
+        days_window = 5 
         
-        # Override date string format for the scraper
-        date_str = current_end.strftime("%Y-%m-%d")
+        # Calculate the start of this mini-window
+        window_start = current_target - datetime.timedelta(days=days_window)
         
-        print(f"\n--- Processing Window: {current_start} to {current_end} ---")
+        # Format date for the scraper
+        # This overrides your system clock!
+        date_str = current_target.strftime("%Y-%m-%d")
         
-        # Call your existing function (forcing the end date)
-        # We use days_back=6 to cover the 7-day window (End date counts as day 0)
-        fetch_and_store_contracts(days_back=6, end_date_str=date_str)
+        print(f"\n🔄 Processing Window: {window_start} to {current_target}")
         
-        # Move the window back
-        current_end = current_start - datetime.timedelta(days=1)
+        # Call your existing scraper logic
+        # We tell it: "Pretend today is 'date_str' and look back 5 days"
+        fetch_and_store_contracts(days_back=days_window, end_date_str=date_str)
         
-        # Sleep to be nice to the API
-        time.sleep(5)
+        # Move the cursor back for the next loop
+        current_target = window_start - datetime.timedelta(days=1)
+        
+        # Sleep to prevent API throttling
+        print("💤 Sleeping 3s...")
+        time.sleep(3)
+
+    print("\n✅ Backfill Complete for 2024.")
 
 if __name__ == "__main__":
     run_backfill()
