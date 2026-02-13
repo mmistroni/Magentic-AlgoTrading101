@@ -1,39 +1,38 @@
 #!/bin/bash
 
-# --- Start of Script ---
+# --- CONFIGURATION ---
+REGION="us-central1"
+IMAGE_NAME="gcr.io/datascience-projects/congress-bot:latest"
+JOB_NAME="contract-scraper"
+PROJECT_ID="datascience-projects"
 
-# 1. Check for Active Google Cloud Authentication
-echo "--- Checking Google Cloud Authentication Status ---"
-
-# The 'gcloud auth print-access-token' command will fail if not logged in.
-# We redirect output to /dev/null to keep the console clean.
+echo "--- 1. Checking Authentication ---"
 gcloud auth print-access-token --quiet > /dev/null 2>&1
-
-# Check the exit code of the last command ($?)
 if [ $? -ne 0 ]; then
-    echo "❌ ERROR: You are not authenticated with gcloud."
-    echo "🚨 Please run the following command to log in, then re-run this script:"
-    echo "   gcloud auth login"
-    exit 1 # Exit the script with an error code
+    echo "❌ ERROR: Not authenticated. Run 'gcloud auth login'."
+    exit 1
 fi
 
-echo "✅ Authentication successful. Proceeding with deployment..."
-gcloud run jobs execute contract-scraper
-# ---
+echo "--- 2. Building & Pushing Image via Cloud Build ---"
+# This replaces 'docker build' and 'docker push'
+gcloud builds submit --tag $IMAGE_NAME . --project $PROJECT_ID
+if [ $? -ne 0 ]; then echo "❌ Cloud Build failed"; exit 1; fi
 
-# Check if the job already exists
-if gcloud run jobs describe contract-scraper --region us-central1 > /dev/null 2>&1; then
-    echo "🔄 Job exists. Updating..."
+echo "--- 3. Updating Cloud Run Job ---"
+if gcloud run jobs describe $JOB_NAME --region $REGION > /dev/null 2>&1; then
     COMMAND="update"
 else
-    echo "🆕 Job not found. Creating..."
     COMMAND="create"
 fi
 
-gcloud run jobs $COMMAND contract-scraper \
-  --image gcr.io/datascience-projects/congress-bot:latest \
-  --region us-central1 \
+gcloud run jobs $COMMAND $JOB_NAME \
+  --image $IMAGE_NAME \
+  --region $REGION \
   --command python \
   --args scripts/scraper_contracts.py \
-  --set-env-vars PROJECT_ID=datascience-projects \
-  --max-retries 0
+  --set-env-vars PROJECT_ID=$PROJECT_ID \
+  --max-retries 0 \
+  --task-timeout=600s
+
+echo "--- 4. Executing Job ---"
+gcloud run jobs execute $JOB_NAME --region $REGION
