@@ -23,6 +23,14 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
     Scrapes USAspending.gov for the past 'days_back' days.
     Default is 2 days.
     """
+    # NEW STRATEGY: Try a wider window if the small one fails
+    # USASpending API can be flaky with 1-day windows. 
+    # Let's force a 7-day window if we are in the 'Daily' run to ensure we catch late data.
+    if days_back < 7:
+        log("🔄 Expanding window to 7 days to ensure overlap and catch delayed filings.")
+        days_back = 7
+    
+    
     log(f"🚀 Starting Government Contract Scraper (Window: {days_back} days)...")
     
     # 1. Determine Dates
