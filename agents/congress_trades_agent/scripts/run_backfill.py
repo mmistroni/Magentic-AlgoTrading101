@@ -1,52 +1,57 @@
 import datetime
 import time
 import sys
+import os
 
-# Import the scraper function from your existing file
-try:
-    from scraper_contracts import fetch_and_store_contracts
-except ImportError:
-    print("❌ Error: Could not find 'scraper_contracts.py' in this folder.")
-    sys.exit(1)
+# Ensure we can import the scraper from the same directory
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from scraper_contracts import fetch_and_store_contracts
 
 # --- CONFIGURATION ---
-# We want data from the start of 2024 up to the end of 2024 (or today)
-START_DATE = datetime.date(2024, 1, 1)  
-END_DATE   = datetime.date(2026, 1, 31) 
+# Backfill from Today back to Feb 1, 2024
+START_DATE = datetime.date(2024, 2, 1)  
+# We force the end date to avoid the "2026 system clock" issue
+END_DATE   = datetime.date(2025, 2, 5) 
 # ---------------------
 
 def run_backfill():
-    print(f"🕰️ Starting Historical Backfill: {START_DATE} -> {END_DATE}")
-    print("------------------------------------------------------")
+    print(f"🚀 Starting Cloud Backfill Job")
+    print(f"🎯 Target Range: {START_DATE} to {END_DATE}")
     
-    # We start at the END and walk backwards to the START
-    current_target = END_DATE
+    # Start at the End Date and walk backwards
+    current_cursor = END_DATE
     
-    while current_target >= START_DATE:
-        # We process 5 days at a time to keep files small and fast
-        days_window = 5 
+    while current_cursor > START_DATE:
+        # We process 5 days at a time (Safe for API timeouts)
+        chunk_size = 5
         
-        # Calculate the start of this mini-window
-        window_start = current_target - datetime.timedelta(days=days_window)
+        # Calculate window start
+        window_start = current_cursor - datetime.timedelta(days=chunk_size)
         
-        # Format date for the scraper
-        # This overrides your system clock!
-        date_str = current_target.strftime("%Y-%m-%d")
+        # Don't go past the start date
+        if window_start < START_DATE:
+            window_start = START_DATE
+            
+        # Format date string for the scraper function
+        date_str = current_cursor.strftime("%Y-%m-%d")
         
-        print(f"\n🔄 Processing Window: {window_start} to {current_target}")
+        print(f"🔄 Processing Window Ending: {date_str} (Looking back {chunk_size} days)...")
         
-        # Call your existing scraper logic
-        # We tell it: "Pretend today is 'date_str' and look back 5 days"
-        fetch_and_store_contracts(days_back=days_window, end_date_str=date_str)
+        try:
+            # Call the existing scraper logic
+            fetch_and_store_contracts(days_back=chunk_size, end_date_str=date_str)
+        except Exception as e:
+            print(f"⚠️ Error in window {date_str}: {e}")
+            # Continue to next window even if this one fails
         
-        # Move the cursor back for the next loop
-        current_target = window_start - datetime.timedelta(days=1)
+        # Move cursor back
+        current_cursor = window_start - datetime.timedelta(days=1)
         
-        # Sleep to prevent API throttling
-        print("💤 Sleeping 3s...")
-        time.sleep(3)
+        # Sleep to be polite to the API and avoid rate limits
+        time.sleep(2)
 
-    print("\n✅ Backfill Complete for 2024.")
+    print("\n✅ Backfill Job Complete.")
 
 if __name__ == "__main__":
     run_backfill()
