@@ -58,7 +58,7 @@ def fetch_technical_snapshot_tool(target_date: str = "today"):
 
     query = f"""
         SELECT * FROM `{table_ref}`
-        WHERE cob = @query_date
+        WHERE cob = @query_date and price is not null
     """
     
     # Using query parameters for security and cleaner syntax
