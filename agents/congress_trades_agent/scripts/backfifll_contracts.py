@@ -3,16 +3,18 @@ import time
 import sys
 import os
 
-# Ensure we can import the scraper from the same directory
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# --- PATH SETUP ---
+# This ensures we can import 'scraper_contracts' from the same folder
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
 
+# Now we can import the function from your scraper file
 from scraper_contracts import fetch_and_store_contracts
 
 # --- CONFIGURATION ---
 # Backfill from Today back to Feb 1, 2024
 START_DATE = datetime.date(2024, 2, 1)  
-# We force the end date to avoid the "2026 system clock" issue
-END_DATE   = datetime.date(2025, 2, 5) 
+END_DATE   = datetime.date(2025, 2, 14) 
 # ---------------------
 
 def run_backfill():
@@ -23,8 +25,8 @@ def run_backfill():
     current_cursor = END_DATE
     
     while current_cursor > START_DATE:
-        # We process 5 days at a time (Safe for API timeouts)
-        chunk_size = 5
+        # We use 7 days because your scraper logic prefers 7 days
+        chunk_size = 7
         
         # Calculate window start
         window_start = current_cursor - datetime.timedelta(days=chunk_size)
@@ -39,17 +41,17 @@ def run_backfill():
         print(f"🔄 Processing Window Ending: {date_str} (Looking back {chunk_size} days)...")
         
         try:
-            # Call the existing scraper logic
+            # Call the scraper function you already wrote
+            # It will handle the API calls and BigQuery upload
             fetch_and_store_contracts(days_back=chunk_size, end_date_str=date_str)
         except Exception as e:
             print(f"⚠️ Error in window {date_str}: {e}")
-            # Continue to next window even if this one fails
         
-        # Move cursor back
+        # Move cursor back (Overlap by 1 day to be safe, or just move back by chunk)
         current_cursor = window_start - datetime.timedelta(days=1)
         
-        # Sleep to be polite to the API and avoid rate limits
-        time.sleep(2)
+        # Sleep to be polite to the API
+        time.sleep(3)
 
     print("\n✅ Backfill Job Complete.")
 
