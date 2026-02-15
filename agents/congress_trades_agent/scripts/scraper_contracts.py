@@ -21,20 +21,14 @@ def log(msg):
 def fetch_and_store_contracts(days_back=2, end_date_str=None):
     """
     Scrapes USAspending.gov for the past 'days_back' days.
-    Default is 2 days.
     """
-    # NEW STRATEGY: Try a wider window if the small one fails
-    # USASpending API can be flaky with 1-day windows. 
-    # Let's force a 7-day window if we are in the 'Daily' run to ensure we catch late data.
     if days_back < 7:
-        log("🔄 Expanding window to 7 days to ensure overlap and catch delayed filings.")
+        log("🔄 Expanding window to 7 days to ensure overlap.")
         days_back = 7
-    
     
     log(f"🚀 Starting Government Contract Scraper (Window: {days_back} days)...")
     
     # 1. Determine Dates
-    # Priority: 1. Function Arg -> 2. Env Var -> 3. System Clock
     if not end_date_str:
         end_date_str = os.environ.get("OVERRIDE_DATE")
 
@@ -43,17 +37,14 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
             target_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d").date()
             log(f"⚠️ Using OVERRIDE date: {target_date}")
         except ValueError:
-            log("❌ Error: Invalid date format in override. Using System Clock.")
             target_date = datetime.date.today()
     else:
         target_date = datetime.date.today()
 
     # Safety Check for 2026+ System Clocks
     if target_date.year > 2025:
-        log(f"⚠️ WARNING: System clock is set to {target_date.year}. This looks incorrect.")
-        log("   If the API returns no data, set the 'OVERRIDE_DATE' environment variable in Cloud Run.")
+        log(f"⚠️ WARNING: System clock is set to {target_date.year}.")
 
-    # Calculate Window
     start_date_obj = target_date - datetime.timedelta(days=days_back)
     end_date_api = target_date.strftime("%Y-%m-%d")
     start_date_api = start_date_obj.strftime("%Y-%m-%d")
@@ -102,7 +93,7 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
         if not file_url and status_url:
             log(f"🔄 Waiting for file generation...")
             retry_count = 0
-            max_retries = 40 # Wait up to 3-4 minutes
+            max_retries = 40 
             
             while retry_count < max_retries: 
                 time.sleep(5) 
@@ -138,21 +129,15 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
         while download_attempts < 10:
             csv_resp = requests.get(file_url)
             
-            # 1. Success (ZIP Header)
             if csv_resp.content.startswith(b'PK'):
                 csv_content = csv_resp.content
                 break 
-            
-            # 2. Waiting Room (HTML)
             elif b'<html' in csv_resp.content.lower():
                 log(f"   ⚠️ Server preparing download (Attempt {download_attempts+1}). Sleeping 10s...")
                 time.sleep(10)
                 download_attempts += 1
-            
-            # 3. Error
             else:
                 log(f"❌ ERROR: unexpected content type.")
-                log(f"   Preview: {csv_resp.text[:200]}")
                 return
 
         if not csv_content:
@@ -169,16 +154,18 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
                 with z.open(csv_filename) as f:
                     for chunk in pd.read_csv(f, chunksize=10000, low_memory=False):
                         
-                        # Optimization: Filter by amount first
-                        if 'total_obligation' in chunk.columns:
-                            chunk = chunk[chunk['total_obligation'] > 500000]
+                        # --- FIX: USE CORRECT COLUMN NAME ---
+                        if 'federal_action_obligation' in chunk.columns:
+                            # Convert to numeric, forcing errors to NaN then 0
+                            chunk['federal_action_obligation'] = pd.to_numeric(chunk['federal_action_obligation'], errors='coerce').fillna(0)
+                            # Filter: > \$500k
+                            chunk = chunk[chunk['federal_action_obligation'] > 500000]
                         
                         if chunk.empty: continue
 
                         for _, row in chunk.iterrows():
                             recipient = str(row.get('recipient_name', '')).upper()
                             
-                            # Basic string filter
                             if not any(x in recipient for x in [' INC', ' CORP', ' PLC', ' LTD', ' CO']):
                                 continue
 
@@ -189,7 +176,8 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
                                 "action_date": row.get('action_date'),
                                 "recipient_name": recipient,
                                 "ticker": ticker,
-                                "amount": float(row.get('total_obligation', 0)),
+                                # --- FIX: USE CORRECT COLUMN NAME ---
+                                "amount": float(row.get('federal_action_obligation', 0)),
                                 "agency": row.get('awarding_agency_name', 'Unknown'),
                                 "description": str(row.get('award_description', ''))[:1000]
                             })
@@ -249,9 +237,8 @@ def upsert_to_bigquery(rows):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # CHANGED DEFAULT TO 2
-    parser.add_argument("--days", type=int, default=2, help="Days to look back")
-    parser.add_argument("--end_date", type=str, default=None, help="YYYY-MM-DD")
+    parser.add_argument("--days", type=int, default=2)
+    parser.add_argument("--end_date", type=str, default=None)
     
     args = parser.parse_args()
     
