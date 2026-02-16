@@ -13,8 +13,8 @@ from scraper_contracts import fetch_and_store_contracts
 
 # --- CONFIGURATION ---
 # Backfill from Today back to Feb 1, 2024
-START_DATE = datetime.date(2024, 2, 1)  
-END_DATE   = datetime.date(2025, 2, 14) 
+START_DATE = datetime.date(2025, 2, 1)  
+END_DATE   = datetime.date(2026, 2, 14) 
 
 # ---------------------
 
