@@ -8,20 +8,36 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
-# Now we can import the function from your scraper file
 from scraper_contracts import fetch_and_store_contracts
 
-# --- CONFIGURATION ---
-# Backfill from Today back to Feb 1, 2024
-START_DATE = datetime.date(2025, 2, 1)  
-END_DATE   = datetime.date(2026, 2, 14) 
+def get_date_from_env(var_name, default_date):
+    val = os.environ.get(var_name)
+    if not val:
+        return default_date
+    try:
+        return datetime.datetime.strptime(val, "%Y-%m-%d").date()
+    except ValueError:
+        print(f"❌ Error: Invalid format for {var_name} ({val}). Use YYYY-MM-DD.")
+        sys.exit(1)
 
+# --- CONFIGURATION ---
+# 1. Try to get dates from Cloud Run Environment Variables
+# 2. If not set, default to a safe recent window (e.g., Feb 2025)
+default_start = datetime.date(2025, 2, 1)
+default_end   = datetime.date(2025, 4, 14)
+
+START_DATE = get_date_from_env("BACKFILL_START", default_start)
+END_DATE   = get_date_from_env("BACKFILL_END", default_end)
 # ---------------------
 
 def run_backfill():
     print(f"🚀 Starting Cloud Backfill Job")
-    print(f"🎯 Target Range: {START_DATE} to {END_DATE}")
+    print(f"⚙️ Configuration: START={START_DATE} | END={END_DATE}")
     
+    if START_DATE >= END_DATE:
+        print("❌ Error: Start Date must be before End Date.")
+        return
+
     # Start at the End Date and walk backwards
     current_cursor = END_DATE
     
@@ -42,13 +58,12 @@ def run_backfill():
         print(f"🔄 Processing Window Ending: {date_str} (Looking back {chunk_size} days)...")
         
         try:
-            # Call the scraper function you already wrote
-            # It will handle the API calls and BigQuery upload
+            # Call the scraper function
             fetch_and_store_contracts(days_back=chunk_size, end_date_str=date_str)
         except Exception as e:
             print(f"⚠️ Error in window {date_str}: {e}")
         
-        # Move cursor back (Overlap by 1 day to be safe, or just move back by chunk)
+        # Move cursor back
         current_cursor = window_start - datetime.timedelta(days=1)
         
         # Sleep to be polite to the API
