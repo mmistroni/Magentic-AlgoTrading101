@@ -29,4 +29,4 @@ gcloud run jobs $COMMAND $JOB_NAME \
   --memory=2Gi
 
 echo "--- 3. Executing Job ---"
-gcloud run jobs execute $JOB_NAME --region $REGION
+#gcloud run jobs execute $JOB_NAME --region $REGION
