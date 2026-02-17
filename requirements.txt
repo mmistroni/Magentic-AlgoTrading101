@@ -274,3 +274,4 @@ pydantic
 pytest
 pytest-asyncio
 vix_utils
+pydantic-tfl-api

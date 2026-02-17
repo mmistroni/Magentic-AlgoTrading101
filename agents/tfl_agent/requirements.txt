@@ -1,0 +1,7 @@
+google-adk
+google-cloud-bigquery
+db-dtypes
+pydantic
+pandas
+pyarrow
+pydantic-tfl-api
