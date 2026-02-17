@@ -25,7 +25,7 @@ gcloud run jobs $COMMAND $JOB_NAME \
   --args scripts/backfill_contracts.py \
   --set-env-vars PROJECT_ID=$PROJECT_ID \
   --max-retries 0 \
-  --task-timeout=3600s \
+  --task-timeout=24h \
   --memory=2Gi
 
 echo "--- 3. Executing Job ---"
