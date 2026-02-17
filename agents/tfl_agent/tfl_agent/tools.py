@@ -2,21 +2,23 @@ from pydantic_tfl_api import JourneyClient
 from datetime import datetime
 import os
 # Initialize the synchronous client
-client = JourneyClient(api_token=os.environ['TFL_API_KEY'])
 
-def get_agent_data():
-    # Fetch journey results
-    # The library automatically maps the JSON to Pydantic objects
-    response = client.get_journey_results(
-        from_path="940GZZLUFLP", # Fairlop Naptan
-        to_path="940GZZBRMSR",   # Bromley South Naptan
-        date="20260218",         # Tomorrow's date
+from pydantic_tfl_api import JourneyClient
+
+from pydantic_tfl_api import JourneyClient
+
+def get_agent_data(from_stn="940GZZLUFLP", to_stn="940GZZBRMSR"):
+    client = JourneyClient(api_token=os.environ['TFL_API_KEY'])
+    
+    # We use the giant method name you found
+    # But we only pass the arguments we actually need!
+    response = client.JourneyResultsByPathFromPathToQueryViaQueryNationalSearchQueryDateQu(
+        from_field="1000079", 
+        to="1000033",
+        date="20260218",
         time="0545",
-        include_alternative_routes=True
+        includeAlternativeRoutes=True
     )
     
-    # Extract the journeys
-    all_journeys = response.content.journeys
-    
-    # Now your Agent can sort these by duration and price!
-    return all_journeys
+    # Access the list of journeys through the .root attribute
+    return response.content.journeys
