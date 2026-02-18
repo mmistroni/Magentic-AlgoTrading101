@@ -23,10 +23,11 @@ gcloud run jobs $COMMAND $JOB_NAME \
   --region $REGION \
   --command python \
   --args scripts/backfill_contracts.py \
-  --set-env-vars PROJECT_ID=$PROJECT_ID \
+  --set-env-vars PROJECT_ID=$PROJECT_ID,BACKFILL_START=2024-06-01,BACKFILL_END=2024-12-31 \
   --max-retries 0 \
   --task-timeout=24h \
   --memory=2Gi
 
-echo "--- 3. Executing Job ---"
-#gcloud run jobs execute $JOB_NAME --region $REGION
+echo "--- 3. Job Updated ---"
+echo "Go to Cloud Console -> Run Jobs -> Execute with overrides to change dates."
+# gcloud run jobs execute $JOB_NAME --region $REGION
