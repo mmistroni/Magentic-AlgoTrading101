@@ -40,11 +40,12 @@ https://medium.com/@princekrampah/multi-agent-architecture-in-multi-agent-system
 # mcp
 
 # TRading AGents
-- Congress Trades Agent using congress trades , form 4 and governmet contracts. PARTIALLY IMPLEMENTED Bu not deployed. Partially working using only Congress Trades
+1 - Congress Trades Agent using congress trades , form 4 and governmet contracts. PARTIALLY IMPLEMENTED Bu not deployed. Partially working using only Congress Trades
       - todo: add Form4
       -   add Governmet Contracts
      -    add lobbying data
-- VIX Agent to detect vix Spikes NOT IMPLEMENTED
-- 13F Agent to infer stocks to invest using 13F. IMPLEMENTED:This is Feature Agent, already developed and backtested
-- ShortSellibng Agent NOT IMPLEMENTED to detect opportunities for Short Selling
-- Agent detect stocks in Upward momentum - IMPLEMENTED: this is Stock Agent
+2 - VIX Agent to detect vix Spikes NOT IMPLEMENTED
+3 - 13F Agent to infer stocks to invest using 13F. IMPLEMENTED:This is Feature Agent, already developed and backtested
+4 - ShortSellibng Agent NOT IMPLEMENTED to detect opportunities for Short Selling
+5 - Agent detect stocks in Upward momentum - IMPLEMENTED: this is Stock Agent
+6 - Commodities speculation Agent NOT IMPLEMENTED
