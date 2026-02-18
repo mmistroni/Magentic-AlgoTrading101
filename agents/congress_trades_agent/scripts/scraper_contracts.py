@@ -64,28 +64,47 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
         # Step A: Initiate Download
         log("⏳ Contacting USASpending API...")
         response = requests.post(url, json=payload)
+        
+        if response.status_code != 200:
+            log(f"❌ API Rejected Request ({response.status_code}): {response.text}")
+            return
+
         init_resp = response.json()
         file_url = init_resp.get('file_url')
         status_url = init_resp.get('status_url')
 
         # Step B: POLLING (Wait for file to be ready)
-        log(f"🔄 Waiting for file generation...")
+        # --- UPDATE: Increased timeout to 16 minutes ---
+        log(f"🔄 Waiting for file generation (Status URL: {status_url})...")
         ready = False
-        for i in range(20): # Try for 100 seconds
-            time.sleep(5) 
-            status_resp = requests.get(status_url).json()
+        max_retries = 100  # 100 attempts
+        sleep_time = 10    # 10 seconds between attempts
+        
+        for i in range(max_retries): 
+            time.sleep(sleep_time) 
+            try:
+                status_resp = requests.get(status_url).json()
+            except:
+                log("   ...network glitch, retrying...")
+                continue
+
             status = status_resp.get('status')
+            
+            # Print status every 30 seconds so logs aren't spammy
+            if i % 3 == 0:
+                log(f"   ...status: {status} (Attempt {i+1}/{max_retries})")
+
             if status == 'finished':
-                file_url = status_resp.get('file_url') # Ensure we have the final URL
+                file_url = status_resp.get('file_url')
                 ready = True
+                log("✅ File Generation Complete.")
                 break
             elif status == 'failed':
                 log(f"❌ API Failed: {status_resp.get('message')}")
                 return
-            log(f"   ...status: {status}")
         
         if not ready:
-            log("❌ Timed out waiting for API generation.")
+            log("❌ Timed out waiting for API generation (Exceeded 16 mins).")
             return
 
         # Step C: Robust Download Loop
@@ -95,20 +114,19 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
         for attempt in range(10):
             try:
                 r = requests.get(file_url)
-                # Check Magic Bytes (PK = Zip)
                 if r.content.startswith(b'PK'):
                     csv_content = r.content
                     log("✅ Download Successful (ZIP found).")
                     break
                 else:
-                    log(f"   ⚠️ Attempt {attempt+1}: File not ready (Server returned text/html). Retrying in 5s...")
-                    time.sleep(5)
+                    log(f"   ⚠️ Attempt {attempt+1}: Server returned text/html. Retrying in 10s...")
+                    time.sleep(10)
             except Exception as e:
                 log(f"   ⚠️ Network error: {e}")
-                time.sleep(5)
+                time.sleep(10)
 
         if not csv_content:
-            log("❌ Critical Error: Could not download valid ZIP file after multiple attempts.")
+            log("❌ Critical Error: Could not download valid ZIP file.")
             return
 
         # Step D: Process ZIP
@@ -118,25 +136,28 @@ def fetch_and_store_contracts(days_back=2, end_date_str=None):
             log(f"📂 Processing: {csv_filename}")
             
             with z.open(csv_filename) as f:
-                # Read Headers first to find the column name
+                # Read Headers first
                 header = pd.read_csv(f, nrows=1)
                 cols = list(header.columns)
                 
-                # Determine Amount Column
-                amount_col = 'federal_action_obligation' if 'federal_action_obligation' in cols else None
-                if not amount_col and 'total_dollars_obligated' in cols: amount_col = 'total_dollars_obligated'
+                # Check for various Amount column names
+                amount_col = None
+                candidates = ['federal_action_obligation', 'total_dollars_obligated', 'total_obligation']
+                for c in candidates:
+                    if c in cols:
+                        amount_col = c
+                        break
                 
                 if not amount_col:
-                    log(f"❌ Columns Found: {cols}")
-                    log("❌ ERROR: Could not find obligation amount column.")
+                    log(f"❌ ERROR: Could not find amount column. Found: {cols}")
                     return
 
                 # Reset file pointer
                 f.seek(0)
                 
-                for chunk in pd.read_csv(f, chunksize=5000, low_memory=False):
+                for chunk in pd.read_csv(f, chunksize=10000, low_memory=False):
                     
-                    # Convert column to numeric
+                    # Convert to numeric
                     chunk[amount_col] = pd.to_numeric(chunk[amount_col], errors='coerce').fillna(0)
                     
                     # Filter > \$500k
