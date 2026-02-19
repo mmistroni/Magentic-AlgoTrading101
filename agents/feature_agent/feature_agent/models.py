@@ -55,6 +55,17 @@ class TrendSignal(BaseModel):
     ticker: str
     signal: Literal["BUY", "SELL", "HOLD"]
     confidence_score: float = Field(ge=0, le=1)
-    technical_indicators: List[str] = Field(description="List of indicators used (e.g., RSI, MACD)")
-    fundamental_metrics: List[str] = Field(description="List of metrics used (e.g., P/E ratio, Revenue Growth)")
+    # NEW FIELD: Capture the manager count from your tool
+    manager_count: int = Field(default=0, description="Elite Manager Consensus Count")
+    technical_indicators: List[str]
+    fundamental_metrics: List[str]
     reasoning: str
+
+    @field_validator('ticker')
+    @classmethod
+    def sanitize_ticker(cls, v):
+        # Remove suffixes like .O, .K, or whitespace
+        clean = v.strip().upper().split('.')[0]
+        if not clean:
+            raise ValueError("Ticker cannot be empty")
+        return clean

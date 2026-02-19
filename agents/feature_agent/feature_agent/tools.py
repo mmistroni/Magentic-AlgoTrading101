@@ -44,8 +44,11 @@ FROM (
     AND UPPER(issuer_name) NOT LIKE '%INDEX%'
     AND UPPER(issuer_name) NOT LIKE '%TRUST%'
 ) base
-JOIN `datascience-projects.gcp_shareloader.map_cusip_ticker` map ON base.cusip = map.cusip
+LEFT JOIN `datascience-projects.gcp_shareloader.map_cusip_ticker` map ON base.cusip = map.cusip
 WHERE base.position_rank <= 10
+  AND map.ticker IS NOT NULL  -- Ensures the agent only gets actionable tickers
+  -- ADD THIS: Filter out Bond/Income/ETF keywords from the issuer name
+  AND NOT REGEXP_CONTAINS(UPPER(issuer_name), r'BOND|INCOME|TREASURY|GOVT|ETF|TRUST|INDEX|SHORT-TERM')
   -- AMENDMENT: Manual Blacklist for trackers that don't have "ETF" in their name
   AND map.ticker NOT IN (
       'SPY', 'IVV', 'VOO', 'QQQ', 'VTI', 'IWM', 'AGG', 'VEA', 'IEFA', 'VWO', 
@@ -72,72 +75,89 @@ import math # Add this at the top
 
 def get_technical_metrics_tool(tickers: str, target_date: str) -> str:
     """
-    Step 2: Filters a batch of tickers based on the 200-day Simple Moving Average (SMA).
+    Step 2: Filters tickers based on the 200-day SMA AND 3-month Relative Strength vs SPY.
     Calculates technicals as of the public disclosure date (target_date + 45 days).
-    
-    Args:
-        tickers (str): A single space-separated string of tickers (e.g., "AAPL MSFT TSLA").
-        target_date (str): The quarter-end filing date (YYYY-MM-DD).
-        
-    Returns:
-        str: A space-separated string containing ONLY the tickers that are currently 
-             trading above their 200-day SMA. Use this string for the next tool.
-             Example: "AAPL NVDA MSFT"
     """
     import math
     import time
-    start_time = time.time()
-    
-    public_date = date.fromisoformat(target_date) + timedelta(days=45)
-    ticker_list = tickers.split()
-    
-    import time
-    start_time = time.time()
+    import pandas as pd
+    import yfinance as yf
+    from datetime import date, timedelta
 
-    # threads=True is used here to prevent the 'huge amount of time' delay 
-    # by downloading historical data in parallel.
+    start_time = time.time()
+    public_date = date.fromisoformat(target_date) + timedelta(days=45)
+    ticker_list = list(set(tickers.split())) # Ensure unique tickers
+    
+    # 1. FETCH BENCHMARK DATA (SPY) FOR RELATIVE STRENGTH
+    # We look back 95 days to ensure we have a clean 90-day (3-month) window
+    spy_start = public_date - timedelta(days=95)
+    spy_data = yf.download("SPY", start=spy_start, end=public_date, progress=False, auto_adjust=True)
+    
+    if spy_data.empty or len(spy_data) < 2:
+        print("❌ [STEP 2] Error: Could not fetch SPY benchmark. Falling back to SMA only.")
+        spy_return = -999.0 
+    else:
+        spy_return = (spy_data['Close'].iloc[-1] - spy_data['Close'].iloc[0]) / spy_data['Close'].iloc[0]
+        print(f"📊 [STEP 2] Benchmark (SPY) 3-month return: {round(spy_return * 100, 2)}%")
+
+    # 2. FETCH PORTFOLIO DATA (Batch Download)
+    # We need 365 days of history to calculate a 200-day SMA reliably
+    history_start = public_date - timedelta(days=365)
     data = yf.download(ticker_list, 
-                       start=public_date - timedelta(days=365), 
+                       start=history_start, 
                        end=public_date, 
                        group_by='ticker',
                        progress=False, 
                        auto_adjust=True,
                        threads=True)
-    end_time = time.time()
-    print(f"⏱️ DEBUG: Technical check for {len(ticker_list)} stocks took {round(end_time - start_time, 2)} seconds.")
-    
+
     results = []
+    
+    # 3. INDIVIDUAL TICKER EVALUATION
     for ticker in ticker_list:
         try:
+            # Handle single vs multiple ticker dataframe structure
             t_data = data[ticker] if len(ticker_list) > 1 else data
+            
+            # CRITICAL: Drop rows with NaN in 'Close' to avoid calculation errors
+            t_data = t_data.dropna(subset=['Close'])
+
+            # SURVIVORSHIP CHECK: Ensure enough data for 200-day SMA
             if t_data.empty or len(t_data) < 200:
                 continue
                 
-            current_price = t_data['Close'].iloc[-1]
-            sma_200 = t_data['Close'].rolling(window=200).mean().iloc[-1]
+            # Current Metrics
+            current_price = float(t_data['Close'].iloc[-1])
+            sma_200 = float(t_data['Close'].rolling(window=200).mean().iloc[-1])
             
-            # --- CRITICAL FIX: NaN Protection ---
-            safe_price = float(current_price) if not math.isnan(current_price) else 0.0
-            safe_sma = float(sma_200) if not math.isnan(sma_200) else 0.0
+            # RS Calculation: Compare current price to price ~63 trading days (3 months) ago
+            # If the stock doesn't have 63 days of history, we use the earliest available
+            idx_3m = -63 if len(t_data) >= 63 else 0
+            start_price_3m = float(t_data['Close'].iloc[idx_3m])
+            stock_3m_return = (current_price - start_price_3m) / start_price_3m
             
-            # Trend Filter Logic
-            if safe_price > safe_sma and safe_price > 0:
-                results.append(ticker) # We only need the ticker string now
+            # NAN PROTECTION
+            if any(math.isnan(x) for x in [current_price, sma_200, stock_3m_return]):
+                continue
+            
+            # --- THE SNIPER LOGIC ---
+            # Condition 1: Long-term uptrend (Above 200-day SMA)
+            # Condition 2: Relative Strength (Outperforming the Market)
+            if current_price > sma_200 and stock_3m_return > spy_return:
+                results.append(ticker)
                 
         except Exception as e:
-            print(f"DEBUG: Error processing {ticker}: {e}")
+            print(f"⚠️ [STEP 2] Error processing {ticker}: {e}")
             continue
 
-    # --- PERFORMANCE & TOKEN DEBUGGING ---
-    end_time = time.time()
-    elapsed = round(end_time - start_time, 2)
+    # 4. FINAL LOGGING & RETURN
+    elapsed = round(time.time() - start_time, 2)
     print(f"⏱️ [STEP 2] Processed {len(ticker_list)} tickers in {elapsed}s.")
-    print(f"🔍 [STEP 2] {len(results)} stocks passed the 200DMA filter.")
+    print(f"🔍 [STEP 2] {len(results)} stocks passed the 'Sniper' filter.")
     
-    # Returning a joined string significantly reduces the context window 
-    # size compared to returning a list of dictionaries.
-    passing_string = " ".join(results)
-    return passing_string
+    return " ".join(results)
+
+
 
 
 # --- TOOL 3: Performance Audit ---
