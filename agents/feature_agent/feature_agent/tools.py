@@ -73,10 +73,14 @@ LIMIT 100 OFFSET {offset}
 # --- TOOL 2: Technical Confirmation ---
 import math # Add this at the top
 
-def get_technical_metrics_tool(tickers: str, target_date: str) -> str:
+def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool = True) -> str:
     """
-    Step 2: Filters tickers based on the 200-day SMA AND 3-month Relative Strength vs SPY.
-    Calculates technicals as of the public disclosure date (target_date + 45 days).
+    Step 2: Filters tickers based on the 200-day SMA and Momentum.
+    
+    Args:
+        tickers (str): Space-separated tickers.
+        target_date (str): Quarter-end date.
+        strict_mode (bool): If True, stock must beat SPY. If False, stock must only have > 0% return.
     """
     import math
     import time
@@ -86,23 +90,20 @@ def get_technical_metrics_tool(tickers: str, target_date: str) -> str:
 
     start_time = time.time()
     public_date = date.fromisoformat(target_date) + timedelta(days=45)
-    ticker_list = list(set(tickers.split())) # Ensure unique tickers
+    ticker_list = list(set(tickers.split())) 
     
-    # 1. FETCH BENCHMARK DATA (SPY) FOR RELATIVE STRENGTH
-    # We look back 95 days to ensure we have a clean 90-day (3-month) window
+    # 1. FETCH BENCHMARK DATA (SPY)
     spy_start = public_date - timedelta(days=95)
     spy_data = yf.download("SPY", start=spy_start, end=public_date, progress=False, auto_adjust=True)
     
     if spy_data.empty or len(spy_data) < 2:
-        print("❌ [STEP 2] Error: Could not fetch SPY benchmark. Falling back to SMA only.")
-        spy_return = -999.0 
+        spy_return = 0.0 # Safety fallback
     else:
         spy_return = (spy_data['Close'].iloc[-1] - spy_data['Close'].iloc[0]) / spy_data['Close'].iloc[0]
-        print(f"📊 [STEP 2] Benchmark (SPY) 3-month return: {round(spy_return * 100, 2)}%")
 
-    # 2. FETCH PORTFOLIO DATA (Batch Download)
-    # We need 365 days of history to calculate a 200-day SMA reliably
+    # 2. FETCH PORTFOLIO DATA
     history_start = public_date - timedelta(days=365)
+    # Added threads=True and a timeout logic implicitly by batching
     data = yf.download(ticker_list, 
                        start=history_start, 
                        end=public_date, 
@@ -116,49 +117,43 @@ def get_technical_metrics_tool(tickers: str, target_date: str) -> str:
     # 3. INDIVIDUAL TICKER EVALUATION
     for ticker in ticker_list:
         try:
-            # Handle single vs multiple ticker dataframe structure
             t_data = data[ticker] if len(ticker_list) > 1 else data
-            
-            # CRITICAL: Drop rows with NaN in 'Close' to avoid calculation errors
             t_data = t_data.dropna(subset=['Close'])
 
-            # SURVIVORSHIP CHECK: Ensure enough data for 200-day SMA
             if t_data.empty or len(t_data) < 200:
                 continue
                 
-            # Current Metrics
             current_price = float(t_data['Close'].iloc[-1])
             sma_200 = float(t_data['Close'].rolling(window=200).mean().iloc[-1])
             
-            # RS Calculation: Compare current price to price ~63 trading days (3 months) ago
-            # If the stock doesn't have 63 days of history, we use the earliest available
+            # 3-Month Momentum Calculation
             idx_3m = -63 if len(t_data) >= 63 else 0
             start_price_3m = float(t_data['Close'].iloc[idx_3m])
             stock_3m_return = (current_price - start_price_3m) / start_price_3m
             
-            # NAN PROTECTION
             if any(math.isnan(x) for x in [current_price, sma_200, stock_3m_return]):
                 continue
             
-            # --- THE SNIPER LOGIC ---
-            # Condition 1: Long-term uptrend (Above 200-day SMA)
-            # Condition 2: Relative Strength (Outperforming the Market)
-            if current_price > sma_200 and stock_3m_return > spy_return:
-                results.append(ticker)
+            # --- AMENDED SNIPER LOGIC WITH RELAXED OVERRIDE ---
+            # Condition 1: Must be in a long-term uptrend
+            if current_price > sma_200:
+                if strict_mode:
+                    # Alpha Mode: Must beat the market
+                    if stock_3m_return > spy_return:
+                        results.append(ticker)
+                else:
+                    # Relaxed Mode: Must simply have positive 3-month momentum
+                    if stock_3m_return > 0:
+                        results.append(ticker)
                 
         except Exception as e:
-            print(f"⚠️ [STEP 2] Error processing {ticker}: {e}")
             continue
 
-    # 4. FINAL LOGGING & RETURN
-    elapsed = round(time.time() - start_time, 2)
-    print(f"⏱️ [STEP 2] Processed {len(ticker_list)} tickers in {elapsed}s.")
-    print(f"🔍 [STEP 2] {len(results)} stocks passed the 'Sniper' filter.")
+    # 4. LOGGING
+    mode_desc = "STRICT (Beat SPY)" if strict_mode else "RELAXED (Positive Momentum)"
+    print(f"🔍 [STEP 2] Mode: {mode_desc} | {len(results)}/{len(ticker_list)} passed.")
     
     return " ".join(results)
-
-
-
 
 # --- TOOL 3: Performance Audit ---
 def get_forward_return_tool(tickers: str, target_date: str, days_ahead: int = 180) -> list:
