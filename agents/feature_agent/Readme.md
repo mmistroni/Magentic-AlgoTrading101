@@ -6,20 +6,24 @@ Sample prompt:
 "Run the backtest for the quarter ending 2024-12-31. Provide the results in a table showing the Ticker, Elite Count, Entry Price, and 6-month Return."
 
 # Better Prompt
-"Perform an Annual Performance Audit for the 2024 Elite Managers.
+Prompt:
+"Perform a High-Conviction Sniper Audit for the 2021 Elite Class.
 
 Workflow:
 
-Use fetch_consensus_holdings_tool for the date 2024-12-31. This will pull tickers based on the managers who earned their 'Elite' status during that year.
+Use fetch_consensus_holdings_tool for 2021-12-31.
 
-Filter these tickers for those trading above their 200-day SMA as of 2025-02-14 (the 13F disclosure date).
+Apply the Adaptive Sniper Logic:
 
-Calculate the 6-month return from Feb 14, 2025, to Aug 14, 2025.
+Start with strict_mode=True (Iterations 1-3).
 
-Reporting Format: > - A table showing: Ticker, Manager Count (Consensus), Entry Price (Feb 2025), and 6-month ROI.
+If < 15 tickers pass, pivot to strict_mode=False (Iterations 4-5).
 
-Executive Summary: Did the 'Elite Class of 2024' produce positive Alpha in the first half of 2025?"
+The Slicing: Sort by Manager Count and take the Top 15.
 
+The Audit: Calculate the 180-day ROI starting from the disclosure date (2022-02-14).
+
+Reporting: In the Executive Summary, explicitly state if you had to trigger 'Relaxed Momentum' mode to reach 15 stocks.
 
 
 
