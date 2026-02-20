@@ -7,11 +7,14 @@ Sample prompt:
 
 # Better Prompt
 Prompt:
-"Perform a High-Conviction Sniper Audit for the 2021 Elite Class.
+
+The Final Test: 2023 Elite Class Audit
+Prompt:
+"Perform a High-Conviction Sniper Audit for the 2023 Elite Class.
 
 Workflow:
 
-Use fetch_consensus_holdings_tool for 2021-12-31.
+Use fetch_consensus_holdings_tool for 2023-12-31.
 
 Apply the Adaptive Sniper Logic:
 
@@ -21,10 +24,9 @@ If < 15 tickers pass, pivot to strict_mode=False (Iterations 4-5).
 
 The Slicing: Sort by Manager Count and take the Top 15.
 
-The Audit: Calculate the 180-day ROI starting from the disclosure date (2022-02-14).
+The Audit: Calculate the 180-day ROI starting from the disclosure date (2024-02-14).
 
-Reporting: In the Executive Summary, explicitly state if you had to trigger 'Relaxed Momentum' mode to reach 15 stocks.
-
+Reporting: In the Executive Summary, explicitly state if you had to trigger 'Relaxed Momentum' mode. This is the final verification of the 'Adaptive' amendment."
 
 
 TODO:Agent still needs to be deployed
