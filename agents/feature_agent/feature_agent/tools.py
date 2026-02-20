@@ -163,40 +163,35 @@ def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool
 
 
 # --- TOOL 3: Performance Audit ---
+# --- TOOL 3: Performance Audit (AMENDED WITH SANITIZATION) ---
 def get_forward_return_tool(tickers: str, target_date: str, days_ahead: int = 180) -> list:
     """
     Step 3: Calculates the forward ROI for a list of tickers.
-    USE THIS tool only after tickers have been confirmed by the Technical Tool.
-    
-    Args:
-        tickers (str): A SINGLE space-separated string of tickers (e.g., "AAPL MSFT TSLA").
-        target_date (str): The quarter-end date (YYYY-MM-DD).
-        days_ahead (int): The investment horizon (default 180).
-    Returns:
-        list: A list of dicts containing ROI data, entry, and exit prices.
+    Automatically handles sanitization of tickers containing SMA metadata.
     """
     import math
+    import re # Ensure regex is imported
+    
+    # --- NEW: SANITIZATION LOGIC ---
+    # This regex removes anything inside parentheses for every ticker in the string
+    clean_tickers_str = re.sub(r'\(.*?\)', '', tickers)
+    ticker_list = clean_tickers_str.split()
+    # -------------------------------
+
     start_dt = date.fromisoformat(target_date) + timedelta(days=45)
     end_dt = start_dt + timedelta(days=days_ahead)
-    ticker_list = tickers.split()
 
     # --- DEBUGGING ---
     print(f"📊 [STEP 3] Running final ROI Audit on {len(ticker_list)} tickers...")
-
-
+    print(f"  - Cleaned Tickers: {', '.join(ticker_list)}")
     
-    # --- CONSOLE DEBUGGING ---
-    print(f"\n[AUDIT START] Target Date: {target_date} | Entry: {start_dt}")
-    print(f"[AUDIT BATCH] Processing {len(ticker_list)} tickers...")
-    
-    # Download all tickers in one block to optimize network calls
+    # Download all tickers in one block
     data = yf.download(ticker_list, start=start_dt, end=end_dt + timedelta(days=10), 
                         group_by='ticker', progress=False, auto_adjust=True, threads=True)
     
     results = []
     for ticker in ticker_list:
         try:
-            # Handle single vs multiple ticker dataframe structure
             t_data = data[ticker] if len(ticker_list) > 1 else data
             
             if t_data.empty or len(t_data) < 2:
@@ -206,22 +201,31 @@ def get_forward_return_tool(tickers: str, target_date: str, days_ahead: int = 18
             entry_p = t_data['Close'].iloc[0]
             exit_p = t_data['Close'].iloc[-1]
             
-            # --- NAN PROTECTION ---
             if not math.isnan(entry_p) and not math.isnan(exit_p):
                 roi = round(float((exit_p - entry_p) / entry_p * 100), 2)
                 results.append({
                     "ticker": ticker,
                     "return_pct": roi,
                     "entry_price": round(float(entry_p), 2),
-                    "exit_price": round(float(exit_p), 2),
-                    "start_date": start_dt.strftime('%Y-%m-%d'),
-                    "end_date": end_dt.strftime('%Y-%m-%d')
+                    "exit_price": round(float(exit_p), 2)
                 })
-            else:
-                print(f"  - {ticker}: Skipping (NaN values found)")
         except Exception as e:
             print(f"  - {ticker}: Error - {e}")
             continue
             
-    print(f"[AUDIT COMPLETE] Successfully processed {len(results)}/{len(ticker_list)} tickers.\n")
     return results
+
+import re
+
+def _sanitize_ticker(ticker_with_metadata: str) -> str:
+    """
+    Strips metadata like (SMA200:UP) from a ticker string.
+    Input: "AAPL(SMA200:UP|SMA50:DOWN)"
+    Output: "AAPL"
+    """
+    return re.sub(r'\(.*\)', '', ticker_with_metadata).strip()
+
+# Example usage in your Step 4 loop:
+# for raw_ticker in results.split():
+#     clean_ticker = sanitize_ticker(raw_ticker)
+#     return_data = get_forward_return_tool(clean_ticker, target_date)
