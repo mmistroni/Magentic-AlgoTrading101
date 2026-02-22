@@ -45,7 +45,13 @@ https://medium.com/@princekrampah/multi-agent-architecture-in-multi-agent-system
       -   add Governmet Contracts
      -    add lobbying data
 2 - VIX Agent to detect vix Spikes NOT IMPLEMENTED
-3 - 13F Agent to infer stocks to invest using 13F. IMPLEMENTED:This is Feature Agent, already developed and backtested
+3 - 13F Agent to infer stocks to invest using 13F. IMPLEMENTED:This is Feature Agent, already developed but need to be re ran for bcktesting
 4 - ShortSellibng Agent NOT IMPLEMENTED to detect opportunities for Short Selling
 5 - Agent detect stocks in Upward momentum - IMPLEMENTED: this is Stock Agent
 6 - Commodities speculation Agent NOT IMPLEMENTED
+
+
+
+## run followibg command toenable gcloud
+xport GOOGLE_APPLICATION_CREDENTIALS="/workspaces/GCP_Experiments/gcp_key.json"
+export GOOGLE_CLOUD_PROJECT="datascience-projects"
