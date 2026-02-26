@@ -1,12 +1,12 @@
 {
     "name": "Magentic Algo Trading Environment",
-    "containerEnv": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/GCP_Experiments/gcp_key.json",
-        "GOOGLE_CLOUD_PROJECT": "datascience-projects"
-    },
     "build": {
         "dockerfile": "Dockerfile",
-        "context": ".."
+        "context": "." 
+    },
+    "containerEnv": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/${localWorkspaceFolderBasename}/GCP_Experiments/gcp_key.json",
+        "GOOGLE_CLOUD_PROJECT": "datascience-projects"
     },
     "customizations": {
         "vscode": {
@@ -17,17 +17,10 @@
                 "ms-toolsai.jupyter"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "./.venv/bin/python",
-                "python.terminal.activateEnvInCurrentTerminal": true,
-                "terminal.integrated.defaultProfile.linux": "bash",
-                "terminal.integrated.profiles.linux": {
-                    "bash": {
-                        "path": "/bin/bash"
-                    }
-                }
+                "python.defaultInterpreterPath": "/workspaces/${localWorkspaceFolderBasename}/.venv/bin/python"
             }
         }
     },
-    "postCreateCommand": "bash -c \"python3 -m venv .venv && source ./.venv/bin/activate && pip install --no-cache-dir -r requirements.txt && python3 -m ipykernel install --user --name=magentic_algo_venv --display-name 'Magentic Algo VEnv'",
+    "postCreateCommand": "bash -c 'python3 -m venv .venv && source .venv/bin/activate && pip install --no-cache-dir -r requirements.txt && python3 -m ipykernel install --user --name=magentic_algo_venv --display-name \"Magentic Algo VEnv\"'",
     "remoteUser": "vscode"
 }

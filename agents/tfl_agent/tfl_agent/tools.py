@@ -5,7 +5,9 @@ from pydantic_tfl_api import JourneyClient
 from .models import RouteRecommendation
 from typing import List
 from datetime import datetime, timedelta
+from pydantic_tfl_api.core import ApiError
 import zoneinfo
+import logging
 
 def get_tfl_route(travel_date:str, travel_time:str) -> List[RouteRecommendation]:
     """
@@ -18,14 +20,29 @@ def get_tfl_route(travel_date:str, travel_time:str) -> List[RouteRecommendation]
     
     # We use the giant method name you found
     # But we only pass the arguments we actually need!
+    # In your tools.py
+    from_st = "Fairlop Underground Station"
+    to_st = "Bromley South Rail Station"
+    
     response = client.JourneyResultsByPathFromPathToQueryViaQueryNationalSearchQueryDateQu(
-        from_field="1000079", 
-        to="1000033",
-        date="20260218",
+        from_field=from_st,
+        to=to_st,         # Bromley South ICS
+        date="20260227",
         time="0545",
-        includeAlternativeRoutes=True
+        nationalSearch=True,      # MANDATORY for Bromley South
+        mode="tube,national-rail,overground,elizabeth-line",
+        useMultiModalCall=True,
+        cyclePreference="None",   # <--- Add this
+        bikeProficiency="Easy",
     )
+
+    if isinstance(response, ApiError):
+        # This will tell you EXACTLY what is wrong (e.g., "invalid date", "unauthorized")
+        print(f"DEBUG: TfL Error {response.http_status_code} -> {response.message}")
+        return []
+
     raw_journeys = response.content.journeys
+    print(f'--- Raw journey is:\n{raw_journeys}')
     recommendations = [_map_tfl_to_recommendation(j) for j in raw_journeys]
     
     return recommendations
@@ -64,20 +81,20 @@ def resolve_date_string(date_input: str) -> dict:
     }
 
 def _map_tfl_to_recommendation(tfl_journey) -> RouteRecommendation:
-    # 1. Determine if there are delays
-    # We check every 'leg' of the journey for disruption messages
-    has_delays = any(getattr(leg, 'disruptions', []) for leg in tfl_journey.legs)
+    # 1. Join all leg summaries so you know where it's going
+    full_route = " -> ".join([leg.instruction.summary for leg in tfl_journey.legs])
     
-    # 2. Extract Fare (TfL sometimes puts this in a list)
-    # Default to 0.0 if not found
+    # 2. Extract total duration (ensure it's the JOURNEY duration, not leg)
+    total_duration = getattr(tfl_journey, 'duration', 0)
+    
+    # 3. Fare logic (using your confirmed totalCost)
     fare_val = 0.0
     if hasattr(tfl_journey, 'fare') and tfl_journey.fare:
-        fare_val = tfl_journey.fare.total_fare / 100  # Convert pence to GBP
+        fare_val = float(getattr(tfl_journey.fare, 'totalCost', 0)) / 100
 
-    # 3. Create the simplified model
     return RouteRecommendation(
-        summary=f"Journey via {tfl_journey.legs[0].instruction.summary}",
+        summary=full_route,
         cost=fare_val,
-        duration=tfl_journey.duration,
-        is_delayed=has_delays
+        duration=total_duration,
+        is_delayed=any(getattr(leg, 'disruptions', []) for leg in tfl_journey.legs)
     )
