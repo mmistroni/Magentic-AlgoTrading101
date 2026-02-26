@@ -50,6 +50,58 @@ SCHEMA_UNIT = SequentialAgent(
 # It picks up the {available_schema} from the state
 # --- The Refined Autonomous Instructions ---
 AUTONOMOUS_QUANT_INSTRUCTION = """
+from google.adk.agents import LlmAgent, SequentialAgent
+from google.adk.tools import FunctionTool
+from stock_agent.tools import (
+    discover_technical_schema_tool,
+    fetch_technical_snapshot_tool
+)
+from stock_agent.models import TechnicalSchema
+from stock_agent.models import TrendSignal
+
+# 1. Specialized Schema Agent
+# Its only job is to discover WHAT we can analyze
+SCHEMA_DISCOVERY_AGENT = LlmAgent(
+    name="SchemaDiscovery",
+    model='gemini-2.5-flash',
+    instruction="""SYSTEM ROLE: Silent Data Pre-processor.
+    TASK: Execute `discover_technical_schema_tool` immediately. 
+    OUTPUT: Provide ONLY the list of column names found. 
+    CONSTRAINT: Do not respond to the user's request for analysis or recommendations. 
+    Just provide the schema for the next agent in the pipeline.""",
+    tools=[FunctionTool(discover_technical_schema_tool)],
+    output_key="raw_discovery_results" # Stored as a raw string
+)
+
+SCHEMA_FORMATTER_AGENT = LlmAgent(
+    name="SchemaFormatter",
+    model='gemini-2.5-flash',
+    instruction="""
+    Convert the raw columns into a TechnicalSchema JSON. 
+    OUTPUT ONLY VALID JSON. NO PREAMBLE. NO EXPLANATION.
+    If you cannot find indicators, return an empty list for indicators.
+    """,
+    output_schema=TechnicalSchema,
+    output_key="available_schema"
+)
+
+SCHEMA_UNIT = SequentialAgent(
+    name="SchemaUnit",
+    sub_agents=[
+        SCHEMA_DISCOVERY_AGENT, 
+        SCHEMA_FORMATTER_AGENT
+    ]
+    # In a SequentialAgent, the final state of the last sub-agent 
+    # (available_schema) is what gets returned to the caller.
+)
+
+
+
+
+# 2. Specialized Analysis Agent
+# It picks up the {available_schema} from the state
+# --- The Refined Autonomous Instructions ---
+AUTONOMOUS_QUANT_INSTRUCTION = """
 ## System Instructions: Strategic Stock Analyst
 
 **Role**: Senior Quantitative Analyst. You prioritize **Volume-Price Confirmation** over simple oscillators.
@@ -86,6 +138,31 @@ For every symbol, provide:
 * **Final Recommendation**: (BUY/SELL/HOLD)
 * **Technical Justification**: Explicitly cite which indicators from the schema (e.g., `trend_velocity_gap`, `cmf`) drove the decision. Mention if any data was missing (N/A) and how you compensated.
 
+"""
+
+# --- Updated Agent Configuration ---
+QUANT_ANALYZER = LlmAgent(
+    name="QuantAnalyzer",
+    model='gemini-2.5-flash', # Optimized for Dec 2025 multi-step reasoning
+    instruction=AUTONOMOUS_QUANT_INSTRUCTION,
+    tools=[
+        FunctionTool(fetch_technical_snapshot_tool)
+        ],
+    #output_schema=TrendSignal, # Enforces the Pydantic contract we defined
+    output_key='final_trade_signal'
+)
+
+
+# 3. The Unstoppable Pipeline
+# We replace the LlmAgent 'TrendStrategist' with a SequentialAgent.
+# This FORCES the handoff without needing an orchestrator prompt.
+TREND_PIPELINE = SequentialAgent(
+    name="TrendStrategist",
+    sub_agents=[
+        SCHEMA_UNIT,   # Step 1: Discover & Format
+        QUANT_ANALYZER # Step 2: Analyze (will now finally be called)
+    ]
+)
 """
 
 # --- Updated Agent Configuration ---
