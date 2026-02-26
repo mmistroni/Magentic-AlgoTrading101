@@ -1,8 +1,10 @@
 ##  Agent on Cloud Run - 
-Cloud run agent to interpert stock trending via big querys
-a good prompt for thi scould be 
+TFL Agent
 
-'Run a technical analysis for yesterday's stock picks and give me your recommendations
+sample prompt
 
-
-Which tickers currently show the most extreme statistical or volume-flow divergences that suggest an imminent reversal or trend continuation, and how do their technical setups differ for long vs. short positions
+system_prompt=(
+        "Use the 'get_tfl_journeys' tool to find routes from Fairlop to Bromley South. "
+        "Analyze the results, sort the top 3 by price and delays, and "
+        "format a WhatsApp message for the user."
+    )
