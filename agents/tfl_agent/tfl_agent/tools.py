@@ -2,14 +2,15 @@ from datetime import datetime
 import os
 # Initialize the synchronous client
 from pydantic_tfl_api import JourneyClient
-from .models import RouteRecommendation
+from .models import RouteRecommendation, Leg, Journey, SimplifiedJourney
 from typing import List
 from datetime import datetime, timedelta
 from pydantic_tfl_api.core import ApiError
 import zoneinfo
 import logging
+import httpx
 
-def get_tfl_route(travel_date:str, travel_time:str) -> List[RouteRecommendation]:
+def aaaaaget_tfl_route(travel_date:str, travel_time:str) -> List[RouteRecommendation]:
     """
     Fetches journeys from TfL.
     Args:
@@ -98,3 +99,52 @@ def _map_tfl_to_recommendation(tfl_journey) -> RouteRecommendation:
         duration=total_duration,
         is_delayed=any(getattr(leg, 'disruptions', []) for leg in tfl_journey.legs)
     )
+
+import httpx
+from pydantic import BaseModel, ConfigDict, Field
+from typing import List, Dict, Any
+
+async def get_tfl_route(travel_date:str, travel_time:str) -> List[SimplifiedJourney]:
+    """
+    Fetches journeys from TfL.
+    Args:
+        travel_date: Date in YYYYMMDD format.
+        travel_time: Time in HHMM format (24h).
+    
+    Returns:
+        A list of SimplifiedJourney objects containing duration and timing.
+        Returns an empty list if a 300 Disambiguation or 404 error occurs.
+    """
+    from_station: str = "940GZZLUFLP"
+    to_station: str = "940GZZBRMSR"
+    
+    url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_station}/to/{to_station}"
+    params = {
+        "mode": "tube,national-rail,overground,elizabeth-line",
+        "nationalSearch": "true",
+        "date": "20260227",
+        "time": "0545",
+        "app_key": "YOUR_KEY" # Ensure this is in your Codespace env vars
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, params=params)
+        
+        if response.status_code != 200:
+            return [] # Fail silently or log for the agent to see
+
+        data = response.json()
+        journeys = []
+        
+        for j in data.get("journeys", []):
+            # Extract names of lines for the legs_summary
+            lines = [leg.get("routeOptions", [{}])[0].get("name", "Walk") for leg in j.get("legs", [])]
+            
+            journeys.append(SimplifiedJourney(
+                duration=j.get("duration"),
+                startDateTime=j.get("startDateTime"),
+                arrivalDateTime=j.get("arrivalDateTime"),
+                legs_summary=lines
+            ))
+            
+        return journeys
