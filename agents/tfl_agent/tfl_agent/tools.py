@@ -116,24 +116,28 @@ async def get_tfl_route(travel_date:str, travel_time:str) -> List[SimplifiedJour
         Returns an empty list if a 300 Disambiguation or 404 error occurs.
     """
     from_station: str = "940GZZLUFLP"
-    to_station: str = "940GZZBRMSR"
-    
+    to_station: str = "1007062"
+    print(f'------ Fetching route for {travel_date} {travel_time}')
     url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_station}/to/{to_station}"
     params = {
         "mode": "tube,national-rail,overground,elizabeth-line",
         "nationalSearch": "true",
-        "date": "20260227",
-        "time": "0545",
-        "app_key": "YOUR_KEY" # Ensure this is in your Codespace env vars
+        "date": travel_date,
+        "time": travel_time,
+        "showFares": "true",
+        "app_key": f"{os.environ['TFL_API_KEY']}" # Ensure this is in your Codespace env vars
     }
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url, params=params)
         
         if response.status_code != 200:
+            print(f'Failed , stauts is {response.status_code}')
+            print(f'======  \n {response.json()}')
             return [] # Fail silently or log for the agent to see
 
         data = response.json()
+        print(data)
         journeys = []
         
         for j in data.get("journeys", []):
