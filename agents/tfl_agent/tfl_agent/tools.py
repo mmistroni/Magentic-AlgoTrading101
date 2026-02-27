@@ -132,23 +132,38 @@ async def get_tfl_route(travel_date:str, travel_time:str) -> List[SimplifiedJour
         response = await client.get(url, params=params)
         
         if response.status_code != 200:
-            print(f'Failed , stauts is {response.status_code}')
-            print(f'======  \n {response.json()}')
-            return [] # Fail silently or log for the agent to see
+            print(f"==========Failed, status is {response.status_code}=====\n{response.json()}")
+            return []
 
         data = response.json()
-        print(data)
+        print(f"--- res[ponse from api is:{data}")
         journeys = []
         
         for j in data.get("journeys", []):
-            # Extract names of lines for the legs_summary
-            lines = [leg.get("routeOptions", [{}])[0].get("name", "Walk") for leg in j.get("legs", [])]
+            # 1. Extract Line Summary
+            lines = [
+                leg.get("routeOptions", [{}])[0].get("name", "Walk") 
+                for leg in j.get("legs", [])
+            ]
+            
+            # 2. Extract Fare Information
+            # The 'fare' object is usually at the root of each journey
+            fare_data = j.get("fare", {})
+            total_cost = None
+            
+            if fare_data:
+                # TfL usually provides a 'totalCost' in pence
+                # We convert to Pounds for readability
+                raw_cost = fare_data.get("totalCost")
+                if raw_cost is not None:
+                    total_cost = raw_cost / 100
             
             journeys.append(SimplifiedJourney(
                 duration=j.get("duration"),
                 startDateTime=j.get("startDateTime"),
                 arrivalDateTime=j.get("arrivalDateTime"),
-                legs_summary=lines
+                legs_summary=lines,
+                total_fare=total_cost  # Ensure your Pydantic model has this field
             ))
             
         return journeys
