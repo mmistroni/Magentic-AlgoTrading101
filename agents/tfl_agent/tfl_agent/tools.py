@@ -140,20 +140,22 @@ async def get_tfl_route(travel_date:str, travel_time:str) -> List[SimplifiedJour
         journeys = []
         
         for j in data.get("journeys", []):
-            # 1. Extract Line Summary
-            lines = [
-                leg.get("routeOptions", [{}])[0].get("name", "Walk") 
-                for leg in j.get("legs", [])
-            ]
+            # 1. Extract Line Summary with better logic
+            lines = []
+            for leg in j.get("legs", []):
+                # Try to get the line name (e.g., 'Central'), 
+                # fallback to 'Walk' if no routeOptions exist
+                route_opts = leg.get("routeOptions", [])
+                line_name = route_opts[0].get("name") if route_opts else "Walk"
+                lines.append(line_name)
             
-            # 2. Extract Fare Information
-            # The 'fare' object is usually at the root of each journey
+            # 2. Format the summary as a string for the Agent
+            # This makes it much easier for the LLM to say "Take the Central Line -> Elizabeth Line"
+            route_path = " -> ".join(lines)
+            
             fare_data = j.get("fare", {})
             total_cost = None
-            
             if fare_data:
-                # TfL usually provides a 'totalCost' in pence
-                # We convert to Pounds for readability
                 raw_cost = fare_data.get("totalCost")
                 if raw_cost is not None:
                     total_cost = raw_cost / 100
@@ -162,8 +164,14 @@ async def get_tfl_route(travel_date:str, travel_time:str) -> List[SimplifiedJour
                 duration=j.get("duration"),
                 startDateTime=j.get("startDateTime"),
                 arrivalDateTime=j.get("arrivalDateTime"),
-                legs_summary=lines,
-                total_fare=total_cost  # Ensure your Pydantic model has this field
+                legs_summary=route_path,  # Change this to a string in your Pydantic model
+                total_fare=total_cost
             ))
             
+        return journeys
+
+
+
+
+
         return journeys
