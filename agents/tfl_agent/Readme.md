@@ -23,3 +23,6 @@ export GOOGLE_CLOUD_PROJECT="datascience-projects"
 
 # 3. Tells gcloud (and some libraries) which project to bill for API usage
 export GOOGLE_CLOUD_QUOTA_PROJECT="datascience-projects"
+
+# TWILIO
+for twilio run script twilio_tool to verify it is working fine
