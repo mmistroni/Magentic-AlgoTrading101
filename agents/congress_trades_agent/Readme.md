@@ -7,7 +7,17 @@ Todo: agent needs to be tested locally
 
 Every time you launch a new Codespace, run the following to authenticate:
 ```bash
-echo "$GCP_SA_KEY" > /tmp/gcp_key.json && export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_key.json
+
+# printf '%s' "$GCP_SA_KEY" > /workspaces/Magentic-AlgoTrading101/gcp_key.json
+
+# 1. The most critical one: Points the code to your JSON file
+export GOOGLE_APPLICATION_CREDENTIALS="/workspaces/Magentic-AlgoTrading101/gcp_key.json"
+
+# 2. Sets the default project so you don't have to hardcode it in Python
+export GOOGLE_CLOUD_PROJECT="datascience-projects"
+
+# 3. Tells gcloud (and some libraries) which project to bill for API usage
+export GOOGLE_CLOUD_QUOTA_PROJECT="datascience-projects"
 
 Sample prompt
 

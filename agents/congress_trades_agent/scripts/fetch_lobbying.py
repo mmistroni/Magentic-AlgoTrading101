@@ -44,60 +44,83 @@ def fetch_lobbying_data(year, quarters=None):
     for q in quarters:
         log(f"🔄 Processing {year} - {q}...")
         
-        # We filter by Year, Quarter, and ensure it's a Quarterly Report (RR)
         params = {
             "filing_year": year,
-            "filing_period": q,
-            "filing_type": "RR", # Regular Report
-            "page_size": 250     # Max allowed by API
+            "filing_type": q,  # Q1, Q2, Q3, or Q4
+            "page_size": 250   # Max allowed by API
         }
         
         next_url = base_url
         page_count = 0
         clean_rows = []
+        max_pages = 100  # Safety limit to prevent infinite loops
+        consecutive_empty = 0  # Track empty pages
         
-        while next_url:
+        while next_url and page_count < max_pages:
             try:
-                # API Call
-                resp = requests.get(next_url, params=params if next_url == base_url else None)
+                # API Call - Use next_url directly for pagination
+                if page_count == 0:
+                    # First request with parameters
+                    resp = requests.get(next_url, params=params)
+                else:
+                    # Subsequent requests use the full URL from 'next'
+                    resp = requests.get(next_url)
+                
+                # Handle rate limiting
+                if resp.status_code == 429:
+                    retry_after = int(resp.headers.get('Retry-After', 30))
+                    log(f"⏳ Rate limited. Waiting {retry_after} seconds...")
+                    time.sleep(retry_after)
+                    continue  # Retry the same URL
+                
                 if resp.status_code != 200:
                     log(f"❌ API Error {resp.status_code}: {resp.text}")
                     break
                 
                 data = resp.json()
                 results = data.get('results', [])
-                next_url = data.get('next') # Pagination URL
                 
+                # Check for empty results
                 if not results:
-                    break
-
+                    consecutive_empty += 1
+                    if consecutive_empty >= 3:  # Stop after 3 empty pages
+                        log(f"   ...stopped after {consecutive_empty} empty pages")
+                        break
+                else:
+                    consecutive_empty = 0  # Reset counter
+                
+                # Get next URL for pagination
+                next_url = data.get('next')
+                
                 # Process Page
                 for item in results:
                     client = item.get('client', {})
                     client_name = client.get('name', '').upper()
                     
-                    # 1. Filter: Must be a corporate-sounding client
-                    # (Simple heuristic to skip 'Association of...', 'Alliance for...', etc.)
-                    if not client_name: continue
+                    if not client_name: 
+                        continue
 
-                    # 2. Get Amount (Income = Firm hired, Expenses = In-house lobbying)
+                    # Get Amount
                     income = item.get('income')
                     expenses = item.get('expenses')
                     
-                    # Convert None to 0.0
                     amt = 0.0
-                    if income: amt = float(income)
-                    if expenses: amt = max(amt, float(expenses))
+                    if income: 
+                        amt = float(income)
+                    if expenses: 
+                        amt = max(amt, float(expenses))
                     
                     # Filter: Only significant spending (> \$10k)
-                    if amt < 10000: continue
+                    if amt < 10000: 
+                        continue
 
-                    # 3. Map Ticker (The Critical Step)
+                    # Map Ticker
                     ticker = mapper.find_ticker(client_name)
-                    if not ticker: continue
+                    if not ticker: 
+                        continue
 
-                    # 4. Extract Issues (What are they lobbying for?)
-                    issues = [i.get('general_issue_code', '') for i in item.get('general_issue_codes', [])]
+                    # Extract Issues
+                    issues = [i.get('general_issue_code', '') for i in item.get('lobbying_activities', [])]
                     issue_str = ",".join(filter(None, issues))
 
                     clean_rows.append({
@@ -108,31 +131,47 @@ def fetch_lobbying_data(year, quarters=None):
                         "amount": amt,
                         "registrant_name": item.get('registrant', {}).get('name'),
                         "general_issues": issue_str,
-                        "filing_date": item.get('dt_posted', '')[:10], # YYYY-MM-DD
-                        "description": item.get('description', '')[:1000]
+                        "filing_date": item.get('dt_posted', '')[:10],
+                        "description": (item.get('lobbying_activities', [{}])[0].get('description', '') if item.get('lobbying_activities') else '')[:1000]
                     })
                 
                 page_count += 1
                 if page_count % 10 == 0:
                     log(f"   ...scraped {page_count} pages ({len(clean_rows)} rows so far)...")
                 
-                # Sleep to respect rate limits
-                time.sleep(0.5)
+                # Rate limiting - adjust based on API limits
+                time.sleep(1.5)  # Increased delay to avoid 429 errors
 
-            except Exception as e:
-                log(f"⚠️ Error on page {page_count}: {e}")
+            except requests.exceptions.RequestException as e:
+                log(f"⚠️ Network error on page {page_count}: {e}")
                 time.sleep(5)
+                continue
+            except Exception as e:
+                log(f"⚠️ Unexpected error on page {page_count}: {e}")
+                break
         
         # Upload Quarter to BigQuery
         if clean_rows:
+            log(f'✅ Found {len(clean_rows)} lobbying records for {year}-{q}')
             upsert_to_bigquery(clean_rows)
         else:
             log(f"⚠️ No public company lobbying found for {year}-{q}.")
 
+
 def upsert_to_bigquery(rows):
     try:
         client = bigquery.Client(project=PROJECT_ID)
+        dataset_id = f"{PROJECT_ID}.{DATASET_ID}"
         table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
+        
+        # Ensure dataset exists
+        try:
+            client.get_dataset(dataset_id)
+        except Exception:
+            dataset = bigquery.Dataset(dataset_id)
+            dataset.location = "US"
+            dataset = client.create_dataset(dataset, exists_ok=True)
+            log(f"✅ Created dataset {dataset_id}")
         
         # Schema definition
         schema = [
@@ -146,6 +185,10 @@ def upsert_to_bigquery(rows):
             bigquery.SchemaField("filing_date", "DATE"),
             bigquery.SchemaField("description", "STRING"),
         ]
+        
+        # Create table if it doesn't exist (using exists_ok)
+        table = bigquery.Table(table_id, schema=schema)
+        table = client.create_table(table, exists_ok=True)  # Won't error if table exists
         
         # Load to Temp Table
         temp_table_id = f"{PROJECT_ID}.{DATASET_ID}.temp_lobbying_{int(time.time())}"
@@ -175,6 +218,10 @@ def upsert_to_bigquery(rows):
         
     except Exception as e:
         log(f"❌ BigQuery Error: {e}")
+
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
