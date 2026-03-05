@@ -30,7 +30,7 @@ GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-your-default-gcp-project-id}"
 GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 
 # Service Name (Used in the deploy command)
-SERVICE_NAME="stock-agent-service"
+SERVICE_NAME="tfl-agent-service"
 
 # Agent-Specific Environment Variables (Necessary for your service to run)
 # Update 'your-vertex-setting' with 'true' or 'false'
@@ -50,7 +50,7 @@ echo "--------------------------------"
 
 
 # 4. Construct the Environment Variables String for the gcloud command
-ENV_VARS_STRING="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI"
+ENV_VARS_STRING="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI",TFL_API_KEY=$TFL_API_KEY
 
 
 # 5. Execute the gcloud run deploy command

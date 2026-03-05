@@ -8,7 +8,7 @@ import httpx
 import sys # ⬅️ ADDED: sys module for version check
 
 # --- Configuration (Dynamic) ---
-APP_URL = "https://stock-agent-service-682143946483.us-central1.run.app"
+APP_URL = "https://tfl-agent-service-682143946483.us-central1.run.app"
 USER_ID = "user_123"
 # Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     # Define your single query here
-    QUERY = "Run a technical analysis for yesterday's stock picks and give me your recommendations"
+    QUERY = "Find the best 3 routes from Fairlop to Bromley South for tomorrow departing at 05:45. Apply the delay penalty logic and format the result for a WhatsApp notification."
     
     try:
         asyncio.run(amain(QUERY))
