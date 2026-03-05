@@ -1,31 +1,18 @@
-export APP_URL="https://stock-agent-service-682143946483.us-central1.run.app"
-# Example: export APP_URL="https://adk-default-service-name-abc123xyz.a.run.app"
+#!/bin/bash
+
+export APP_URL="https://tfl-agent-service-682143946483.us-central1.run.app"
 export TOKEN=$(gcloud auth print-identity-token)
 
-echo 'Listing Apps'
+echo "🚀 Triggering TfL Route Check Agent..."
 
-curl -X GET -H "Authorization: Bearer $TOKEN" $APP_URL/list-apps
-
-echo 'Creating session......'
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-    $APP_URL/apps/stock_agent/users/user_123/sessions/session_abc \
-    -H "Content-Type: application/json" \
-    -d '{"state": {"preferred_language": "English", "visit_count": 5}}'
-
-echo 'Running Requests...'
-
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-    $APP_URL/run_sse \
+# We call the specific route defined in your main.py: @app.post("/trigger-route-check")
+curl -i -X POST "$APP_URL/trigger-route-check" \
+    -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-    "app_name": "stock_agent",
-    "user_id": "user_123",
-    "session_id": "session_abc",
-    "new_message": {
-        "role": "user",
-        "parts": [{
-        "text": "Run a technical analysis for yesterday stock picks and give me your recommendations"
-        }]
-    },
-    "streaming": false
+        "query": "Find the best 3 routes from Fairlop to Bromley South for tomorrow departing at 05:45. Apply the delay penalty logic and format the result for a WhatsApp notification.",
+        "subject_line": "TfL Journey: Fairlop to Bromley",
+        "recipient": "mmistroni@gmail.com"
     }'
+
+echo -e "\n\n✅ Request sent. Check your Cloud Run logs or email for the agent output."

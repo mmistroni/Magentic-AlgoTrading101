@@ -8,11 +8,11 @@ import httpx
 import sys # ⬅️ ADDED: sys module for version check
 
 # --- Configuration (Dynamic) ---
-APP_URL = os.environ['STOCK_AGENT_URL']
+APP_URL = 'https://tfl-agent-service-682143946483.us-central1.run.app'
 USER_ID = "user_123"
 # Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
-APP_NAME = "stock_agent"
+APP_NAME = "tfl_agent"
 
 # --- Authentication Function (ASYNC) ---
 
