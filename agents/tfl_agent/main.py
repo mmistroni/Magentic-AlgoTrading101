@@ -79,6 +79,52 @@ async def send_email_via_api(subject: str, body: str, recipient: str):
         except Exception as e:
             print(f"Failed to send email: {e}")
 
+
+@app.post("/process-query")
+async def process_query(request: Request):
+    """
+    Dedicated programmatic testing route.
+    Returns the agent response directly in the JSON body.
+    """
+    try:
+        # 1. Parse Input
+        body = await request.json()
+        query_text = body.get("query", "No query provided")
+        
+        # 2. Setup Session (Mimicking your Crawler Agent pattern)
+        session_id = f"test_{os.urandom(3).hex()}"
+        user_id = "test_user"
+
+        await runner.session_service.create_session(
+            app_name=app_name,
+            user_id=user_id,
+            session_id=session_id
+        )
+
+        # 3. Run Agent and Aggregate Result
+        content = types.Content(
+            role='user', 
+            parts=[types.Part.from_text(text=query_text)]
+        )
+        
+        full_response = ""
+        async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
+            if event.is_final_response() and event.content.parts:
+                full_response = event.content.parts[0].text
+        
+        # 4. Return directly to the caller
+        return {
+            "query": query_text,
+            "agent_output": full_response,
+            "session_id": session_id,
+            "status": "completed"
+        }
+
+    except Exception as e:
+        logging.exception("Programmatic test route failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/trigger-route-check")
 async def trigger_monitor(request: Request, background_tasks: BackgroundTasks):
     try:
