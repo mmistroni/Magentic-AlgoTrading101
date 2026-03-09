@@ -57,3 +57,79 @@ def fetch_form4_signals_tool(ticker: str, analysis_date: str):
     })
     
     return json.dumps(insider_data)
+
+
+import json
+from google.cloud import bigquery
+import os
+
+def fetch_lobbying_signals_tool(ticker: str):
+    """
+    Political Context Validator: Retrieves recent corporate lobbying activity for a specific ticker.
+    
+    Use this tool to find out if a company is actively spending money in Washington D.C., 
+    how much they are spending, and what specific issues they are lobbying for.
+
+    Args:
+        ticker (str): The stock symbol (e.g., 'NVDA', 'LMT').
+
+    Returns:
+        str: A JSON string containing:
+             - 'total_recent_spend': Sum of lobbying amounts.
+             - 'recent_filing_dates': Dates of the lobbying reports.
+             - 'lobbied_issues': A list of text describing what they lobbied for.
+    """
+    print(f"🏛️ Fetching corporate lobbying data for: {ticker}")
+    
+    try:
+        # Initialize BigQuery Client
+        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "datascience-projects")
+        client = bigquery.Client(project=project_id)
+        
+        # Query to get the last 12 months of lobbying for this ticker
+        query = f"""
+            SELECT 
+                ticker,
+                client_name,
+                SUM(amount) as total_spend,
+                MAX(filing_date) as latest_filing,
+                STRING_AGG(DISTINCT general_issues LIMIT 5) as top_issues,
+                COUNT(*) as number_of_filings
+            FROM `datascience-projects.gcp_shareloader.lobbying_signals`
+            WHERE ticker = @ticker
+              -- Look at the last 365 days of available data
+              AND filing_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
+            GROUP BY ticker, client_name
+        """
+        
+        # Use query parameters for safety
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("ticker", "STRING", ticker.upper())
+            ]
+        )
+        
+        results = client.query(query, job_config=job_config).result()
+        
+        # Parse the result
+        records = list(results)
+        if not records:
+            return json.dumps({
+                "ticker": ticker, 
+                "lobbying_status": "No recent lobbying activity found."
+            })
+            
+        row = records[0]
+        lobbying_data = {
+            "ticker": row.ticker,
+            "company_name": row.client_name,
+            "total_spend_last_12m": float(row.total_spend) if row.total_spend else 0,
+            "latest_filing_date": str(row.latest_filing),
+            "number_of_filings": row.number_of_filings,
+            "top_lobbied_issues": row.top_issues
+        }
+        
+        return json.dumps(lobbying_data)
+
+    except Exception as e:
+        return json.dumps({"ticker": ticker, "error": f"Database error: {str(e)}"})
