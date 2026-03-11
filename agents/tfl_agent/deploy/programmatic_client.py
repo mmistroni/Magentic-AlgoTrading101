@@ -1,183 +1,70 @@
-import os
-import json
+import requests
 import subprocess
-import asyncio
-from typing import Dict, Any
-from datetime import datetime
-import httpx 
-import sys # ⬅️ ADDED: sys module for version check
+import json
 
-# --- Configuration (Dynamic) ---
-APP_URL = "https://tfl-agent-service-682143946483.us-central1.run.app"
-USER_ID = "user_123"
-# Generate a single session ID for the entire conversation loop
-SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
-APP_NAME = "agent_crawler"
-
-# --- Authentication Function (ASYNC) ---
-
-async def get_auth_token() -> str:
+def get_gcloud_identity_token():
     """
-    Executes 'gcloud auth print-identity-token' asynchronously to get the token.
+    Mimics $(gcloud auth print-identity-token)
+    This works in your Codespace because gcloud is already logged in as you.
     """
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "gcloud", "auth", "print-identity-token",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await proc.communicate()
-        
-        if proc.returncode != 0:
-            raise RuntimeError(f"gcloud command failed: {stderr.decode().strip()}")
-            
-        return stdout.decode().strip()
+        token = subprocess.check_output(
+            ["gcloud", "auth", "print-identity-token"], 
+            text=True, 
+            stderr=subprocess.PIPE
+        ).strip()
+        return token
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error getting token: {e.stderr}")
+        return None
     except FileNotFoundError:
-        raise RuntimeError("gcloud command not found. Please ensure Google Cloud CLI is installed.")
+        print("❌ gcloud CLI not found. Please ensure it is installed and in your PATH.")
+        return None
 
-# --- API Interaction Functions (ASYNC) ---
+def trigger_tfl_agent():
+    # 1. Configuration
+    APP_URL = "https://tfl-agent-service-682143946483.us-central1.run.app/process-query"
+    
+    # 2. Authentication
+    token = get_gcloud_identity_token()
+    if not token:
+        print("🛑 Could not proceed without a valid Identity Token.")
+        return
 
-async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, data: Dict[str, Any] = None) -> httpx.Response:
-    """Helper function for authenticated asynchronous requests using httpx."""
-    token = await get_auth_token()
+    # 3. Request Payload
+    # Note: Using your Fairlop-to-Bromley South query logic
+    payload = {
+        "query": (
+            "Find the best 3 routes from Fairlop to Bromley South for tomorrow "
+            "departing at 05:45. Apply the delay penalty logic and format the "
+            "result for a WhatsApp notification."
+        ),
+        "subject_line": "TfL Journey: Fairlop to Bromley",
+        "recipient": "mmistroni@gmail.com"
+    }
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    url = f"{APP_URL}{endpoint}"
-    
+
+    # 4. Execution
+    print(f"🚀 Triggering TfL Route Check Agent...")
     try:
-        if method.upper() == 'POST':
-            response = await client.post(url, headers=headers, json=data)
-        elif method.upper() == 'DELETE':
-             response = await client.delete(url, headers=headers)
+        response = requests.post(APP_URL, json=payload, headers=headers)
+        
+        # 5. Output Handling
+        print(f"HTTP Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            print("✅ Request successful! Response from Agent:")
+            print(json.dumps(response.json(), indent=2))
         else:
-            raise ValueError(f"Unsupported method: {method}")
-
-        response.raise_for_status() 
-        return response
-    except httpx.HTTPStatusError as errh:
-        print(f"\n❌ **HTTP ERROR:** Status {response.status_code} for {url}")
-        print(f"❌ **Server Response (Raw):**\n{response.text}")
-        raise
-    except httpx.RequestError as err:
-        print(f"\n❌ An unexpected request error occurred: {err}")
-        raise
-
-async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str):
-    """Executes a single POST request to the /run_sse endpoint."""
-    
-    print(f"\n[User] -> Sending message: '{message}'")
-    
-    run_data = {
-        "app_name": APP_NAME,
-        "user_id": USER_ID,
-        "session_id": session_id,
-        "new_message": {"role": "user", "parts": [{"text": message}]},
-        "streaming": False 
-    }
-    
-    try:
-        response = await make_request(client, "POST", "/run_sse", data=run_data)
-        current_status = response.status_code
-        # print(f"**Request Status Code:** {current_status}") 
-
-        raw_text = response.text.strip()
-        
-        # Multi-line SSE parsing logic
-        data_lines = [
-            line.strip() 
-            for line in raw_text.split('\n') 
-            if line.strip().startswith("data:")
-        ]
-        
-        if not data_lines:
-             raise json.JSONDecodeError("No 'data:' lines found in 200 response.", raw_text, 0)
-        
-        last_data_line = data_lines[-1]
-        json_payload = last_data_line[len("data:"):].strip()
-        agent_response = json.loads(json_payload)
-        
-        # Extract the final text 
-        final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', 'Agent response structure not recognized.')
-        
-        print(f"[Agent] -> {final_text}")
-    
-    except json.JSONDecodeError as e:
-        print(f"\n🚨 **JSON PARSING FAILED**!")
-        print(f"   Error: {e}")
-        print("   --- RAW SERVER CONTENT ---")
-        print(raw_text)
-        print("   --------------------------")
-        
+            print("⚠️ Request failed.")
+            print(f"Response Body: {response.text}")
+            
     except Exception as e:
-        print(f"❌ Agent request failed: {e}")
-
-# --- Interactive Chat Loop ---
-
-async def chat(client: httpx.AsyncClient, session_id: str):
-    """Runs the main conversation loop, handling user input asynchronously."""
-    print("--- 💬 Start Chatting ---")
-    
-    try:
-        # Use asyncio.to_thread to run blocking input() without freezing the event loop
-        user_input = await asyncio.to_thread(input, f"[{USER_ID}]: ")
-        
-        # Send the message to the agent
-        await run_agent_request(client, session_id, user_input)
-
-    except Exception as e:
-        print(f"An unexpected error occurred in the loop: {e}")
-        raise e
-
-# --- Main Logic (ASYNC) ---
-
-# --- Updated Main Logic for Single Execution ---
-
-async def amain(message_to_send: str):
-    """Main function to run a single interaction and then cleanup."""
-    print(f"\n🤖 Starting Single-Run Client | Session: **{SESSION_ID}**")
-    
-    session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
-    current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
-    
-    async with httpx.AsyncClient(timeout=60.0) as client: # Increased timeout for tool calls
-        
-        # 1. Create Session
-        try:
-            await make_request(client, "POST", current_session_endpoint, data=session_data)
-            print(f"✅ Session created.")
-        except Exception as e:
-            print(f"❌ Could not start session: {e}")
-            return
-
-        # 2. Run Single Request
-        print(f"--- 💬 Executing Single Task ---")
-        try:
-            await run_agent_request(client, SESSION_ID, message_to_send)
-        except Exception as e:
-            print(f"❌ Agent execution error: {e}")
-        
-        # 3. Cleanup: Delete Session
-        # Added a tiny sleep to ensure server-side async tasks finish before deletion
-        await asyncio.sleep(1) 
-        print(f"\n## 3. Deleting Session: {SESSION_ID}")
-        try:
-            await make_request(client, "DELETE", current_session_endpoint)
-            print("✅ Session deleted successfully.")
-        except Exception as e:
-            print(f"⚠️ Warning: Failed to delete session. {e}")
+        print(f"❌ An error occurred during the request: {e}")
 
 if __name__ == "__main__":
-    if sys.version_info < (3, 9):
-        print("🚨 ERROR: Python 3.9+ required.")
-        sys.exit(1)
-        
-    # Define your single query here
-    QUERY = "What is the current price of Horizon spinning bike?"
-    
-    try:
-        asyncio.run(amain(QUERY))
-    except Exception as e:
-        print(f"FATAL ERROR: {e}")
-
+    trigger_tfl_agent()

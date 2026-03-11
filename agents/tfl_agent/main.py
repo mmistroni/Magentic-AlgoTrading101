@@ -88,6 +88,10 @@ async def process_query(request: Request):
     """
     try:
         # 1. Parse Input
+        
+        logging.info(f"Callign Process Query with : {request}")
+        logging.info(f"Tfl key is:{os.environ.get('TFL_API_KEY', 'No tfl api defined')}")
+
         body = await request.json()
         query_text = body.get("query", "No query provided")
         

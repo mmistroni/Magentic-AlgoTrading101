@@ -6,7 +6,7 @@ export TOKEN=$(gcloud auth print-identity-token)
 echo "🚀 Triggering TfL Route Check Agent..."
 
 # We call the specific route defined in your main.py: @app.post("/trigger-route-check")
-curl -i -X POST "$APP_URL/trigger-route-check" \
+curl -i -X POST "$APP_URL/process-query" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
