@@ -46,11 +46,11 @@ echo "--- Environment Variables to be set on Cloud Run service ---"
 echo "  GOOGLE_CLOUD_PROJECT:       $GOOGLE_CLOUD_PROJECT"
 echo "  GOOGLE_CLOUD_LOCATION:      $GOOGLE_CLOUD_LOCATION"
 echo "  GOOGLE_GENAI_USE_VERTEXAI:  $GOOGLE_GENAI_USE_VERTEXAI"
-echo "--------------------------------"
+echo "===--------------------------------"
 
 
 # 4. Construct the Environment Variables String for the gcloud command
-ENV_VARS_STRING="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI",TFL_API_KEY=$TFL_API_KEY
+ENV_VARS_STRING="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI,TFL_API_KEY=$TFL_API_KEY,EMAIL_API_KEY=$SENDGRID_KEY"
 
 
 # 5. Execute the gcloud run deploy command
@@ -71,5 +71,7 @@ else
   echo ""
   echo "❌ Deployment failed. Please check the error messages above."
 fi
+
+
 
 # --- End of Script ---
