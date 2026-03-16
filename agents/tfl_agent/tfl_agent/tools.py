@@ -10,44 +10,6 @@ import zoneinfo
 import logging
 import httpx
 
-def aaaaaget_tfl_route(travel_date:str, travel_time:str) -> List[RouteRecommendation]:
-    """
-    Fetches journeys from TfL.
-    Args:
-        travel_date: Date in YYYYMMDD format.
-        travel_time: Time in HHMM format (24h).
-    """
-    client = JourneyClient(api_token=os.environ['TFL_API_KEY'])
-    
-    # We use the giant method name you found
-    # But we only pass the arguments we actually need!
-    # In your tools.py
-    from_st = "Fairlop Underground Station"
-    to_st = "Bromley South Rail Station"
-    
-    response = client.JourneyResultsByPathFromPathToQueryViaQueryNationalSearchQueryDateQu(
-        from_field=from_st,
-        to=to_st,         # Bromley South ICS
-        date="20260227",
-        time="0545",
-        nationalSearch=True,      # MANDATORY for Bromley South
-        mode="tube,national-rail,overground,elizabeth-line",
-        useMultiModalCall=True,
-        cyclePreference="None",   # <--- Add this
-        bikeProficiency="Easy",
-    )
-
-    if isinstance(response, ApiError):
-        # This will tell you EXACTLY what is wrong (e.g., "invalid date", "unauthorized")
-        print(f"DEBUG: TfL Error {response.http_status_code} -> {response.message}")
-        return []
-
-    raw_journeys = response.content.journeys
-    print(f'--- Raw journey is:\n{raw_journeys}')
-    recommendations = [_map_tfl_to_recommendation(j) for j in raw_journeys]
-    
-    return recommendations
-    
 from datetime import datetime, timedelta
 import zoneinfo
 
@@ -104,7 +66,8 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Dict, Any
 
-async def get_tfl_route(travel_date:str, travel_time:str) -> List[SimplifiedJourney]:
+async def get_tfl_route(travel_date:str, 
+                        travel_time: str = "0545") -> List[SimplifiedJourney]:
     """
     Fetches journeys from TfL.
     Args:
