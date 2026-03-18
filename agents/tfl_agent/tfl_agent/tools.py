@@ -1,22 +1,17 @@
-from datetime import datetime
 import os
-# Initialize the synchronous client
-from pydantic_tfl_api import JourneyClient
-from .models import RouteRecommendation, Leg, Journey, SimplifiedJourney
-from typing import List
-from datetime import datetime, timedelta
-from pydantic_tfl_api.core import ApiError
+import httpx
 import zoneinfo
 import logging
-import httpx
-
 from datetime import datetime, timedelta
-import zoneinfo
+from typing import List, Dict, Any
+from .models import SimplifiedJourney
+
+# Configure logging for better visibility in Cloud Run
+logger = logging.getLogger(__name__)
 
 def resolve_date_string(date_input: str) -> dict:
     """
     Resolves relative date terms like 'today' or 'tomorrow' into YYYYMMDD.
-    If a specific date is passed (e.g. '2026-03-01'), it formats it correctly.
     """
     london_tz = zoneinfo.ZoneInfo("Europe/London")
     now = datetime.now(london_tz)
@@ -30,111 +25,93 @@ def resolve_date_string(date_input: str) -> dict:
     elif clean_input == "yesterday":
         target_date = now - timedelta(days=1)
     else:
-        # Fallback: Try to parse a standard date string if the LLM sends one
         try:
+            # Handle YYYY-MM-DD input from LLM
             target_date = datetime.strptime(clean_input, "%Y-%m-%d")
         except ValueError:
             return {"error": f"Could not resolve date: {date_input}", "status": "failure"}
 
-    resolved_str = target_date.strftime("%Y%m%d")
     return {
-        "resolved_date": resolved_str,
+        "resolved_date": target_date.strftime("%Y%m%d"),
         "human_readable": target_date.strftime("%A, %d %B %Y"),
         "status": "success"
     }
 
-def _map_tfl_to_recommendation(tfl_journey) -> RouteRecommendation:
-    # 1. Join all leg summaries so you know where it's going
-    full_route = " -> ".join([leg.instruction.summary for leg in tfl_journey.legs])
-    
-    # 2. Extract total duration (ensure it's the JOURNEY duration, not leg)
-    total_duration = getattr(tfl_journey, 'duration', 0)
-    
-    # 3. Fare logic (using your confirmed totalCost)
-    fare_val = 0.0
-    if hasattr(tfl_journey, 'fare') and tfl_journey.fare:
-        fare_val = float(getattr(tfl_journey.fare, 'totalCost', 0)) / 100
-
-    return RouteRecommendation(
-        summary=full_route,
-        cost=fare_val,
-        duration=total_duration,
-        is_delayed=any(getattr(leg, 'disruptions', []) for leg in tfl_journey.legs)
-    )
-
-import httpx
-from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Dict, Any
-
-async def get_tfl_route(travel_date:str, 
+async def get_tfl_route(travel_date: str, 
                         travel_time: str = "0545") -> List[SimplifiedJourney]:
     """
-    Fetches journeys from TfL.
-    Args:
-        travel_date: Date in YYYYMMDD format.
-        travel_time: Time in HHMM format (24h).
-    
-    Returns:
-        A list of SimplifiedJourney objects containing duration and timing.
-        Returns an empty list if a 300 Disambiguation or 404 error occurs.
+    Fetches journeys from TfL with disruption detection and National Rail support.
     """
+    # Station IDs: Fairlop (Tube) to Bromley South (National Rail)
     from_station: str = "940GZZLUFLP"
     to_station: str = "1007062"
-    print(f'------ Fetching route for {travel_date} {travel_time}')
+    
+    print(f'🚀 Fetching route for {travel_date} at {travel_time}')
+    
     url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_station}/to/{to_station}"
+    
+    # Expanded modes to ensure we don't just get Elizabeth Line
     params = {
-        "mode": "tube,national-rail,overground,elizabeth-line",
+        "mode": "tube,national-rail,overground,elizabeth-line,southeastern,thameslink",
         "nationalSearch": "true",
         "date": travel_date,
         "time": travel_time,
         "showFares": "true",
-        "app_key": f"{os.environ['TFL_API_KEY']}" # Ensure this is in your Codespace env vars
+        "app_key": os.environ.get('TFL_API_KEY')
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params)
-        
-        if response.status_code != 200:
-            print(f"==========Failed, status is {response.status_code}=====\n{response.json()}")
+        try:
+            response = await client.get(url, params=params, timeout=20.0)
+            
+            if response.status_code != 200:
+                print(f"❌ TfL API Failure: {response.status_code}")
+                return []
+
+            data = response.json()
+            journeys = []
+            
+            for j in data.get("journeys", []):
+                # --- 1. Line Summary & Disruption Detection ---
+                lines = []
+                is_disrupted = False
+                disruption_notes = []
+                
+                for leg in j.get("legs", []):
+                    # Get Line Name
+                    route_opts = leg.get("routeOptions", [])
+                    line_name = route_opts[0].get("name") if route_opts else "Walk"
+                    lines.append(line_name)
+                    
+                    # Extract Disruptions
+                    leg_disruptions = leg.get("disruptions", [])
+                    if leg_disruptions:
+                        is_disrupted = True
+                        for d in leg_disruptions:
+                            # Use 'description' for the human-readable delay text
+                            disruption_notes.append(d.get("description", "Service delay reported"))
+                
+                # --- 2. Fare Calculation ---
+                fare_data = j.get("fare", {})
+                total_cost = None
+                if fare_data:
+                    raw_cost = fare_data.get("totalCost")
+                    if raw_cost is not None:
+                        total_cost = float(raw_cost) / 100
+                
+                # --- 3. Build Model ---
+                journeys.append(SimplifiedJourney(
+                    duration=j.get("duration"),
+                    startDateTime=j.get("startDateTime"),
+                    arrivalDateTime=j.get("arrivalDateTime"),
+                    legs_summary=" -> ".join(lines),
+                    total_fare=total_cost,
+                    is_disrupted=is_disrupted,
+                    disruption_messages=list(set(disruption_notes)) # Unique notes only
+                ))
+                
+            return journeys
+
+        except Exception as e:
+            print(f"💥 Error in get_tfl_route: {str(e)}")
             return []
-
-        data = response.json()
-        print(f"--- res[ponse from api is:{data}")
-        journeys = []
-        
-        for j in data.get("journeys", []):
-            # 1. Extract Line Summary with better logic
-            lines = []
-            for leg in j.get("legs", []):
-                # Try to get the line name (e.g., 'Central'), 
-                # fallback to 'Walk' if no routeOptions exist
-                route_opts = leg.get("routeOptions", [])
-                line_name = route_opts[0].get("name") if route_opts else "Walk"
-                lines.append(line_name)
-            
-            # 2. Format the summary as a string for the Agent
-            # This makes it much easier for the LLM to say "Take the Central Line -> Elizabeth Line"
-            route_path = " -> ".join(lines)
-            
-            fare_data = j.get("fare", {})
-            total_cost = None
-            if fare_data:
-                raw_cost = fare_data.get("totalCost")
-                if raw_cost is not None:
-                    total_cost = raw_cost / 100
-            
-            journeys.append(SimplifiedJourney(
-                duration=j.get("duration"),
-                startDateTime=j.get("startDateTime"),
-                arrivalDateTime=j.get("arrivalDateTime"),
-                legs_summary=route_path,  # Change this to a string in your Pydantic model
-                total_fare=total_cost
-            ))
-            
-        return journeys
-
-
-
-
-
-        return journeys
