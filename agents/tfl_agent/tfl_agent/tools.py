@@ -44,7 +44,7 @@ async def get_tfl_route(travel_date: str,
     """
     # Use the Hub IDs
     from_station = "940GZZLUFLP" 
-    to_station = "1000033"   
+    to_station = "490004381N"
     
     print(f'🚀 Fetching route for {travel_date} at {travel_time}')
     
