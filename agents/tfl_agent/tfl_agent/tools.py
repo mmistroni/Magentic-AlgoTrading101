@@ -42,35 +42,39 @@ async def get_tfl_route(travel_date: str,
     """
     Fetches journeys from TfL with disruption detection and National Rail support.
     """
-    # Station IDs: Fairlop (Tube) to Bromley South (National Rail)
-    from_station: str = "940GZZLUFLP"
-    to_station: str = "1007062"
+    # Use the Hub IDs
+    from_station = "940GZZLUFLP" 
+    to_station = "1000033"   
     
     print(f'🚀 Fetching route for {travel_date} at {travel_time}')
     
+    # We use the ICS code directly in the URL to stop the '300 Multiple Choice'
     url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_station}/to/{to_station}"
     
-    # Expanded modes to ensure we don't just get Elizabeth Line
     params = {
-        "mode": "tube,national-rail,overground,elizabeth-line,southeastern,thameslink",
-        "nationalSearch": "true",
         "date": travel_date,
         "time": travel_time,
+        "nationalSearch": "true",
         "showFares": "true",
         "app_key": os.environ.get('TFL_API_KEY')
     }
+
 
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url, params=params, timeout=20.0)
             
+            if response.status_code == 300:
+                print("⚠️ TfL returned '300 Multiple Choices'. Try using Naptan IDs instead.")
+                return []
+
             if response.status_code != 200:
                 print(f"❌ TfL API Failure: {response.status_code}")
                 return []
 
             data = response.json()
             journeys = []
-            
+            print(f'Data is:\n{data}')
             for j in data.get("journeys", []):
                 # --- 1. Line Summary & Disruption Detection ---
                 lines = []
