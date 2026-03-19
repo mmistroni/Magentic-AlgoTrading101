@@ -25,6 +25,8 @@ async def test_main():
             print(f"--- Option {i} ---")
             print(f"Path: {journey.legs_summary}")
             print(f"Duration: {journey.duration} mins")
+            print(f"Start: {journey.startDateTime} mins")
+            print(f"End: {journey.arrivalDateTime} mins")
             print(f"Disrupted: {journey.is_disrupted}")
             if journey.is_disrupted:
                 print(f"Messages: {journey.disruption_messages}")

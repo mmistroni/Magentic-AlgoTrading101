@@ -37,83 +37,81 @@ def resolve_date_string(date_input: str) -> dict:
         "status": "success"
     }
 
-async def get_tfl_route(travel_date: str, 
-                        travel_time: str = "0545") -> List[SimplifiedJourney]:
+
+# --- TOOL 2: STATION RESOLVER (The Fix) ---
+async def get_station_id(name: str) -> str:
+    """Matches a name to a Naptan ID to prevent '300 Multiple Choice' errors."""
+    url = f"https://api.tfl.gov.uk/StopPoint/Search/{name}"
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.get(url, params={"app_key": os.environ.get('TFL_API_KEY')})
+            if r.status_code == 200 and r.json().get("matches"):
+                # Returns the first specific station ID (e.g., 940GZZLUDHK)
+                return r.json()["matches"][0]["id"]
+        except Exception as e:
+            logger.error(f"Search failed for {name}: {e}")
+    return name # Fallback to original name if search fails
+
+async def get_tfl_route(travel_date: str, travel_time: str = "0545") -> List[SimplifiedJourney]:
     """
-    Fetches journeys from TfL with disruption detection and National Rail support.
+    Final Fix: Uses ICS Codes and includes all necessary modes for Denmark Hill.
     """
+    # ICS Codes are the numeric 'Master IDs' for these stations
+    from_id = "1000079"  # Fairlop (ICS Code)
+    to_id = "1001083"    # Denmark Hill (ICS Code)
+    
     url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_id}/to/{to_id}"
     
     params = {
         "date": travel_date,
         "time": travel_time,
-        "nationalSearch": "true",
+        # WE MUST INCLUDE national-rail OR DENMARK HILL WON'T BE 'IDENTIFIED'
+        "mode": "tube,overground,national-rail", 
         "app_key": os.environ.get('TFL_API_KEY')
     }
 
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(url, params=params, timeout=20.0)
-            
-            if response.status_code == 300:
-                data = response.json()
-                # Extract the first suggested Naptan IDs from the "choices"
-                best_from = data.get("fromStopPointProfiles", [{}])[0].get("naptanId", from_id)
-                best_to = data.get("toStopPointProfiles", [{}])[0].get("naptanId", to_id)
-                
-                print(f"⚠️ 300 Error: Disambiguating to {best_from} -> {best_to}")
-                # Recursively call with the "correct" IDs
-                return await get_tfl_route(best_from, best_to, travel_date, travel_time)
-
-
-            if response.status_code != 200:
-                print(f"❌ TfL API Failure: {response.status_code}")
-                return []
-
-            data = response.json()
-            journeys = []
-            print(f'Data is:\n{data}')
-            for j in data.get("journeys", []):
-                # --- 1. Line Summary & Disruption Detection ---
-                lines = []
-                is_disrupted = False
-                disruption_notes = []
-                
-                for leg in j.get("legs", []):
-                    # Get Line Name
-                    route_opts = leg.get("routeOptions", [])
-                    line_name = route_opts[0].get("name") if route_opts else "Walk"
-                    lines.append(line_name)
-                    
-                    # Extract Disruptions
-                    leg_disruptions = leg.get("disruptions", [])
-                    if leg_disruptions:
-                        is_disrupted = True
-                        for d in leg_disruptions:
-                            # Use 'description' for the human-readable delay text
-                            disruption_notes.append(d.get("description", "Service delay reported"))
-                
-                # --- 2. Fare Calculation ---
-                fare_data = j.get("fare", {})
-                total_cost = None
-                if fare_data:
-                    raw_cost = fare_data.get("totalCost")
-                    if raw_cost is not None:
-                        total_cost = float(raw_cost) / 100
-                
-                # --- 3. Build Model ---
-                journeys.append(SimplifiedJourney(
-                    duration=j.get("duration"),
-                    startDateTime=j.get("startDateTime"),
-                    arrivalDateTime=j.get("arrivalDateTime"),
-                    legs_summary=" -> ".join(lines),
-                    total_fare=total_cost,
-                    is_disrupted=is_disrupted,
-                    disruption_messages=list(set(disruption_notes)) # Unique notes only
-                ))
-                
-            return journeys
-
-        except Exception as e:
-            print(f"💥 Error in get_tfl_route: {str(e)}")
+        response = await client.get(url, params=params, timeout=20.0)
+        
+        # Log for debugging if it fails again
+        if response.status_code != 200:
+            logger.error(f"TfL Error: {response.status_code}")
             return []
+
+        data = response.json()
+        journeys = []
+        
+        for j in data.get("journeys", []):
+            # Extract line names from 'routeOptions'
+            lines = []
+            for leg in j.get("legs", []):
+                name = leg.get("routeOptions", [{}])[0].get("name", "Walk")
+                lines.append(name)
+            
+            disruptions = [d.get("description") for leg in j.get("legs", []) for d in leg.get("disruptions", [])]
+            
+            #Helper to format "2026-03-20T05:45:00" -> "05:45"
+            def format_time(dt_str):
+                if not dt_str: return "N/A"
+                return datetime.fromisoformat(dt_str).strftime("%H:%M")
+
+            dep_time = format_time(j.get("startDateTime"))
+            arr_time = format_time(j.get("arrivalDateTime"))
+
+
+            # Fare (pence to pounds)
+            raw_fare = j.get("fare", {}).get("totalCost")
+            total_fare = float(raw_fare) / 100 if raw_fare is not None else None
+
+            journeys.append(SimplifiedJourney(
+                duration=j.get("duration"),
+                startDateTime=dep_time,
+                arrivalDateTime=arr_time,
+                legs_summary=" -> ".join(lines),
+                total_fare=total_fare,
+                is_disrupted=len(disruptions) > 0,
+                disruption_messages=list(set(disruptions))
+            ))
+            
+        return journeys
+
