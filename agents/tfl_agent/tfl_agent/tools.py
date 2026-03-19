@@ -42,31 +42,29 @@ async def get_tfl_route(travel_date: str,
     """
     Fetches journeys from TfL with disruption detection and National Rail support.
     """
-    # Use the Hub IDs
-    from_station = "940GZZLUFLP" 
-    to_station = "490004381N"
-    
-    print(f'🚀 Fetching route for {travel_date} at {travel_time}')
-    
-    # We use the ICS code directly in the URL to stop the '300 Multiple Choice'
-    url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_station}/to/{to_station}"
+    url = f"https://api.tfl.gov.uk/Journey/JourneyResults/{from_id}/to/{to_id}"
     
     params = {
         "date": travel_date,
         "time": travel_time,
         "nationalSearch": "true",
-        "showFares": "true",
         "app_key": os.environ.get('TFL_API_KEY')
     }
-
 
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url, params=params, timeout=20.0)
             
             if response.status_code == 300:
-                print("⚠️ TfL returned '300 Multiple Choices'. Try using Naptan IDs instead.")
-                return []
+                data = response.json()
+                # Extract the first suggested Naptan IDs from the "choices"
+                best_from = data.get("fromStopPointProfiles", [{}])[0].get("naptanId", from_id)
+                best_to = data.get("toStopPointProfiles", [{}])[0].get("naptanId", to_id)
+                
+                print(f"⚠️ 300 Error: Disambiguating to {best_from} -> {best_to}")
+                # Recursively call with the "correct" IDs
+                return await get_tfl_route(best_from, best_to, travel_date, travel_time)
+
 
             if response.status_code != 200:
                 print(f"❌ TfL API Failure: {response.status_code}")

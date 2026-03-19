@@ -28,9 +28,21 @@ class BestRoutesResponse(BaseModel):
 
 # --- 3. The API Parsing Models (Used inside the tool logic) ---
 class Leg(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    summary: str = Field(..., alias="instruction", reinforcement="summary")
+    mode: str = Field(..., path=["mode", "id"])
     duration: int
-    instruction: dict 
-    # Use aliases if the TfL JSON uses camelCase
-    departureTime: str 
-    arrivalTime: str
+    arrival_point: str = Field(..., path=["arrivalPoint", "commonName"])
+
+    @classmethod
+    def from_api(cls, leg_dict):
+        # Flattening the nested TfL structure
+        return cls(
+            instruction=leg_dict["instruction"]["summary"],
+            mode=leg_dict["mode"]["id"],
+            duration=leg_dict["duration"],
+            arrival_point=leg_dict["arrivalPoint"]["commonName"]
+        )
+class Journey(BaseModel):
+    start_time: str = Field(..., alias="startDateTime")
+    duration: int
+    legs: List[Leg]
