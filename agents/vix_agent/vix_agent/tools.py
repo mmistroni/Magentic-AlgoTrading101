@@ -83,66 +83,52 @@ def vix_ingestion_tool() -> str:
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
 
-def merge_vix_and_cot_features_tool(vix_path: str, cot_clean_path: str) -> str:
+def merge_all_features_tool(vix_path: str, cot_clean_path: str, vix_futures_path: str, spx_path: str = "") -> str:
     """
-    Merges daily VIX data with weekly COT data using forward-filling to align frequencies.
-    
-    Args:
-        vix_path: Daily VIX DataFrame path, indexed by daily date.
-        cot_clean_path: Weekly COT DataFrame path, indexed by weekly (Friday release) date.
-        
-    Returns:
-        A daily DataFrame containing both VIX and the forward-filled COT features.
+    Merges Daily VIX Spot, Weekly COT, Daily VIX Futures, and optionally SPX.
+    Uses forward-filling for COT to align weekly data to daily trading days.
     """
-    print("Feature Agent: Starting VIX/COT frequency alignment and merge...")
+    print("Feature Agent: Starting multi-dataset alignment and merge...")
+    merged_path = "./temp_data/master_merged_data.csv"
+    os.makedirs(os.path.dirname(merged_path), exist_ok=True)
     
-    # --- Step 1: Align COT to Daily Frequency using Forward Fill (ffill) ---
-    file_path = "./temp_data/vix_cot_merged.csv"
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    
-    # Create a new index spanning the entire date range of the VIX data
+    # 1. Load the core datasets and ensure their indexes are explicitly datetime
     vix_df = _read_data_from_pandas(vix_path)
-
-    print(f'[Merge]. vix columns are:{vix_df.columns}')
-
-
-
+    vix_df.index = pd.to_datetime(vix_df.index)
+    
     cot_clean_df = _read_data_from_pandas(cot_clean_path)
+    cot_clean_df.index = pd.to_datetime(cot_clean_df.index)
     
-    print(f'[Merge]. cot clean df  clumns are:{cot_clean_df.columns}')
+    futures_df = _read_data_from_pandas(vix_futures_path)
+    futures_df.index = pd.to_datetime(futures_df.index)
 
-    
+    # 2. Align COT to Daily Frequency using Forward Fill
     start_date = vix_df.index.min()
     end_date = vix_df.index.max()
     daily_index = pd.date_range(start=start_date, end=end_date, freq='D')
-    merged_path = "./temp_data/vix_and_cot_merged.csv"
+    
+    cot_daily_filled = cot_clean_df.reindex(daily_index).ffill()
+    
+    # 3. Join everything to the VIX Spot index (Left Join keeps only trading days)
+    merged_df = vix_df.join(cot_daily_filled, how='left')
+    merged_df = merged_df.join(futures_df, how='left')
 
-    # Reindex the weekly COT data to this full daily range. 
-    # This introduces NaN for all non-reporting days (Sat-Thu).
-    cot_daily_filled = cot_clean_df.reindex(daily_index)
-    
-    # The crucial step: Forward-fill the weekly COT values to every day until the next report.
-    cot_daily_filled = cot_daily_filled.ffill()
-    
-    # --- Step 2: Merge the two datasets ---
-    
-    # Outer join to ensure we keep all trading days from the VIX data.
-    # The index (Date) is shared.
-    merged_df = vix_df.merge(
-        cot_daily_filled, 
-        left_index=True, 
-        right_index=True, 
-        how='outer'
-    )
-    
-    # Drop rows where VIX data is missing (i.e., weekends/holidays that were in the daily_index)
-    # assuming VIX is the authoritative list of trading days.
-    # Assuming 'vix_close' is a column in vix_df:
+    # 4. Integrate SPX if the path is provided
+    if spx_path and os.path.exists(spx_path):
+        spx_df = _read_data_from_pandas(spx_path)
+        spx_df.index = pd.to_datetime(spx_df.index)
+        # Rename SPX columns so they don't clash with VIX 'close'/'open'
+        spx_df = spx_df.add_prefix('spx_') 
+        merged_df = merged_df.join(spx_df, how='left')
+
+    # Drop any remaining rows where VIX Spot data is missing
     merged_df.dropna(subset=[vix_df.columns[0]], inplace=True) 
     
-    # We now have a daily dataset where COT data changes only once per week (on Friday)
     merged_df.to_csv(merged_path, header=True)
+    print(f"[Merge Tool] Master dataset created with columns: {merged_df.columns.tolist()}")
+    
     return merged_path
+
 
 
 def apply_thresholds_to_features(df: pd.DataFrame, vix_zscore_threshold: float, cot_percentile_threshold: float) -> pd.DataFrame:
@@ -187,72 +173,56 @@ def calculate_features_tool(
     cot_percentile_threshold: float) -> str:
     """
     Performs all feature engineering, including Net Position calculation, 
-    Z-score/Percentile calculation, and applying the LLM-defined thresholds.
-    Returns the URI of the final feature file.
+    Z-score, COT Percentile, and the new VIX Term Structure Basis.
     """
-    # 1. Load data from merged_data_uri:
     print(f'[FEATURES TOOL: VixZ:{vix_zscore_threshold}|CotPcNt:{cot_percentile_threshold}]')
     df = _read_data_from_pandas(merged_data_uri).copy()
     
-    # 2. calculate net position
-    # Assuming 'df' is your loaded merged DataFrame
+    # 2. Calculate net position
     df['net_position'] = df['comm_positions_long_all'] - df['comm_positions_short_all']
 
-    print(f"Net position not none:{df[df['net_position'].notna()]}")
-
-    # 3. Calculate VIX Z-Score (using a lookback window)
-    # Define a window (e.g., 252 trading days = approx. 1 year)
+    # 3. Calculate VIX Z-Score (1-year window)
     window = 252  
-
-    # Calculate Rolling Mean and Standard Deviation
     df['VIX_Rolling_Mean'] = df['close'].rolling(window=window).mean()
     df['VIX_Rolling_Std'] = df['close'].rolling(window=window).std()
-
-    # Calculate the Z-Score
     df['VIX_ZScore'] = (df['close'] - df['VIX_Rolling_Mean']) / df['VIX_Rolling_Std']
 
-    # 4. Calculate COT Percentile Rank (using a lookback window)
-    # Define a long window (e.g., 1250 trading days = approx. 5 years)
+    # 4. Calculate COT Percentile Rank (5-year window)
     long_window = 1250 
-
-    # Calculate Rolling Max and Min for the Net Position
     df['COT_Rolling_Max'] = df['net_position'].rolling(window=long_window).max()
     df['COT_Rolling_Min'] = df['net_position'].rolling(window=long_window).min()
-
-    # Calculate the COT Oscillator (Percentile Rank)
     df['COT_Percentile'] = (df['net_position'] - df['COT_Rolling_Min']) / \
                         (df['COT_Rolling_Max'] - df['COT_Rolling_Min'])
-    # 5. Apply thresholds to create binary signals:
-    #    Extreme_VIX_Signal = 1 if VIX_ZScore > vix_zscore_threshold
-    #    Extreme_COT_Signal = 1 if COT_Percentile < cot_percentile_threshold
-    # --- Example of function call inside calculate_features_tool ---
+
+    # 4.5 🚀 NEW: Calculate VIX Term Structure Basis (Spot vs Futures)
+    # Basis = VIX Spot - VIX Front Month Future
+    if 'vix_front_month_close' in df.columns:
+        df['VIX_Basis'] = df['close'] - df['vix_front_month_close']
+        
+        # When Basis > 0, the market is in BACKWARDATION (Panic mode / Spike happening)
+        df['Backwardation_Signal'] = (df['VIX_Basis'] > 0).astype(int)
+    else:
+        print("Warning: VIX Futures data missing from merge. Skipping Basis calculation.")
+
+    # 5. Apply thresholds to create binary signals
     final_feature_df = apply_thresholds_to_features(
                                  df, 
                                  vix_zscore_threshold=vix_zscore_threshold, 
                                  cot_percentile_threshold=cot_percentile_threshold
                         )
-
     
-    # 6. Save the final DataFrame and return the new URI string
-    print(f"[FEATURE TOOL EXTREMe VIX]\n{df[df['Extreme_VIX_Signal'] == 1]}")
-
-    print(f"\n[FEATURE TOOL EXTREMe COT]\n{df[df['Extreme_COT_Signal'] == 1]}")
-
-
-
-
-    file_path = "./temp_data/vix_cot_features.csv"
+    file_path = "./temp_data/master_features.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
     final_feature_df.to_csv(file_path, header=True)
 
     return file_path
 
 
+
 def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
     """
     Processes the last 7 trading days of data to provide a weekly context 
-    and generates signals for each day.
+    and generates signals for each day, incorporating VIX Term Structure.
     """
     input_path = engineered_data_uri
     signal_path = f"./temp_data/weekly_signal_{market.replace(' ', '_').lower()}.json" 
@@ -262,42 +232,54 @@ def signal_generation_tool(engineered_data_uri: str, market: str) -> str:
         df = pd.read_csv(input_path, index_col='date', parse_dates=True)
         df.index = pd.to_datetime(df.index)
         
-        print(f'SignalTool[Head ]\n{df.head(7)}')
-        print('----------------------------')
-        print(f'SignalTool[Tail ]\n{df.tail(7)}')
-        
-
         # Ensure we don't crash if there are fewer than 7 rows
-        target_rows = df.head(7)
+        target_rows = df.tail(7) # CHANGED to tail(7) to get the MOST RECENT days
     
-        print(f'[SiGNal Tool]\n{target_rows}')
-
+        print(f'[SIGNAL TOOL] Processing last 7 days:\n{target_rows.index.tolist()}')
 
         signals_list = []
 
         for timestamp, row in target_rows.iterrows():
-            # Logic remains similar but applied per day
             sig = "Neutral"
             conf = 0.5
             
-            # Using the calculated features from your calculate_features_tool
+            # 1. Extract existing features
             vix_z = row.get('VIX_ZScore', 0)
             cot_p = row.get('COT_Percentile', 0.5)
-
-            # Bearish Setup for Short Selling (VIX Low/Falling, COT High)
-            if vix_z < -1.5 and cot_p > 0.8:
-                sig = "Sell/Short"
-                conf = 0.75
             
+            # 2. Extract new Futures features (Default to -1 / Contango if missing)
+            vix_basis = row.get('VIX_Basis', -1.0) 
+            is_backwardation = row.get('Backwardation_Signal', 0)
+
+            # --- SIGNAL LOGIC ---
+            
+            # Condition A: Active Panic (Backwardation)
+            # Spot VIX is higher than Futures. The market is actively crashing / VIX is spiking.
+            if is_backwardation == 1:
+                sig = "STRONG BUY VIX / SPIKE DETECTED"
+                conf = 0.90
+            
+            # Condition B: The "Spring is Coiled" (Complacency Setup)
+            # VIX is abnormally low (Z < -1.5), but Commercials are heavily long VIX/short SPX
+            elif vix_z < -1.5 and cot_p > 0.8:
+                sig = "WARNING: VIX Spike Imminent"
+                conf = 0.75
+                
+            # Condition C: Volatility Crush (Mean Reversion)
+            # VIX is extremely high, but Futures are much lower, predicting a return to normal
+            elif vix_z > 2.5 and is_backwardation == 0:
+                sig = "SELL VIX / Volatility Crush Expected"
+                conf = 0.80
+
             signals_list.append({
                 "date": str(timestamp.date()),
                 "market": market,
                 "signal": sig,
                 "confidence": conf,
-                "justification": f"VIX Z: {vix_z:.2f} | COT %: {cot_p:.2f}"
+                "justification": f"VIX Z: {vix_z:.2f} | COT %: {cot_p:.2f} | VIX Basis: {vix_basis:.2f} (Back: {is_backwardation})"
             })
 
-        print(f'[SIGNAL TOOL] signal json:\n{signals_list}')
+        print(f'[SIGNAL TOOL] Generated {len(signals_list)} daily signals.')
 
         # Save as a JSON list
         with open(signal_path, 'w') as outfile:
