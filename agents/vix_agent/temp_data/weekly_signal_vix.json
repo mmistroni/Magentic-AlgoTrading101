@@ -4,6 +4,13 @@
     "market": "VIX",
     "signal": "Neutral",
     "confidence": 0.5,
-    "justification": "VIX Z: nan | COT %: nan | VIX Basis: nan (Back: 0.0)"
+    "justification": "VIX Z: nan | COT %: nan | VIX Basis: -0.87 (Back: 0.0)"
+  },
+  {
+    "date": "2025-11-21",
+    "market": "VIX",
+    "signal": "Neutral",
+    "confidence": 0.5,
+    "justification": "VIX Z: nan | COT %: nan | VIX Basis: -0.70 (Back: 0.0)"
   }
 ]

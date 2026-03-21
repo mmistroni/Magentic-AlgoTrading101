@@ -7,6 +7,7 @@ import pytest
 from vix_agent.tools import (
     ingestion_tool,
     vix_ingestion_tool,
+    vix_futures_ingestion_tool,
     merge_all_features_tool,
     calculate_features_tool,
     signal_generation_tool
@@ -14,12 +15,44 @@ from vix_agent.tools import (
 from vix_agent.vix_futures_tools import vix_futures_ingestion_tool
 
 
-def test_end_to_end_tool_pipeline():
-    """
-    Simulates the SequentialAgent pipeline to ensure all tools
-    can pass data to each other without crashing, ending in a JSON report.
-    """
+# --- 1. DEFINE YOUR MOCK BEHAVIORS ---
+def mock_bq_cot_data(market: str) -> pd.DataFrame:
+    return pd.DataFrame([
+        ['2025-11-20', 150000, 100000],
+        ['2025-11-21', 155000, 102000]
+    ], columns=['Timestamp', 'comm_positions_long_all', 'comm_positions_short_all'])
+
+def mock_bq_vix_data() -> pd.DataFrame:
+    return pd.DataFrame([
+        ['2025-11-20', 16.67, 17.55, 15.23, 15.23, 1000],
+        ['2025-11-21', 15.23, 16.00, 14.50, 14.80, 1200]
+    ], columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+
+def mock_bq_vix_futures_data(target_date: str) -> pd.DataFrame:
+    return pd.DataFrame([
+        ['2025-11-20', 16.10],
+        ['2025-11-21', 15.50]
+    ], columns=['date', 'vix_front_month_close'])
+
+
+# --- 2. THE TEST USING MONKEYPATCH ---
+# Notice we just pass 'monkeypatch' as an argument. Pytest handles injecting it automatically.
+def test_end_to_end_tool_pipeline(monkeypatch):
+    
+    # 3. OVERRIDE THE FUNCTIONS
+    # Format: monkeypatch.setattr("path.to.module.function_name", replacement_function)
+    monkeypatch.setattr("vix_agent.tools.fetch_cot_from_bq", mock_bq_cot_data)
+    monkeypatch.setattr("vix_agent.tools.fetch_vix_from_bq", mock_bq_vix_data)
+    monkeypatch.setattr("vix_agent.vix_futures_tools.fetch_vix_futures_from_bq", mock_bq_vix_futures_data)
+    
     print("\n--- Starting Pipeline Test ---")
+         
+
+    # 4. ACT: Call the tools! 
+    # Because of monkeypatch.setattr(), these will naturally hit your mock functions above.
+    cot_raw_uri = ingestion_tool("VIX")
+    vix_spot_raw_uri = vix_ingestion_tool()
+    vix_futures_raw_uri = vix_futures_ingestion_tool("2024-01-15")     
     
     # ==========================================
     # 1. ARRANGE & ACT: INGESTION STAGE
