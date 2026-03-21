@@ -1,0 +1,9 @@
+[
+  {
+    "date": "2025-11-20",
+    "market": "VIX",
+    "signal": "Neutral",
+    "confidence": 0.5,
+    "justification": "VIX Z: nan | COT %: nan | VIX Basis: nan (Back: 0.0)"
+  }
+]

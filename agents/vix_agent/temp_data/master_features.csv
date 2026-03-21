@@ -1,0 +1,2 @@
+date,open,high,low,close,volume,comm_positions_long_all,comm_positions_short_all,vix_front_month_close,net_position,VIX_Rolling_Mean,VIX_Rolling_Std,VIX_ZScore,COT_Rolling_Max,COT_Rolling_Min,COT_Percentile,VIX_Basis,Backwardation_Signal,Extreme_VIX_Signal,Extreme_COT_Signal,Combined_Feature_Signal
+2025-11-20,16.670000076293945,17.559999465942383,15.239999771118164,15.239999771118164,1000,150000,100000,,50000,,,,,,,,0,0,0,0

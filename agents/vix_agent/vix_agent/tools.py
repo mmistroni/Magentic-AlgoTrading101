@@ -16,17 +16,16 @@ import numpy as np
 import json
 
 def _get_raw_data(market) -> pd.DataFrame :
+    # 💥 FIX 1: Provide the exact columns the feature tool expects
     raw_data = [
-        ['Timestamp', 'Raw_COT_Value', 'Raw_VIX_Value'],
-        ['2025-11-20', '10.5', '90.0'],
+        ['Timestamp', 'comm_positions_long_all', 'comm_positions_short_all'],
+        ['2025-11-20', 150000, 100000],
     ]
 
     header = raw_data[0]
     data_rows = raw_data[1:]
     
-    # 2. Create the initial DataFrame
     return pd.DataFrame(data_rows, columns=header)
-
 def _get_vix_raw_data() -> pd.DataFrame :
     raw_data = [
         ['date', 'open', 'high', 'low', 'close', 'volume'],
@@ -45,7 +44,9 @@ def _read_data_from_pandas(input_path:str) -> pd.DataFrame :
     # Ensure the numerical columns are correctly cast
     return pd.read_csv(
         input_path, 
-        )
+        index_col=0,       # <-- FIX: Tells pandas to use the first column as the index
+        parse_dates=True   # <-- BONUS: Converts your Timestamp index into actual datetime objects
+    )
     
     
 
@@ -61,7 +62,7 @@ def ingestion_tool(market: str) -> str:
 
     raw_data = _get_raw_data(market)
 
-    raw_data.to_csv(file_path, header=True)
+    raw_data.to_csv(file_path, header=True, index=False)
 
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
@@ -78,7 +79,7 @@ def vix_ingestion_tool() -> str:
 
     raw_data = _get_vix_raw_data()
 
-    raw_data.to_csv(file_path, header=True)
+    raw_data.to_csv(file_path, header=True, index=False)
 
     # 💥 CRITICAL FIX: Return the file path string directly.
     return file_path
