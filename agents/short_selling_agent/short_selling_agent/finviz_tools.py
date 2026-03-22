@@ -48,15 +48,6 @@ def get_short_squeeze_filter():
                     }
     return _run_screener(filters_dict)
 
-def get_fmp_bigger_losers(fmp_api_key):
-    fmp_url = f'https://financialmodelingprep.com/stable/biggest-losers?apikey={fmp_api_key}'
-
-    try :
-        data = requests.get(fmp_url).json()
-        return data
-    except Exception as e:
-        logging.info(f'Failed to retriefe biggest losers:{str(e)}')
-        return []
 
 
 
