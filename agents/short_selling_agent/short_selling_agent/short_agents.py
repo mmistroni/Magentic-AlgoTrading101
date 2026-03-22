@@ -1,11 +1,8 @@
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.tools import FunctionTool
-from stock_agent.tools import (
-    discover_technical_schema_tool,
-    fetch_technical_snapshot_tool
-)
-from stock_agent.models import TechnicalSchema
-from stock_agent.models import TrendSignal
+from .tools import get_bearish_insider_sales, get_blacklist_targets, \
+                get_fmp_bigger_losers, get_fmp_news, get_short_squeeze_filter
+
 
 # 1. Specialized Schema Agent
 # Its only job is to discover WHAT we can analyze
