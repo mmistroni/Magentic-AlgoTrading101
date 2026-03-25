@@ -67,7 +67,7 @@ def main():
         logging.info(f"Saved {len(rows)} Blacklist tickers to BQ." if not errors else f"BQ Errors: {errors}")
 
     # 2. INGEST FMP LOSERS
-    losers_report = get_fmp_bigger_losers(FMP_API_KEY)
+    losers_report = get_fmp_bigger_losers()
     if getattr(losers_report, "error_message", None):
         logging.error(f"Failed to get Losers: {losers_report.error_message}")
     elif losers_report.losers:

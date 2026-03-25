@@ -43,7 +43,7 @@ def get_short_squeeze_filter():
     filters_dict = {'Float Short': 'Over 15%',
                     'Float' : 'Under 50M',
                     'Option/Short' : 'Shortable',
-                    'Insider Transactions' : 'Negative (<0%)'
+                    'InsiderTransactions' : 'Negative (<0%)'
 
                     }
     return _run_screener(filters_dict)
