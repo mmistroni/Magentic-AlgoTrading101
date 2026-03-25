@@ -1,10 +1,12 @@
 # Assuming get_short_squeeze_filter is imported from your finviz_tools
 from .finviz_tools import get_short_squeeze_filter 
-from .schemas import BiggestLosersReport, InsiderTrade, BlacklistReport, MarketLoser
+from .schemas import BiggestLosersReport, InsiderTrade, BlacklistReport, MarketLoser, \
+    StockNewsReport, InsiderTradingReport, NewsArticle
 
 import logging
 import requests
 import os
+from datetime import datetime, timedelta
 
 
 def get_blacklist_targets() -> BlacklistReport:
