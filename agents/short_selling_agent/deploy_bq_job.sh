@@ -39,7 +39,7 @@ echo "  FMP_API_KEY:    [HIDDEN FOR SECURITY]"
 echo "--------------------------------"
 
 # 4. Construct the Environment Variables String
-ENV_VARS_STRING="GCP_PROJECT_ID=$GOOGLE_CLOUD_PROJECT,FMP_API_KEY=$FMP_API_KEY"
+ENV_VARS_STRING="GCP_PROJECT_ID=$GOOGLE_CLOUD_PROJECT,FMP_API_KEY=$FMP_KEY"
 
 # 5. Execute the gcloud run jobs deploy command
 # Notice we use '--command' and '--args' to override the 'uvicorn' CMD in your Dockerfile!
