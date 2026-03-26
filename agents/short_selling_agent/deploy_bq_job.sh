@@ -40,7 +40,7 @@ echo "--------------------------------"
 
 # 4. Construct the Environment Variables String
 # Fixed typo here: changed $FMP_KEY to $FMP_API_KEY
-ENV_VARS_STRING="GCP_PROJECT_ID=$GOOGLE_CLOUD_PROJECT,FMP_API_KEY=$FMP_API_KEY"
+ENV_VARS_STRING="GCP_PROJECT_ID=$GOOGLE_CLOUD_PROJECT,FMP_API_KEY=$FMP_KEY"
 
 # 5. Execute the gcloud run jobs deploy command
 echo "Executing gcloud run jobs deploy..."
