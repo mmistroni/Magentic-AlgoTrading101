@@ -39,10 +39,10 @@ echo "  FMP_API_KEY:    [HIDDEN FOR SECURITY]"
 echo "--------------------------------"
 
 # 4. Construct the Environment Variables String
-ENV_VARS_STRING="GCP_PROJECT_ID=$GOOGLE_CLOUD_PROJECT,FMP_API_KEY=$FMP_KEY"
+# Fixed typo here: changed $FMP_KEY to $FMP_API_KEY
+ENV_VARS_STRING="GCP_PROJECT_ID=$GOOGLE_CLOUD_PROJECT,FMP_API_KEY=$FMP_API_KEY"
 
 # 5. Execute the gcloud run jobs deploy command
-# Notice we use '--command' and '--args' to override the 'uvicorn' CMD in your Dockerfile!
 echo "Executing gcloud run jobs deploy..."
 gcloud run jobs deploy "$JOB_NAME" \
   --source . \
@@ -52,12 +52,21 @@ gcloud run jobs deploy "$JOB_NAME" \
   --command="python" \
   --args="-m,short_selling_agent.bq_ingestion"
 
-# 6. Provide a Completion Message
+# 6. Provide a Completion Message and Kick Off the Job
 if [ $? -eq 0 ]; then
   echo ""
   echo "✅ Deployment of JOB $JOB_NAME to Google Cloud Run **successful**!"
-  echo "🚀 To run this job immediately, execute:"
-  echo "   gcloud run jobs execute $JOB_NAME --region $GOOGLE_CLOUD_LOCATION"
+  echo "🚀 Kicking off the job execution now..."
+  
+  # This command executes the job immediately
+  gcloud run jobs execute "$JOB_NAME" \
+    --region "$GOOGLE_CLOUD_LOCATION" \
+    --project "$GOOGLE_CLOUD_PROJECT"
+
+  echo ""
+  echo "✅ Job execution triggered!"
+  echo "📊 You can monitor the logs live by running:"
+  echo "   gcloud run jobs logs tail $JOB_NAME --region $GOOGLE_CLOUD_LOCATION"
 else
   echo ""
   echo "❌ Deployment failed. Please check the error messages above."

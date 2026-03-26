@@ -38,16 +38,37 @@ def get_short_sell_filter():
                     }
     return _run_screener(filters_dict)
 
+import requests
+
 def get_short_squeeze_filter():
+    print("Injecting stealth headers for Cloud Run...")
+    
+    # 1. The Disguise: Make Python look exactly like a real Desktop Chrome Browser
+    stealth_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0'
+    }
+    
+    # 2. Apply the disguise globally to the underlying requests library
+    requests.utils.default_headers().update(stealth_headers)
 
-    filters_dict = {'Float Short': 'Over 15%',
-                    'Float' : 'Under 50M',
-                    'Option/Short' : 'Shortable',
-                    'InsiderTransactions' : 'Negative (<0%)'
-
-                    }
+    # 3. Your exact filters
+    filters_dict = {
+        'Float Short': 'Over 15%',
+        'Float' : 'Under 50M',
+        'Option/Short' : 'Shortable',
+        'InsiderTransactions' : 'Negative (<0%)' 
+    }
+    
+    # 4. Execute your existing screener logic
     return _run_screener(filters_dict)
-
 
 
 
