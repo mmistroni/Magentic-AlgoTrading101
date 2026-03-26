@@ -18,6 +18,7 @@ def get_blacklist_targets() -> BlacklistReport:
     try:
         finviz_screens = get_short_squeeze_filter()
         tickers = [data['ticker'].strip() for data in finviz_screens if 'ticker' in data]
+        logging.info(f'Fetched {len(tickers)} from blacklist')
         return BlacklistReport(tickers=tickers)
     except Exception as e:
         logging.error(f"Error scraping Finviz Blacklist: {e}")
