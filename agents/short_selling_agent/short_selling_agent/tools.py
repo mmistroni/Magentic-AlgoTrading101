@@ -22,7 +22,7 @@ def get_blacklist_targets() -> BlacklistReport:
         return BlacklistReport(tickers=tickers)
     except Exception as e:
         logging.error(f"Error scraping Finviz Blacklist: {e}")
-        return BlacklistReport(tickers=[], error_message=str(e))
+        raise e
 
 
 def get_fmp_bigger_losers() -> BiggestLosersReport:
@@ -30,7 +30,7 @@ def get_fmp_bigger_losers() -> BiggestLosersReport:
     Fetches the list of the biggest losing stocks in the market today.
     AGENT INSTRUCTIONS: Call this to find initial candidates that are gapping down.
     """
-    fmp_url = f'https://financialmodelingprep.com/stable/biggest-losers?apikey={os.environ['FMP_API_KEY']}'
+    fmp_url = f"https://financialmodelingprep.com/stable/biggest-losers?apikey={os.environ['FMP_API_KEY']}"
     try:
         data = requests.get(fmp_url).json()
         losers = []
