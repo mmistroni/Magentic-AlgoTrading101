@@ -8,40 +8,51 @@ from short_selling_agent.schemas import MarketLoser
 # 2. IMPORT THE SHARED STATE FROM FILE 1
 from state import CURRENT_RUN_STATE 
 
+from google.cloud import bigquery
+from short_selling_agent.tools import get_fmp_news, get_bearish_insider_sales
+from short_selling_agent.schemas import MarketLoser
+from state import CURRENT_RUN_STATE 
+
+# --- AGENT 1'S ONLY TOOL ---
 def tool_fetch_bq_candidates() -> str:
-    """Fetches BigQuery candidates and saves them to the global state."""
+    """
+    Fetches the market losers from BigQuery and saves them to the shared state.
+    Returns a comma-separated list of the tickers found.
+    """
     client = bigquery.Client(project='datascience-projects')
     query = "SELECT ticker, price, change_pct FROM `datascience-projects.finviz_blacklist.fmp_daily_losers` LIMIT 3"
     results = client.query(query).result()
     
+    tickers = []
     for row in results:
         loser = MarketLoser(ticker=row.ticker, price=row.price, change_pct=row.change_pct)
-        # We are modifying the shared memory bank!
         CURRENT_RUN_STATE.dossier.market_losers.append(loser)
+        tickers.append(row.ticker)
         
-    return "SUCCESS: Loaded market losers into the Pipeline Dossier."
+    # We return the list of tickers so Agent 1 can pass them to Agent 2!
+    return f"Tickers loaded: {', '.join(tickers)}"
 
-def tool_get_staged_tickers() -> str:
-    """Tells the agent which tickers to analyze."""
-    # We read from the shared memory bank!
-    tickers = [loser.ticker for loser in CURRENT_RUN_STATE.dossier.market_losers]
-    return f"TICKERS TO ANALYZE: {', '.join(tickers)}"
-
+# --- AGENT 2'S ONLY TOOL ---
 def tool_stage_news(ticker: str) -> str:
-    """Fetches news and saves it to the global state."""
-    # Call your original tool
-    news_report = get_fmp_news(ticker) 
-    # Modify the shared memory bank!
+    """
+    Fetches the most recent news headlines for a specific stock ticker and saves it to the dossier.
+    """
+    news_report = get_fmp_news(ticker)
     CURRENT_RUN_STATE.dossier.news_reports.append(news_report)
-    return f"SUCCESS: News for {ticker} appended to dossier."
+    return f"Success: News for {ticker} saved to state."
 
+# --- AGENT 3'S ONLY TOOL ---
 def tool_stage_insiders(ticker: str) -> str:
-    """Fetches insider sales and saves it to the global state."""
+    """
+    Fetches Form 4 Insider Sales for a specific stock ticker and saves it to the dossier.
+    """
     insider_report = get_bearish_insider_sales(ticker)
     CURRENT_RUN_STATE.dossier.insider_reports.append(insider_report)
-    return f"SUCCESS: Form 4 Insider data for {ticker} appended to dossier."
+    return f"Success: Insiders for {ticker} saved to state."
 
+# --- AGENT 4'S ONLY TOOL ---
 def tool_read_full_dossier() -> str:
-    """Dumps the entire global state to a JSON string for the Quant to read."""
-    # Read the final state and give it to the LLM!
+    """
+    Returns the complete JSON dataset of all staged Market Data, News, and Insider Sales.
+    """
     return CURRENT_RUN_STATE.dossier.model_dump_json(indent=2)
