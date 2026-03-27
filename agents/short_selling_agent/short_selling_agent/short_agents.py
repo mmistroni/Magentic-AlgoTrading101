@@ -1,8 +1,13 @@
 from google_adk import LLMAgent, SequentialAgent  
-# Import your other tools: get_fmp_news, get_bearish_insider_sales
-from short_selling_agent.tools import get_bq_short_candidates, get_fmp_news,\
-     get_bearish_insider_sales
-from short_selling_agent.schemas import PipelineDossier
+
+# Import the wrapper tools
+from short_selling_agent.stage_tools import (
+    tool_fetch_bq_candidates, 
+    tool_get_staged_tickers, 
+    tool_stage_news, 
+    tool_stage_insiders, 
+    tool_read_full_dossier
+)
 
 # ---------------------------------------------------------
 # AGENT 1: BigQuery Ingestion
@@ -10,12 +15,12 @@ from short_selling_agent.schemas import PipelineDossier
 BQ_INGESTION_AGENT = LLMAgent(
     name="BQIngestionAgent", 
     model="gemini-1.5-pro",
-    tools=[get_bq_short_candidates],
+    tools=[tool_fetch_bq_candidates],
     system_instruction=(
         "You are Step 1 in the Short Selling Pipeline. "
-        "Your job is to call the `get_bq_short_candidates` tool. "
-        "Extract the tickers and their quantitative data (price, drop %, float, squeeze risk). "
-        "Format this data clearly as a 'Daily Candidate List' and pass it to the next agent."
+        "Your ONLY job is to call the `tool_fetch_bq_candidates` tool. "
+        "Do NOT output the data. Just call the tool, and when it succeeds, "
+        "output exactly: 'Step 1 complete. Tickers are staged.'"
     )
 )
 
@@ -25,13 +30,14 @@ BQ_INGESTION_AGENT = LLMAgent(
 NEWS_ANALYST_AGENT = LLMAgent(
     name="NewsAnalystAgent",
     model="gemini-1.5-pro",
-    tools=[get_fmp_news],
+    # ADDED: tool_get_staged_tickers so it knows what to search for!
+    tools=[tool_get_staged_tickers, tool_stage_news],
     system_instruction=(
         "You are Step 2 in the Short Selling Pipeline. "
-        "You will receive a 'Daily Candidate List' containing several tickers from the previous step. "
-        "For EACH ticker on the list, you MUST call the `get_fmp_news` tool. "
-        "Write a brief 'Catalyst Summary' for each ticker explaining why it dropped today. "
-        "APPEND your news summaries to the original candidate list, and pass the combined dossier forward."
+        "1. First, call `tool_get_staged_tickers` to find out which stocks we are analyzing today. "
+        "2. For EVERY ticker returned, call the `tool_stage_news` tool. "
+        "3. Once you have called the news tool for all tickers, DO NOT output the news. "
+        "Simply output exactly: 'Step 2 complete. News is staged.'"
     )
 )
 
@@ -41,13 +47,14 @@ NEWS_ANALYST_AGENT = LLMAgent(
 INSIDER_ANALYST_AGENT = LLMAgent(
     name="InsiderAnalystAgent",
     model="gemini-1.5-pro",
-    tools=[get_bearish_insider_sales],
+    # ADDED: tool_get_staged_tickers so it knows what to search for!
+    tools=[tool_get_staged_tickers, tool_stage_insiders],
     system_instruction=(
         "You are Step 3 in the Short Selling Pipeline. "
-        "You will receive a dossier containing tickers, market data, and news catalysts. "
-        "For EACH ticker in the dossier, call the `get_bearish_insider_sales` tool. "
-        "Check if C-Suite executives are dumping stock. "
-        "APPEND your 'Insider Conviction Summary' for each ticker to the dossier, and pass it to the Lead Quant."
+        "1. First, call `tool_get_staged_tickers` to find out which stocks we are analyzing. "
+        "2. For EVERY ticker returned, call the `tool_stage_insiders` tool. "
+        "3. Once you have called the insider tool for all tickers, DO NOT output the data. "
+        "Simply output exactly: 'Step 3 complete. Insiders are staged.'"
     )
 )
 
@@ -57,13 +64,14 @@ INSIDER_ANALYST_AGENT = LLMAgent(
 QUANT_COORDINATOR_AGENT = LLMAgent(
     name="LeadQuantTrader",
     model="gemini-1.5-pro",
-    tools=[], # No tools needed, just reasoning
+    # ADDED: This is crucial! The Quant needs a way to read the Google Doc!
+    tools=[tool_read_full_dossier], 
     system_instruction=(
         "You are the final step: The Lead Quant Trader. "
-        "You will receive a massive dossier from your junior analysts containing: "
-        "1. BQ Market Data, 2. News Catalysts, 3. Insider Dumping Data for today's worst performing stocks. "
-        "Your job is to synthesize all of this. "
-        "For EACH stock, write a final 'Short Report'. "
+        "1. Call the `tool_read_full_dossier` tool to download the massive JSON dossier. "
+        "2. This dossier contains BQ Market Data, News Catalysts, and Insider Dumping Data. "
+        "3. Synthesize all of this information. "
+        "For EACH stock in the dossier, write a final 'Short Report'. "
         "Assign a Conviction Score (1-10) and give a final verdict: [SHORT, AVOID, or COVER]. "
         "If 'is_squeeze_risk' is True, be highly skeptical unless the news is devastating."
     )
@@ -75,9 +83,9 @@ QUANT_COORDINATOR_AGENT = LLMAgent(
 SHORT_SELLING_PIPELINE = SequentialAgent(
     name="ShortSellingPipeline_V1",
     sub_agents=[
-        BQ_INGESTION_AGENT,          # Step 1: Gets tickers from BQ
-        NEWS_ANALYST_AGENT,          # Step 2: Adds News for all tickers
-        INSIDER_ANALYST_AGENT,       # Step 3: Adds Insiders for all tickers
-        QUANT_COORDINATOR_AGENT      # Step 4: Final verdict on all tickers
+        BQ_INGESTION_AGENT,          
+        NEWS_ANALYST_AGENT,          
+        INSIDER_ANALYST_AGENT,       
+        QUANT_COORDINATOR_AGENT      
     ]
 )
