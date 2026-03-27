@@ -33,7 +33,7 @@ def setup_bigquery_tables(client: bigquery.Client, dataset_ref):
         bigquery.SchemaField("change_pct", "FLOAT", mode="NULLABLE"),
         bigquery.SchemaField("short_interest_pct", "FLOAT", mode="NULLABLE"),
         bigquery.SchemaField("free_float", "FLOAT", mode="NULLABLE"),
-        bigquery.SchemaField("is_squeeze_risk", "BOOLEAN", mode="REQUIRED"),
+        bigquery.SchemaField("is_squeeze_risk", "BOOLEAN", mode="NULLABLE"),
     ]
     losers_table_id = f"{PROJECT_ID}.{DATASET_ID}.fmp_daily_losers"
     client.create_table(bigquery.Table(losers_table_id, schema=losers_schema), exists_ok=True)
