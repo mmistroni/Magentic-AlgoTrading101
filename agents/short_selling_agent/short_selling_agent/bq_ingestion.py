@@ -81,8 +81,15 @@ def main():
                 "is_squeeze_risk": is_dangerous
             })    
 
-        errors = client.insert_rows_json(losers_table_id, rows_to_insert)
-        logging.info(f"Saved {len(rows_to_insert)} SAFE Losers to BQ.")
+        if rows_to_insert:
+            errors = client.insert_rows_json(losers_table_id, rows_to_insert)
+            if errors:
+                logging.error(f"BQ Insert Errors: {errors}")
+            else:
+                logging.info(f"Saved {len(rows_to_insert)} Enriched Losers to BQ.")
+        else:
+            logging.warning("No valid stocks (>\$5.00) found today. Nothing saved to BQ.")
+
 
     logging.info("--- INGESTION JOB COMPLETE ---")
 
