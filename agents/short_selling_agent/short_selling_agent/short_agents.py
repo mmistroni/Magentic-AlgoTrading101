@@ -2,6 +2,8 @@ from google_adk import LLMAgent, SequentialAgent
 # Import your other tools: get_fmp_news, get_bearish_insider_sales
 from short_selling_agent.tools import get_bq_short_candidates, get_fmp_news,\
      get_bearish_insider_sales
+from short_selling_agent.schemas import PipelineDossier
+
 # ---------------------------------------------------------
 # AGENT 1: BigQuery Ingestion
 # -------------------------------------------------------

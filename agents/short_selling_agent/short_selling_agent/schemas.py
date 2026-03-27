@@ -42,3 +42,31 @@ class InsiderTradingReport(BaseModel):
     total_dollars_dumped: float = Field(description="Aggregate dollar amount sold by C-Suite in the time window")
     significant_sales: List[InsiderTrade] = Field(description="List of major individual sale transactions")
     error_message: Optional[str] = Field(default=None)
+
+
+from pydantic import BaseModel
+from typing import List, Optional
+
+# Import your existing models
+from .schemas import MarketLoser, StockNewsReport, InsiderTradingReport
+
+class QuantDecision(BaseModel):
+    ticker: str
+    conviction_score: int
+    action: str  # SHORT, AVOID, COVER
+    reasoning: str
+
+class PipelineDossier(BaseModel):
+    """This is the state object passed from Agent to Agent."""
+    
+    # Populated by Agent 1 (BQ Ingestion)
+    market_losers: List[MarketLoser] 
+    
+    # Populated by Agent 2 (News)
+    news_reports: Optional[List[StockNewsReport]] = []
+    
+    # Populated by Agent 3 (Insiders)
+    insider_reports: Optional[List[InsiderTradingReport]] = []
+    
+    # Populated by Agent 4 (Quant Coordinator)
+    final_decisions: Optional[List[QuantDecision]] = []
