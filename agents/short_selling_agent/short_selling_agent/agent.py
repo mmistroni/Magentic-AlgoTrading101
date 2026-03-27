@@ -1,7 +1,7 @@
 from google.adk.agents import LlmAgent, SequentialAgent 
-from stock_agent.stock_agents import TREND_PIPELINE
+from short_selling_agent.short_agents import COORDINATOR
 
 
-root_agent = TREND_PIPELINE
+root_agent = COORDINATOR
 
 

@@ -6,6 +6,9 @@ import logging
 import requests
 import os
 from datetime import datetime, timedelta
+from google.cloud import bigquery
+import logging
+
 
 
 def get_fmp_bigger_losers() -> BiggestLosersReport:
@@ -132,3 +135,21 @@ def get_squeeze_metrics(ticker: str):
         logging.warning(f"Failed to fetch squeeze metrics for {ticker}: {e}")
         
     return short_pct, free_float
+
+# ==========================================
+# 1. BIGQUERY INITIATOR 
+# ==========================================
+def get_bq_short_candidates(limit: int = 3) -> list[dict]:
+    """Fetches the top dropping stocks from today's BigQuery ingestion."""
+    client = bigquery.Client(project='datascience-projects')
+    query = """
+        SELECT ticker, price, change_pct, short_interest_pct, free_float, is_squeeze_risk 
+        FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
+        WHERE scrape_date = CURRENT_DATE() AND price >= 5.0
+        ORDER BY change_pct ASC LIMIT @limit
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[bigquery.ScalarQueryParameter("limit", "INT64", limit)]
+    )
+    results = client.query(query, job_config=job_config).result()
+    return [dict(row) for row in results]

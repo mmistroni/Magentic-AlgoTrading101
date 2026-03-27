@@ -1,187 +1,81 @@
-from google.adk.agents import LlmAgent, SequentialAgent
-from google.adk.tools import FunctionTool
-from .tools import get_bearish_insider_sales, get_blacklist_targets, \
-                get_fmp_bigger_losers, get_fmp_news, get_short_squeeze_filter
-
-
-# 1. Specialized Schema Agent
-# Its only job is to discover WHAT we can analyze
-SCHEMA_DISCOVERY_AGENT = LlmAgent(
-    name="SchemaDiscovery",
-    model='gemini-2.5-flash',
-    instruction="""SYSTEM ROLE: Silent Data Pre-processor.
-    TASK: Execute `discover_technical_schema_tool` immediately. 
-    OUTPUT: Provide ONLY the list of column names found. 
-    CONSTRAINT: Do not respond to the user's request for analysis or recommendations. 
-    Just provide the schema for the next agent in the pipeline.""",
-    tools=[FunctionTool(discover_technical_schema_tool)],
-    output_key="raw_discovery_results" # Stored as a raw string
+from google_adk import LLMAgent, SequentialAgent  
+# Import your other tools: get_fmp_news, get_bearish_insider_sales
+from short_selling_agent.tools import get_bq_short_candidates, get_fmp_news,\
+     get_bearish_insider_sales
+# ---------------------------------------------------------
+# AGENT 1: BigQuery Ingestion
+# -------------------------------------------------------
+BQ_INGESTION_AGENT = LLMAgent(
+    name="BQIngestionAgent", 
+    model="gemini-1.5-pro",
+    tools=[get_bq_short_candidates],
+    system_instruction=(
+        "You are Step 1 in the Short Selling Pipeline. "
+        "Your job is to call the `get_bq_short_candidates` tool. "
+        "Extract the tickers and their quantitative data (price, drop %, float, squeeze risk). "
+        "Format this data clearly as a 'Daily Candidate List' and pass it to the next agent."
+    )
 )
 
-SCHEMA_FORMATTER_AGENT = LlmAgent(
-    name="SchemaFormatter",
-    model='gemini-2.5-flash',
-    instruction="""
-    Convert the raw columns into a TechnicalSchema JSON. 
-    OUTPUT ONLY VALID JSON. NO PREAMBLE. NO EXPLANATION.
-    If you cannot find indicators, return an empty list for indicators.
-    """,
-    output_schema=TechnicalSchema,
-    output_key="available_schema"
+# ---------------------------------------------------------
+# AGENT 2: News Analyst
+# ---------------------------------------------------------
+NEWS_ANALYST_AGENT = LLMAgent(
+    name="NewsAnalystAgent",
+    model="gemini-1.5-pro",
+    tools=[get_fmp_news],
+    system_instruction=(
+        "You are Step 2 in the Short Selling Pipeline. "
+        "You will receive a 'Daily Candidate List' containing several tickers from the previous step. "
+        "For EACH ticker on the list, you MUST call the `get_fmp_news` tool. "
+        "Write a brief 'Catalyst Summary' for each ticker explaining why it dropped today. "
+        "APPEND your news summaries to the original candidate list, and pass the combined dossier forward."
+    )
 )
 
-SCHEMA_UNIT = SequentialAgent(
-    name="SchemaUnit",
+# ---------------------------------------------------------
+# AGENT 3: Insider Analyst
+# ---------------------------------------------------------
+INSIDER_ANALYST_AGENT = LLMAgent(
+    name="InsiderAnalystAgent",
+    model="gemini-1.5-pro",
+    tools=[get_bearish_insider_sales],
+    system_instruction=(
+        "You are Step 3 in the Short Selling Pipeline. "
+        "You will receive a dossier containing tickers, market data, and news catalysts. "
+        "For EACH ticker in the dossier, call the `get_bearish_insider_sales` tool. "
+        "Check if C-Suite executives are dumping stock. "
+        "APPEND your 'Insider Conviction Summary' for each ticker to the dossier, and pass it to the Lead Quant."
+    )
+)
+
+# ---------------------------------------------------------
+# AGENT 4: Quant Coordinator (Final Decision)
+# ---------------------------------------------------------
+QUANT_COORDINATOR_AGENT = LLMAgent(
+    name="LeadQuantTrader",
+    model="gemini-1.5-pro",
+    tools=[], # No tools needed, just reasoning
+    system_instruction=(
+        "You are the final step: The Lead Quant Trader. "
+        "You will receive a massive dossier from your junior analysts containing: "
+        "1. BQ Market Data, 2. News Catalysts, 3. Insider Dumping Data for today's worst performing stocks. "
+        "Your job is to synthesize all of this. "
+        "For EACH stock, write a final 'Short Report'. "
+        "Assign a Conviction Score (1-10) and give a final verdict: [SHORT, AVOID, or COVER]. "
+        "If 'is_squeeze_risk' is True, be highly skeptical unless the news is devastating."
+    )
+)
+
+# ---------------------------------------------------------
+# BUILD THE PIPELINE
+# ---------------------------------------------------------
+SHORT_SELLING_PIPELINE = SequentialAgent(
+    name="ShortSellingPipeline_V1",
     sub_agents=[
-        SCHEMA_DISCOVERY_AGENT, 
-        SCHEMA_FORMATTER_AGENT
-    ]
-    # In a SequentialAgent, the final state of the last sub-agent 
-    # (available_schema) is what gets returned to the caller.
-)
-
-
-
-
-# 2. Specialized Analysis Agent
-# It picks up the {available_schema} from the state
-# --- The Refined Autonomous Instructions ---
-AUTONOMOUS_QUANT_INSTRUCTION = """
-from google.adk.agents import LlmAgent, SequentialAgent
-from google.adk.tools import FunctionTool
-from stock_agent.tools import (
-    discover_technical_schema_tool,
-    fetch_technical_snapshot_tool
-)
-from stock_agent.models import TechnicalSchema
-from stock_agent.models import TrendSignal
-
-# 1. Specialized Schema Agent
-# Its only job is to discover WHAT we can analyze
-SCHEMA_DISCOVERY_AGENT = LlmAgent(
-    name="SchemaDiscovery",
-    model='gemini-2.5-flash',
-    instruction="""SYSTEM ROLE: Silent Data Pre-processor.
-    TASK: Execute `discover_technical_schema_tool` immediately. 
-    OUTPUT: Provide ONLY the list of column names found. 
-    CONSTRAINT: Do not respond to the user's request for analysis or recommendations. 
-    Just provide the schema for the next agent in the pipeline.""",
-    tools=[FunctionTool(discover_technical_schema_tool)],
-    output_key="raw_discovery_results" # Stored as a raw string
-)
-
-SCHEMA_FORMATTER_AGENT = LlmAgent(
-    name="SchemaFormatter",
-    model='gemini-2.5-flash',
-    instruction="""
-    Convert the raw columns into a TechnicalSchema JSON. 
-    OUTPUT ONLY VALID JSON. NO PREAMBLE. NO EXPLANATION.
-    If you cannot find indicators, return an empty list for indicators.
-    """,
-    output_schema=TechnicalSchema,
-    output_key="available_schema"
-)
-
-SCHEMA_UNIT = SequentialAgent(
-    name="SchemaUnit",
-    sub_agents=[
-        SCHEMA_DISCOVERY_AGENT, 
-        SCHEMA_FORMATTER_AGENT
-    ]
-    # In a SequentialAgent, the final state of the last sub-agent 
-    # (available_schema) is what gets returned to the caller.
-)
-
-
-
-
-# 2. Specialized Analysis Agent
-# It picks up the {available_schema} from the state
-# --- The Refined Autonomous Instructions ---
-AUTONOMOUS_QUANT_INSTRUCTION = """
-## System Instructions: Strategic Stock Analyst
-
-**Role**: Senior Quantitative Analyst. You prioritize **Volume-Price Confirmation** over simple oscillators.
-
-### 1. Indicator Hierarchy
-You are provided with 18 indicators. Categorize and weight them as follows:
-* **Primary (Trend)**: `SMA20`, `SMA50`, `SMA200`, `slope`, `trend_velocity_gap`.
-* **Confirmation (Volume)**: `current_obv`, `prev_obv`, `obv_historical`, `current_cmf`, `previous_cmf`.
-* **Filter (Context)**: `choppiness`, `spx_choppiness`.
-* **Timing (Momentum)**: `RSI`, `demarker`.
-
-### 2. Execution Logic (Strict Gating)
-
-**Step A: Market Regime (The Filter)**
-* If `choppiness` > 60 OR `spx_choppiness` > 60: Market is "Range-Bound." Do not issue BUY/SELL unless Volume is at a 20-day high (check `obv_historical`).
-
-**Step B: Trend Bias (The Direction)**
-* **Bullish Bias**: Price > SMA50 AND `slope` > 0.
-* **Bearish Bias**: Price < SMA50 AND `slope` < 0.
-* **Velocity**: If `trend_velocity_gap` is increasing compared to recent values, the trend is accelerating.
-
-**Step C: Volume Integrity (The Validator)**
-* **BUY Condition**: Must have (Bullish Bias) AND (rising OBV trend in `obv_historical` OR `current_cmf` > 0). 
-* **Divergence Warning**: If Price is rising but `current_obv` < `prev_obv`, mark as "Divergent" and issue **HOLD**.
-
-**Step D: Momentum (The Entry/Exit)**
-* **Strength Rule**: In a Strong Bullish Bias, ignore RSI "Overbought" (60-75). Only SELL if RSI > 80.
-* **Mean Reversion**: In a "Neutral" trend, use RSI < 35 for BUY and RSI > 65 for SELL.
-
-### 3. Output Requirements
-For every symbol, provide:
-* **Trend Status**: (Bullish/Bearish/Neutral)
-* **Volume Confirmation**: (Confirmed/Divergent/Insufficient Data)
-* **Final Recommendation**: (BUY/SELL/HOLD)
-* **Technical Justification**: Explicitly cite which indicators from the schema (e.g., `trend_velocity_gap`, `cmf`) drove the decision. Mention if any data was missing (N/A) and how you compensated.
-
-"""
-
-# --- Updated Agent Configuration ---
-QUANT_ANALYZER = LlmAgent(
-    name="QuantAnalyzer",
-    model='gemini-2.5-flash', # Optimized for Dec 2025 multi-step reasoning
-    instruction=AUTONOMOUS_QUANT_INSTRUCTION,
-    tools=[
-        FunctionTool(fetch_technical_snapshot_tool)
-        ],
-    #output_schema=TrendSignal, # Enforces the Pydantic contract we defined
-    output_key='final_trade_signal'
-)
-
-
-# 3. The Unstoppable Pipeline
-# We replace the LlmAgent 'TrendStrategist' with a SequentialAgent.
-# This FORCES the handoff without needing an orchestrator prompt.
-TREND_PIPELINE = SequentialAgent(
-    name="TrendStrategist",
-    sub_agents=[
-        SCHEMA_UNIT,   # Step 1: Discover & Format
-        QUANT_ANALYZER # Step 2: Analyze (will now finally be called)
-    ]
-)
-"""
-
-# --- Updated Agent Configuration ---
-QUANT_ANALYZER = LlmAgent(
-    name="QuantAnalyzer",
-    model='gemini-2.5-flash', # Optimized for Dec 2025 multi-step reasoning
-    instruction=AUTONOMOUS_QUANT_INSTRUCTION,
-    tools=[
-        FunctionTool(fetch_technical_snapshot_tool)
-        ],
-    #output_schema=TrendSignal, # Enforces the Pydantic contract we defined
-    output_key='final_trade_signal'
-)
-
-
-# 3. The Unstoppable Pipeline
-# We replace the LlmAgent 'TrendStrategist' with a SequentialAgent.
-# This FORCES the handoff without needing an orchestrator prompt.
-TREND_PIPELINE = SequentialAgent(
-    name="TrendStrategist",
-    sub_agents=[
-        SCHEMA_UNIT,   # Step 1: Discover & Format
-        QUANT_ANALYZER # Step 2: Analyze (will now finally be called)
+        BQ_INGESTION_AGENT,          # Step 1: Gets tickers from BQ
+        NEWS_ANALYST_AGENT,          # Step 2: Adds News for all tickers
+        INSIDER_ANALYST_AGENT,       # Step 3: Adds Insiders for all tickers
+        QUANT_COORDINATOR_AGENT      # Step 4: Final verdict on all tickers
     ]
 )
