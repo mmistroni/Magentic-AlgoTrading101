@@ -2,27 +2,10 @@
 from .finviz_tools import get_short_squeeze_filter 
 from .schemas import BiggestLosersReport, InsiderTrade, BlacklistReport, MarketLoser, \
     StockNewsReport, InsiderTradingReport, NewsArticle
-
 import logging
 import requests
 import os
 from datetime import datetime, timedelta
-
-
-def get_blacklist_targets() -> BlacklistReport:
-    """
-    Fetches a list of highly shorted, low-float stocks that pose a massive "short squeeze" risk.
-    AGENT INSTRUCTIONS: Use this to get the 'Danger List'. Do not short these stocks.
-    """
-    logging.info("Step 1: Scraping Finviz for Squeeze Blacklist...")
-    try:
-        finviz_screens = get_short_squeeze_filter()
-        tickers = [data['ticker'].strip() for data in finviz_screens if 'ticker' in data]
-        logging.info(f'Fetched {len(tickers)} from blacklist')
-        return BlacklistReport(tickers=tickers)
-    except Exception as e:
-        logging.error(f"Error scraping Finviz Blacklist: {e}")
-        raise e
 
 
 def get_fmp_bigger_losers() -> BiggestLosersReport:
@@ -125,9 +108,6 @@ def get_bearish_insider_sales(ticker: str, days_back: int = 180, min_value: int 
     except Exception as e:
         logging.error(f"Error processing Form 4 data: {str(e)}")
         return InsiderTradingReport(ticker=ticker, total_dollars_dumped=0.0, significant_sales=[], error_message=str(e))
-
-import requests
-import logging
 
 def get_squeeze_metrics(ticker: str):
     """Fetches Float and Short Interest from FMP for historical tracking."""
