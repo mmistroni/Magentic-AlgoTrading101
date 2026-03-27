@@ -125,3 +125,30 @@ def get_bearish_insider_sales(ticker: str, days_back: int = 180, min_value: int 
     except Exception as e:
         logging.error(f"Error processing Form 4 data: {str(e)}")
         return InsiderTradingReport(ticker=ticker, total_dollars_dumped=0.0, significant_sales=[], error_message=str(e))
+
+import requests
+import logging
+
+def get_squeeze_metrics(ticker: str):
+    """Fetches Float and Short Interest from FMP for historical tracking."""
+    short_pct = 0.0
+    free_float = 999999999.0
+    
+    try:
+        api_key = os.environ['FMP_API_KEY']
+        # 1. Get Short Interest
+        short_url = f"https://financialmodelingprep.com/api/v4/stock-short-interest?symbol={ticker}&apikey={api_key}"
+        short_data = requests.get(short_url).json()
+        if short_data and isinstance(short_data, list):
+            short_pct = float(short_data[0].get('shortPercentOfFloat', 0))
+            
+        # 2. Get Float
+        float_url = f"https://financialmodelingprep.com/api/v4/shares_float?symbol={ticker}&apikey={api_key}"
+        float_data = requests.get(float_url).json()
+        if float_data and isinstance(float_data, list):
+            free_float = float(float_data[0].get('freeFloat', 999999999))
+            
+    except Exception as e:
+        logging.warning(f"Failed to fetch squeeze metrics for {ticker}: {e}")
+        
+    return short_pct, free_float
