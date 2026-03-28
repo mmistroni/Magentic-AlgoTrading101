@@ -1,4 +1,4 @@
-from google_adk import LLMAgent, SequentialAgent  
+from google.adk.agents import LlmAgent, SequentialAgent  
 from short_selling_agent.stage_tools import (
     tool_fetch_bq_candidates, 
     tool_stage_news, 
@@ -9,7 +9,7 @@ from short_selling_agent.stage_tools import (
 # ---------------------------------------------------------
 # AGENT 1: BigQuery Ingestion
 # ---------------------------------------------------------
-BQ_INGESTION_AGENT = LLMAgent(
+BQ_INGESTION_AGENT = LlmAgent(
     name="BQIngestionAgent", 
     model="gemini-1.5-pro",
     tools=[tool_fetch_bq_candidates], # EXACTLY ONE TOOL
@@ -23,7 +23,7 @@ BQ_INGESTION_AGENT = LLMAgent(
 # ---------------------------------------------------------
 # AGENT 2: News Analyst
 # ---------------------------------------------------------
-NEWS_ANALYST_AGENT = LLMAgent(
+NEWS_ANALYST_AGENT = LlmAgent(
     name="NewsAnalystAgent",
     model="gemini-1.5-pro",
     tools=[tool_stage_news], # EXACTLY ONE TOOL
@@ -39,7 +39,7 @@ NEWS_ANALYST_AGENT = LLMAgent(
 # ---------------------------------------------------------
 # AGENT 3: Insider Analyst
 # ---------------------------------------------------------
-INSIDER_ANALYST_AGENT = LLMAgent(
+INSIDER_ANALYST_AGENT = LlmAgent(
     name="InsiderAnalystAgent",
     model="gemini-1.5-pro",
     tools=[tool_stage_insiders], # EXACTLY ONE TOOL
@@ -55,7 +55,7 @@ INSIDER_ANALYST_AGENT = LLMAgent(
 # ---------------------------------------------------------
 # AGENT 4: Quant Coordinator (Final Decision)
 # ---------------------------------------------------------
-QUANT_COORDINATOR_AGENT = LLMAgent(
+QUANT_COORDINATOR_AGENT = LlmAgent(
     name="LeadQuantTrader",
     model="gemini-1.5-pro",
     tools=[tool_read_full_dossier], # EXACTLY ONE TOOL
