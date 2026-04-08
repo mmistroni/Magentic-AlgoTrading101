@@ -8,15 +8,44 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 
 # 1. Import your actual pipeline
-# (Update 'your_module' to your actual project structure)
-from congress_trades_agent.congress_agents import CONGRESS_PIPELINE
+from congress_trades_agent.agent import CONGRESS_PIPELINE
 
-# 2. IMPORT YOUR MOCK TOOLS DIRECTLY FROM YOUR FILE
-from mock_tools import (
-    fetch_political_signals_tool as mock_fetch_political,
-    fetch_form4_signals_tool as mock_fetch_form4,
-    check_fundamentals_tool as mock_check_fundamentals
-)
+# =============================================================================
+# INLINE MOCK FUNCTIONS (No need for external mock_tools.py!)
+# =============================================================================
+
+def mock_fetch_congress(analysis_date: str):
+    print(f"Mocking Congress signals for {analysis_date}")
+    return json.dumps([
+        {"ticker": "BE", "net_buy_activity": 85, "market_uptrend": True},
+        {"ticker": "MOH", "net_buy_activity": 15, "market_uptrend": False},
+        {"ticker": "EQIX", "net_buy_activity": 50, "market_uptrend": True}
+    ])
+
+def mock_check_fundamentals(ticker: str):
+    print(f"Mocking fundamentals for {ticker}")
+    db = {
+        "BE": {"ticker": "BE", "sector": "Technology", "forward_pe": 25, "debt_to_equity": 50, "market_cap_B": 10},
+        "MOH": {"ticker": "MOH", "sector": "Healthcare", "forward_pe": 15, "debt_to_equity": 80, "market_cap_B": 5},
+        "EQIX": {"ticker": "EQIX", "sector": "Real Estate", "forward_pe": 60, "debt_to_equity": 250, "market_cap_B": 80} # High Debt + High PE = Trap
+    }
+    return json.dumps(db.get(ticker.upper(), {"error": "Not Found"}))
+
+def mock_fetch_form4(ticker: str, analysis_date: str=""):
+    print(f"Mocking Form 4 for {ticker}")
+    db = {
+        "BE": {"ticker": "BE", "insider_title": "CEO", "transaction_type": "Buy", "signal_strength": "Strong"},
+        "MOH": {"ticker": "MOH", "insider_title": "CFO", "transaction_type": "Sell", "signal_strength": "Warning"},
+    }
+    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "signal_strength": "Neutral"}))
+
+def mock_fetch_lobbying(ticker: str):
+    print(f"Mocking Lobbying for {ticker}")
+    db = {
+        "BE": {"ticker": "BE", "total_spend_last_12m": 5000000, "top_lobbied_issues": "Green Energy Subsidies"},
+    }
+    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "lobbying_status": "No activity"}))
+
 
 # =============================================================================
 # FIXTURES
@@ -51,12 +80,13 @@ def alpha_workflow_runner(cleanup_temp_data):
 async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner):
     runner, session_service = alpha_workflow_runner 
 
-    # --- PATCH THE REAL TOOLS WITH YOUR IMPORTED MOCKS ---
-    # This tells pytest: "When the agent tries to call the real tool, 
-    # run the mock tool we imported from mock_tools.py instead!"
-    mocker.patch('your_module.tools.fetch_political_signals_tool', side_effect=mock_fetch_political)
-    mocker.patch('your_module.tools.fetch_form4_signals_tool', side_effect=mock_fetch_form4)
-    mocker.patch('your_module.tools.check_fundamentals_tool', side_effect=mock_check_fundamentals)
+    # --- PATCH THE REAL TOOLS WITH OUR INLINE MOCKS ---
+    # Note: These paths must match exactly where the tools are imported in agent.py
+    mocker.patch('congress_trades_agent.tools.fetch_congress_signals_tool', side_effect=mock_fetch_congress)
+    mocker.patch('congress_trades_agent.tools.check_fundamentals_tool', side_effect=mock_check_fundamentals)
+    
+    mocker.patch('congress_trades_agent.extra_tools.fetch_form4_signals_tool', side_effect=mock_fetch_form4)
+    mocker.patch('congress_trades_agent.extra_tools.fetch_lobbying_signals_tool', side_effect=mock_fetch_lobbying)
 
     session_id = "test_session_alpha_003"
     user_id = "test_quant"
@@ -109,7 +139,7 @@ async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner
 
     actions = {trade["ticker"]: trade["action"] for trade in trade_plan}
     
-    # 🎯 Verify against your specific mock_tools.py logic
+    # 🎯 Verify against our mock logic
     assert "BUY" in actions["BE"], "Agent failed to buy the Golden Confluence stock (BE)!"
     assert actions["MOH"] == "PASS", "Agent mistakenly bought a FALLING KNIFE (MOH)!"
     assert actions["EQIX"] == "PASS", "Agent ignored the Safety Rails and bought EQIX!"
