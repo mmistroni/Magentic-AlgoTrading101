@@ -175,3 +175,116 @@ async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner
     assert "PASS" in actions["EQIX"], f"Agent ignored the Safety Rails and bought EQIX! Action was: {actions['EQIX']}"
 
     print("✅ All Agent Logic and Guardrails passed successfully!")
+
+
+# =============================================================================
+# DEEP MOCKS: EDGE CASES (JPM, GHOST, AAPL)
+# =============================================================================
+
+def mock_get_bq_data_edge_cases(analysis_date: str) -> list:
+    print(f"\n---> 🛑 BQ MOCK HIT: Returning Edge Case signals for {analysis_date}")
+    return [
+        {"ticker": "JPM", "net_buy_activity": 45, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        {"ticker": "GHOST", "net_buy_activity": 30, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        {"ticker": "AAPL", "net_buy_activity": 25, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date}
+    ]
+
+class MockYFTickerEdgeCases:
+    def __init__(self, ticker):
+        self.ticker = ticker
+        
+        # Simulate Yahoo Finance missing a ticker
+        if ticker.upper() == "GHOST":
+            raise Exception("Simulated API Failure - Data Unavailable")
+            
+        db = {
+            "JPM": {"sector": "Financial Services", "industry": "Banks", "marketCap": 500_000_000_000, "beta": 1.1, "forwardPE": 12, "debtToEquity": 450}, # INTENTIONAL HIGH DEBT
+            "AAPL": {"sector": "Technology", "industry": "Consumer Electronics", "marketCap": 3_000_000_000_000, "beta": 1.2, "forwardPE": 28, "debtToEquity": 140},
+        }
+        self.info = db.get(ticker.upper(), {"sector": "Unknown", "marketCap": 0, "beta": 1.0, "forwardPE": 10, "debtToEquity": 10})
+        print(f"---> 🛑 YFINANCE MOCK HIT: Returning fundamentals for {ticker}")
+
+class MockLobbyingQueryEdgeCases:
+    def __init__(self, ticker):
+        self.ticker = ticker
+    def result(self):
+        # Only JPM gets lobbying data here
+        if self.ticker == "JPM":
+            class Row:
+                ticker = "JPM"
+                client_name = "JPMorgan Chase"
+                total_spend = 2000000
+                latest_filing = "2024-10-01"
+                number_of_filings = 2
+                top_issues = "Banking Regulations"
+            return [Row()]
+        return []
+
+class MockLobbyingClientEdgeCases:
+    def __init__(self, *args, **kwargs): 
+        pass
+    def query(self, query, job_config=None):
+        ticker = job_config.query_parameters[0].value
+        return MockLobbyingQueryEdgeCases(ticker)
+
+
+# =============================================================================
+# INTEGRATION TEST 2: EDGE CASES & RESILIENCE
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_alpha_pipeline_edge_cases(mocker, alpha_workflow_runner):
+    """Tests Agent resilience to missing data and nuanced sector exemptions."""
+    runner, session_service = alpha_workflow_runner 
+
+    # 🎯 PATCH WITH THE EDGE CASE MOCKS
+    mocker.patch('congress_trades_agent.tools._get_bq_data', side_effect=mock_get_bq_data_edge_cases)
+    mocker.patch('congress_trades_agent.tools.yf.Ticker', side_effect=MockYFTickerEdgeCases)
+    mocker.patch('congress_trades_agent.extra_tools.bigquery.Client', side_effect=MockLobbyingClientEdgeCases)
+
+    session_id = "test_session_edge_001"
+    user_id = "test_quant"
+    app_name = "AlphaTradingApp"
+    test_prompt = "Run the Alpha strategy for 2024-10-15."
+
+    await session_service.create_session(
+        app_name=app_name, session_id=session_id, user_id=user_id, state={} 
+    )
+    
+    user_content = types.Content(role='user', parts=[types.Part.from_text(text=test_prompt)])
+    final_events_generator = runner.run_async( 
+        user_id=user_id, session_id=session_id, new_message=user_content 
+    )
+    
+    print("\n" + "="*70)
+    print("🕵️ TRACE: Edge Case Testing")
+    print("="*70)
+
+    # Let the pipeline run silently for this test
+    async for event in final_events_generator:
+        pass 
+
+    # Fetch final state
+    final_session = await session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
+    final_plan_str = final_session.state.get('final_trade_plan')
+    
+    clean_json_str = final_plan_str.replace("```json", "").replace("```", "").strip()
+    trade_plan = json.loads(clean_json_str)
+
+    actions = {trade["ticker"]: trade["action"] for trade in trade_plan}
+    print(f"######----- Returned Edge Case Actions: {actions} -----")
+    
+    # 🎯 Pattern 1: Sector Exemption Test (Bank Debt)
+    assert "JPM" in actions, "Agent entirely skipped JPM!"
+    assert "BUY" in actions["JPM"], f"Agent failed the Sector Exemption! It rejected JPM due to high debt despite being a Bank. Action: {actions['JPM']}"
+
+    # 🎯 Pattern 2: Missing Data Resilience Test (Broken API)
+    assert "GHOST" in actions, "Agent entirely skipped GHOST!"
+    assert "PASS" in actions["GHOST"], f"Agent recklessly bought GHOST despite missing fundamental safety data! Action: {actions['GHOST']}"
+
+    # 🎯 Pattern 3: Baseline Normal Buy Test (No extreme signals)
+    assert "AAPL" in actions, "Agent entirely skipped AAPL!"
+    assert "STRONG" not in actions["AAPL"], "Agent hallucinated a Strong Buy for AAPL despite missing Golden Confluence (no lobbying/insiders)!"
+    assert "BUY" in actions["AAPL"] or "HOLD" in actions["AAPL"], f"Agent failed to issue a baseline buy/hold for AAPL. Action: {actions['AAPL']}"
+
+    print("✅ All Edge Cases and Resilience logic passed successfully!")
