@@ -7,44 +7,66 @@ from google.genai import types
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 
-# 1. Import your actual pipeline
-from congress_trades_agent.agent import CONGRESS_PIPELINE
+# Import your actual pipeline
+from congress_trades_agent.congress_agents import CONGRESS_PIPELINE
+
 
 # =============================================================================
-# INLINE MOCK FUNCTIONS (No need for external mock_tools.py!)
+# DEEP MOCKS (Intercepting the APIs, NOT the Tool Pointers)
 # =============================================================================
 
-def mock_fetch_congress(analysis_date: str):
-    print(f"Mocking Congress signals for {analysis_date}")
-    return json.dumps([
-        {"ticker": "BE", "net_buy_activity": 85, "market_uptrend": True},
-        {"ticker": "MOH", "net_buy_activity": 15, "market_uptrend": False},
-        {"ticker": "EQIX", "net_buy_activity": 50, "market_uptrend": True}
-    ])
+# 1. Mock the internal BigQuery helper for Congress Signals
+def mock_get_bq_data(analysis_date: str) -> list:
+    print(f"\n---> 🛑 BQ MOCK HIT: Returning 3 Congress signals for {analysis_date}")
+    return [
+        {"ticker": "BE", "net_buy_activity": 85, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        {"ticker": "MOH", "net_buy_activity": 15, "market_uptrend": False, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        {"ticker": "EQIX", "net_buy_activity": 50, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date}
+    ]
 
-def mock_check_fundamentals(ticker: str):
-    print(f"Mocking fundamentals for {ticker}")
-    db = {
-        "BE": {"ticker": "BE", "sector": "Technology", "forward_pe": 25, "debt_to_equity": 50, "market_cap_B": 10},
-        "MOH": {"ticker": "MOH", "sector": "Healthcare", "forward_pe": 15, "debt_to_equity": 80, "market_cap_B": 5},
-        "EQIX": {"ticker": "EQIX", "sector": "Real Estate", "forward_pe": 60, "debt_to_equity": 250, "market_cap_B": 80} # High Debt + High PE = Trap
-    }
-    return json.dumps(db.get(ticker.upper(), {"error": "Not Found"}))
+# 2. Mock yfinance.Ticker to prevent internet calls in Fundamentals Tool
+class MockYFTicker:
+    def __init__(self, ticker):
+        self.ticker = ticker
+        db = {
+            "BE": {"sector": "Technology", "industry": "Software", "marketCap": 10_000_000_000, "beta": 1.5, "forwardPE": 25, "debtToEquity": 50},
+            "MOH": {"sector": "Healthcare", "industry": "Medical", "marketCap": 5_000_000_000, "beta": 0.8, "forwardPE": 15, "debtToEquity": 80},
+            "EQIX": {"sector": "Real Estate", "industry": "REIT", "marketCap": 80_000_000_000, "beta": 1.1, "forwardPE": 60, "debtToEquity": 250}
+        }
+        # Provide fallback if ticker isn't in DB
+        self.info = db.get(ticker.upper(), {"sector": "Unknown", "marketCap": 0, "beta": 1.0, "forwardPE": 10, "debtToEquity": 10})
+        print(f"---> 🛑 YFINANCE MOCK HIT: Returning fundamentals for {ticker}")
 
-def mock_fetch_form4(ticker: str, analysis_date: str=""):
-    print(f"Mocking Form 4 for {ticker}")
-    db = {
-        "BE": {"ticker": "BE", "insider_title": "CEO", "transaction_type": "Buy", "signal_strength": "Strong"},
-        "MOH": {"ticker": "MOH", "insider_title": "CFO", "transaction_type": "Sell", "signal_strength": "Warning"},
-    }
-    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "signal_strength": "Neutral"}))
+# 3. Mock BigQuery Client specifically for the Lobbying Tool
+class MockLobbyingRow:
+    def __init__(self, ticker):
+        self.ticker = ticker
+        self.client_name = f"{ticker} Corp"
+        self.total_spend = 5000000 if ticker == "BE" else 0
+        self.latest_filing = "2024-10-01"
+        self.number_of_filings = 5
+        self.top_issues = "Green Energy Subsidies" if ticker == "BE" else "None"
 
-def mock_fetch_lobbying(ticker: str):
-    print(f"Mocking Lobbying for {ticker}")
-    db = {
-        "BE": {"ticker": "BE", "total_spend_last_12m": 5000000, "top_lobbied_issues": "Green Energy Subsidies"},
-    }
-    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "lobbying_status": "No activity"}))
+class MockLobbyingQuery:
+    def __init__(self, ticker):
+        self.ticker = ticker
+    def result(self):
+        # Only return results for BE to test confluence logic
+        if self.ticker == "BE":
+            return [MockLobbyingRow(self.ticker)]
+        return []
+
+class MockLobbyingClient:
+    def __init__(self, *args, **kwargs): 
+        pass
+    def query(self, query, job_config=None):
+        # Safely extract the ticker from the query parameters
+        ticker = job_config.query_parameters[0].value
+        print(f"---> 🛑 LOBBYING BQ MOCK HIT: Returning lobbying data for {ticker}")
+        return MockLobbyingQuery(ticker)
+
+# Note: We do NOT need to mock fetch_form4_signals_tool! 
+# Your extra_tools.py already has `mock_form4_db` built into the function natively!
 
 
 # =============================================================================
@@ -63,7 +85,6 @@ def cleanup_temp_data():
 
 @pytest.fixture
 def alpha_workflow_runner(cleanup_temp_data):
-    """Initializes the ADK Runner with our pipeline."""
     session_service = InMemorySessionService()
     runner = Runner(
         agent=CONGRESS_PIPELINE, 
@@ -71,6 +92,7 @@ def alpha_workflow_runner(cleanup_temp_data):
         app_name="AlphaTradingApp" 
     )
     return runner, session_service
+
 
 # =============================================================================
 # THE INTEGRATION TEST
@@ -80,15 +102,14 @@ def alpha_workflow_runner(cleanup_temp_data):
 async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner):
     runner, session_service = alpha_workflow_runner 
 
-    # --- PATCH THE REAL TOOLS WITH OUR INLINE MOCKS ---
-    # Note: These paths must match exactly where the tools are imported in agent.py
-    mocker.patch('congress_trades_agent.tools.fetch_congress_signals_tool', side_effect=mock_fetch_congress)
-    mocker.patch('congress_trades_agent.tools.check_fundamentals_tool', side_effect=mock_check_fundamentals)
-    
-    mocker.patch('congress_trades_agent.extra_tools.fetch_form4_signals_tool', side_effect=mock_fetch_form4)
-    mocker.patch('congress_trades_agent.extra_tools.fetch_lobbying_signals_tool', side_effect=mock_fetch_lobbying)
+    # -------------------------------------------------------------------------
+    # 🎯 APPLYING DEEP MOCKS
+    # -------------------------------------------------------------------------
+    mocker.patch('congress_trades_agent.tools._get_bq_data', side_effect=mock_get_bq_data)
+    mocker.patch('congress_trades_agent.tools.yf.Ticker', side_effect=MockYFTicker)
+    mocker.patch('congress_trades_agent.extra_tools.bigquery.Client', side_effect=MockLobbyingClient)
 
-    session_id = "test_session_alpha_003"
+    session_id = "test_session_alpha_004"
     user_id = "test_quant"
     app_name = "AlphaTradingApp"
     
@@ -117,12 +138,12 @@ async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner
             print(f"\n🚀 [AGENT HANDOFF]: {event.agent_call.agent_name}")
             
         if hasattr(event, 'tool_call'):
-            print(f"🛠️ [TOOL CALLED]: {event.tool_call.function_name}({event.tool_call.arguments})")
+            print(f"🛠️ [TOOL CALL ATTEMPT]: {event.tool_call.function_name}({event.tool_call.arguments})")
 
         if hasattr(event, 'model_response') and event.model_response:
             thought = event.model_response.text.strip()
             if thought:
-                print(f"🧠 [THOUGHT/OUTPUT]: {thought[:200]}...\n")
+                print(f"🧠 [AGENT THOUGHT]: {thought[:250]}...\n") 
 
     print("="*70)
 
@@ -130,18 +151,25 @@ async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner
     final_session = await session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
     final_state = final_session.state
     
+    print(f"\n📊 RAW STATE OUTPUT: {json.dumps(final_state, indent=2)}\n")
+
     final_plan_str = final_state.get('final_trade_plan')
-    assert final_plan_str is not None, "Trader failed to output a final plan!"
+    assert final_plan_str is not None, "Trader failed to output a final plan in state!"
     
-    # Extract JSON safely
     clean_json_str = final_plan_str.replace("```json", "").replace("```", "").strip()
     trade_plan = json.loads(clean_json_str)
 
     actions = {trade["ticker"]: trade["action"] for trade in trade_plan}
+    print(f"######----- Returned Actions: {actions} -----")
     
     # 🎯 Verify against our mock logic
-    assert "BUY" in actions["BE"], "Agent failed to buy the Golden Confluence stock (BE)!"
-    assert actions["MOH"] == "PASS", "Agent mistakenly bought a FALLING KNIFE (MOH)!"
-    assert actions["EQIX"] == "PASS", "Agent ignored the Safety Rails and bought EQIX!"
+    assert "BE" in actions, "Agent entirely skipped BE!"
+    assert actions["BE"] == "BUY", f"Agent failed to buy BE! It decided to: {actions['BE']}"
+    
+    assert "MOH" in actions, "Agent entirely skipped MOH!"
+    assert actions["MOH"] == "PASS", f"Agent mistakenly bought a FALLING KNIFE (MOH)! Action was: {actions['MOH']}"
+    
+    assert "EQIX" in actions, "Agent entirely skipped EQIX!"
+    assert actions["EQIX"] == "PASS", f"Agent ignored the Safety Rails and bought EQIX! Action was: {actions['EQIX']}"
 
     print("✅ All Agent Logic and Guardrails passed successfully!")
