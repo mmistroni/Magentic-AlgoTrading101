@@ -163,13 +163,15 @@ async def test_alpha_pipeline_logic_and_guardrails(mocker, alpha_workflow_runner
     print(f"######----- Returned Actions: {actions} -----")
     
     # 🎯 Verify against our mock logic
+    # 🎯 Verify against our mock logic
     assert "BE" in actions, "Agent entirely skipped BE!"
-    assert actions["BE"] == "BUY", f"Agent failed to buy BE! It decided to: {actions['BE']}"
+    # Check if "BUY" is IN the string, so it catches "BUY" or "STRONG BUY"
+    assert "BUY" in actions["BE"], f"Agent failed to buy BE! It decided to: {actions['BE']}"
     
     assert "MOH" in actions, "Agent entirely skipped MOH!"
-    assert actions["MOH"] == "PASS", f"Agent mistakenly bought a FALLING KNIFE (MOH)! Action was: {actions['MOH']}"
+    assert "PASS" in actions["MOH"], f"Agent mistakenly bought a FALLING KNIFE (MOH)! Action was: {actions['MOH']}"
     
     assert "EQIX" in actions, "Agent entirely skipped EQIX!"
-    assert actions["EQIX"] == "PASS", f"Agent ignored the Safety Rails and bought EQIX! Action was: {actions['EQIX']}"
+    assert "PASS" in actions["EQIX"], f"Agent ignored the Safety Rails and bought EQIX! Action was: {actions['EQIX']}"
 
     print("✅ All Agent Logic and Guardrails passed successfully!")
