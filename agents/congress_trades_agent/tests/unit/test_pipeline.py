@@ -288,3 +288,240 @@ async def test_alpha_pipeline_edge_cases(mocker, alpha_workflow_runner):
     assert "BUY" in actions["AAPL"] or "HOLD" in actions["AAPL"], f"Agent failed to issue a baseline buy/hold for AAPL. Action: {actions['AAPL']}"
 
     print("✅ All Edge Cases and Resilience logic passed successfully!")
+
+
+    # =============================================================================
+# DEEP MOCKS: MIXED CONFLICTING CASES (TRAP, BEAR, BUBB)
+# =============================================================================
+
+def mock_get_bq_data_mixed(analysis_date: str) -> list:
+    print(f"\n---> 🛑 BQ MOCK HIT: Returning Mixed signals for {analysis_date}")
+    return [
+        {"ticker": "TRAP", "net_buy_activity": 60, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        {"ticker": "BEAR", "net_buy_activity": 80, "market_uptrend": False, "signal_date": analysis_date, "last_trade_date": analysis_date}, # FALSE market regime
+        {"ticker": "BUBB", "net_buy_activity": 40, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date}
+    ]
+
+class MockYFTickerMixed:
+    def __init__(self, ticker):
+        self.ticker = ticker
+        db = {
+            "TRAP": {"sector": "Technology", "industry": "Software", "marketCap": 10_000_000_000, "beta": 1.2, "forwardPE": 20, "debtToEquity": 40},
+            "BEAR": {"sector": "Healthcare", "industry": "Medical", "marketCap": 20_000_000_000, "beta": 0.9, "forwardPE": 15, "debtToEquity": 50},
+            "BUBB": {"sector": "Technology", "industry": "AI", "marketCap": 5_000_000_000, "beta": 2.5, "forwardPE": 1000, "debtToEquity": 10}, # P/E is 1000! Bubble!
+        }
+        self.info = db.get(ticker.upper(), {"sector": "Unknown", "marketCap": 0, "beta": 1.0, "forwardPE": 10, "debtToEquity": 10})
+
+class MockLobbyingQueryMixed:
+    def __init__(self, ticker):
+        self.ticker = ticker
+    def result(self):
+        # Let's give TRAP and BEAR some lobbying to make them look like "Golden Signals" on the surface
+        if self.ticker in ["TRAP", "BEAR"]:
+            class Row:
+                ticker = self.ticker
+                client_name = f"{self.ticker} Corp"
+                total_spend = 3000000
+                latest_filing = "2024-10-01"
+                number_of_filings = 3
+                top_issues = "Tax Breaks"
+            return [Row()]
+        return []
+
+class MockLobbyingClientMixed:
+    def __init__(self, *args, **kwargs): pass
+    def query(self, query, job_config=None):
+        return MockLobbyingQueryMixed(job_config.query_parameters[0].value)
+
+def mock_fetch_form4_mixed(ticker: str, analysis_date: str=""):
+    """Custom Form4 Mock for Test 3 to force conflicting insider signals."""
+    db = {
+        "TRAP": {"ticker": "TRAP", "insider_title": "CFO", "transaction_type": "Sell", "signal_strength": "Warning - Insider Dumping"},
+        "BEAR": {"ticker": "BEAR", "insider_title": "CEO", "transaction_type": "Buy", "signal_strength": "Strong Buy Confluence"},
+        "BUBB": {"ticker": "BUBB", "insider_title": "Director", "transaction_type": "Hold", "signal_strength": "Neutral"}
+    }
+    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "signal_strength": "Neutral"}))
+
+
+# =============================================================================
+# INTEGRATION TEST 3: CONFLICTING SIGNALS & MACRO
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_alpha_pipeline_mixed_cases(mocker, alpha_workflow_runner):
+    """Tests Agent handling of conflicting signals, bad macro, and valuation bubbles."""
+    runner, session_service = alpha_workflow_runner 
+
+    # 🎯 PATCH WITH THE MIXED MOCKS
+    mocker.patch('congress_trades_agent.tools._get_bq_data', side_effect=mock_get_bq_data_mixed)
+    mocker.patch('congress_trades_agent.tools.yf.Ticker', side_effect=MockYFTickerMixed)
+    mocker.patch('congress_trades_agent.extra_tools.bigquery.Client', side_effect=MockLobbyingClientMixed)
+    # Patch the form4 tool specifically for this test so we can test the CFO dump
+    mocker.patch('congress_trades_agent.extra_tools.fetch_form4_signals_tool', side_effect=mock_fetch_form4_mixed)
+
+    session_id = "test_session_mixed_002"
+    user_id = "test_quant"
+    app_name = "AlphaTradingApp"
+    test_prompt = "Run the Alpha strategy for 2024-10-15."
+
+    await session_service.create_session(
+        app_name=app_name, session_id=session_id, user_id=user_id, state={} 
+    )
+    
+    user_content = types.Content(role='user', parts=[types.Part.from_text(text=test_prompt)])
+    final_events_generator = runner.run_async(user_id=user_id, session_id=session_id, new_message=user_content)
+    
+    print("\n" + "="*70)
+    print("🕵️ TRACE: Mixed Conflicting Cases Testing")
+    print("="*70)
+
+    # We will print the Agent's thoughts here because it's fascinating to see how it resolves conflicts
+    async for event in final_events_generator:
+        if hasattr(event, 'model_response') and event.model_response:
+            thought = event.model_response.text.strip()
+            if thought:
+                print(f"🧠 [THOUGHT]: {thought[:150]}...\n") 
+
+    final_session = await session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
+    final_plan_str = final_session.state.get('final_trade_plan')
+    
+    clean_json_str = final_plan_str.replace("```json", "").replace("```", "").strip()
+    trade_plan = json.loads(clean_json_str)
+    actions = {trade["ticker"]: trade["action"] for trade in trade_plan}
+    
+    print(f"######----- Returned Mixed Actions: {actions} -----")
+    
+    # 🎯 Pattern 1: The Trap (Insider Dumping)
+    assert "TRAP" in actions, "Agent skipped TRAP!"
+    assert "PASS" in actions["TRAP"], f"Agent bought TRAP despite CFO dumping shares! Action: {actions['TRAP']}"
+
+    # 🎯 Pattern 2: The Macro Headwind (Bear Market)
+    assert "BEAR" in actions, "Agent skipped BEAR!"
+    assert "STRONG BUY" not in actions["BEAR"], "Agent issued a Strong Buy in a Bear Market!"
+    assert "PASS" in actions["BEAR"] or "HOLD" in actions["BEAR"], f"Agent failed to respect bearish regime! Action: {actions['BEAR']}"
+
+    # 🎯 Pattern 3: Valuation Bubble (P/E 1000)
+    assert "BUBB" in actions, "Agent skipped BUBB!"
+    assert "BUY" not in actions["BUBB"], f"Agent bought a massive bubble (P/E 1000)! Action: {actions['BUBB']}"
+    assert "PASS" in actions["BUBB"] or "HOLD" in actions["BUBB"], "Agent should have passed on BUBB due to valuation."
+
+    print("✅ All Mixed Conflicting Cases passed successfully!")
+
+
+# =============================================================================
+# DEEP MOCKS: MIXED CONFLICTING CASES (TRAP, BEAR, BUBB)
+# =============================================================================
+
+def mock_get_bq_data_mixed(analysis_date: str) -> list:
+    print(f"\n---> 🛑 BQ MOCK HIT: Returning Mixed signals for {analysis_date}")
+    return [
+        {"ticker": "TRAP", "net_buy_activity": 60, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        {"ticker": "BEAR", "net_buy_activity": 80, "market_uptrend": False, "signal_date": analysis_date, "last_trade_date": analysis_date}, # FALSE market regime
+        {"ticker": "BUBB", "net_buy_activity": 40, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date}
+    ]
+
+class MockYFTickerMixed:
+    def __init__(self, ticker):
+        self.ticker = ticker
+        db = {
+            "TRAP": {"sector": "Technology", "industry": "Software", "marketCap": 10_000_000_000, "beta": 1.2, "forwardPE": 20, "debtToEquity": 40},
+            "BEAR": {"sector": "Healthcare", "industry": "Medical", "marketCap": 20_000_000_000, "beta": 0.9, "forwardPE": 15, "debtToEquity": 50},
+            "BUBB": {"sector": "Technology", "industry": "AI", "marketCap": 5_000_000_000, "beta": 2.5, "forwardPE": 1000, "debtToEquity": 10}, # P/E is 1000! Bubble!
+        }
+        self.info = db.get(ticker.upper(), {"sector": "Unknown", "marketCap": 0, "beta": 1.0, "forwardPE": 10, "debtToEquity": 10})
+
+class MockLobbyingQueryMixed:
+    def __init__(self, ticker):
+        self.ticker = ticker
+    def result(self):
+        # Let's give TRAP and BEAR some lobbying to make them look like "Golden Signals" on the surface
+        if self.ticker in ["TRAP", "BEAR"]:
+            class Row:
+                ticker = self.ticker
+                client_name = f"{self.ticker} Corp"
+                total_spend = 3000000
+                latest_filing = "2024-10-01"
+                number_of_filings = 3
+                top_issues = "Tax Breaks"
+            return [Row()]
+        return []
+
+class MockLobbyingClientMixed:
+    def __init__(self, *args, **kwargs): pass
+    def query(self, query, job_config=None):
+        return MockLobbyingQueryMixed(job_config.query_parameters[0].value)
+
+def mock_fetch_form4_mixed(ticker: str, analysis_date: str=""):
+    """Custom Form4 Mock for Test 3 to force conflicting insider signals."""
+    db = {
+        "TRAP": {"ticker": "TRAP", "insider_title": "CFO", "transaction_type": "Sell", "signal_strength": "Warning - Insider Dumping"},
+        "BEAR": {"ticker": "BEAR", "insider_title": "CEO", "transaction_type": "Buy", "signal_strength": "Strong Buy Confluence"},
+        "BUBB": {"ticker": "BUBB", "insider_title": "Director", "transaction_type": "Hold", "signal_strength": "Neutral"}
+    }
+    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "signal_strength": "Neutral"}))
+
+
+# =============================================================================
+# INTEGRATION TEST 3: CONFLICTING SIGNALS & MACRO
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_alpha_pipeline_mixed_cases(mocker, alpha_workflow_runner):
+    """Tests Agent handling of conflicting signals, bad macro, and valuation bubbles."""
+    runner, session_service = alpha_workflow_runner 
+
+    # 🎯 PATCH WITH THE MIXED MOCKS
+    mocker.patch('congress_trades_agent.tools._get_bq_data', side_effect=mock_get_bq_data_mixed)
+    mocker.patch('congress_trades_agent.tools.yf.Ticker', side_effect=MockYFTickerMixed)
+    mocker.patch('congress_trades_agent.extra_tools.bigquery.Client', side_effect=MockLobbyingClientMixed)
+    # Patch the form4 tool specifically for this test so we can test the CFO dump
+    mocker.patch('congress_trades_agent.extra_tools.fetch_form4_signals_tool', side_effect=mock_fetch_form4_mixed)
+
+    session_id = "test_session_mixed_002"
+    user_id = "test_quant"
+    app_name = "AlphaTradingApp"
+    test_prompt = "Run the Alpha strategy for 2024-10-15."
+
+    await session_service.create_session(
+        app_name=app_name, session_id=session_id, user_id=user_id, state={} 
+    )
+    
+    user_content = types.Content(role='user', parts=[types.Part.from_text(text=test_prompt)])
+    final_events_generator = runner.run_async(user_id=user_id, session_id=session_id, new_message=user_content)
+    
+    print("\n" + "="*70)
+    print("🕵️ TRACE: Mixed Conflicting Cases Testing")
+    print("="*70)
+
+    # We will print the Agent's thoughts here because it's fascinating to see how it resolves conflicts
+    async for event in final_events_generator:
+        if hasattr(event, 'model_response') and event.model_response:
+            thought = event.model_response.text.strip()
+            if thought:
+                print(f"🧠 [THOUGHT]: {thought[:150]}...\n") 
+
+    final_session = await session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
+    final_plan_str = final_session.state.get('final_trade_plan')
+    
+    clean_json_str = final_plan_str.replace("```json", "").replace("```", "").strip()
+    trade_plan = json.loads(clean_json_str)
+    actions = {trade["ticker"]: trade["action"] for trade in trade_plan}
+    
+    print(f"######----- Returned Mixed Actions: {actions} -----")
+    
+    # 🎯 Pattern 1: The Trap (Insider Dumping)
+    assert "TRAP" in actions, "Agent skipped TRAP!"
+    assert "PASS" in actions["TRAP"], f"Agent bought TRAP despite CFO dumping shares! Action: {actions['TRAP']}"
+
+    # 🎯 Pattern 2: The Macro Headwind (Bear Market)
+    assert "BEAR" in actions, "Agent skipped BEAR!"
+    assert "STRONG BUY" not in actions["BEAR"], "Agent issued a Strong Buy in a Bear Market!"
+    assert "PASS" in actions["BEAR"] or "HOLD" in actions["BEAR"], f"Agent failed to respect bearish regime! Action: {actions['BEAR']}"
+
+    # 🎯 Pattern 3: Valuation Bubble (P/E 1000)
+    assert "BUBB" in actions, "Agent skipped BUBB!"
+    assert "BUY" not in actions["BUBB"], f"Agent bought a massive bubble (P/E 1000)! Action: {actions['BUBB']}"
+    assert "PASS" in actions["BUBB"] or "HOLD" in actions["BUBB"], "Agent should have passed on BUBB due to valuation."
+
+    print("✅ All Mixed Conflicting Cases passed successfully!")
+
