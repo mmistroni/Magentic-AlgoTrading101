@@ -5,7 +5,7 @@
         "context": "." 
     },
     "containerEnv": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/${localWorkspaceFolderBasename}/GCP_Experiments/gcp_key.json",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/${localWorkspaceFolderBasename}/gcp_key.json",
         "GOOGLE_CLOUD_PROJECT": "datascience-projects"
     },
     "customizations": {
