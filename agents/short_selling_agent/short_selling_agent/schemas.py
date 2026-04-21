@@ -70,3 +70,8 @@ class PipelineDossier(BaseModel):
     
     # Populated by Agent 4 (Quant Coordinator)
     final_decisions: Optional[List[QuantDecision]] = []
+
+
+class Plus500UniverseReport(BaseModel):
+    tickers: List[str] = Field(description="List of tradable ticker symbols on Plus500")
+    error_message: Optional[str] = Field(default=None)
