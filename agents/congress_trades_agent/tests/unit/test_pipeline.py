@@ -409,24 +409,29 @@ async def test_alpha_pipeline_mixed_cases(mocker, alpha_workflow_runner):
 
 
 # =============================================================================
-# DEEP MOCKS: MIXED CONFLICTING CASES (TRAP, BEAR, BUBB)
+# DEEP MOCKS: MIXED CONFLICTING CASES (MOH, BE, NDAQ)
 # =============================================================================
 
 def mock_get_bq_data_mixed(analysis_date: str) -> list:
     print(f"\n---> 🛑 BQ MOCK HIT: Returning Mixed signals for {analysis_date}")
     return [
-        {"ticker": "TRAP", "net_buy_activity": 60, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
-        {"ticker": "BEAR", "net_buy_activity": 80, "market_uptrend": False, "signal_date": analysis_date, "last_trade_date": analysis_date}, # FALSE market regime
-        {"ticker": "BUBB", "net_buy_activity": 40, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date}
+        # MOH is the TRAP (Real Form4 tool says CFO Selling)
+        {"ticker": "MOH", "net_buy_activity": 60, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date},
+        # BE is the BEAR (Real Form4 tool says CEO Buying, but we force market_uptrend=False)
+        {"ticker": "BE", "net_buy_activity": 80, "market_uptrend": False, "signal_date": analysis_date, "last_trade_date": analysis_date}, 
+        # NDAQ is the BUBBLE (Real Form4 tool says Neutral, we force P/E = 1000)
+        {"ticker": "NDAQ", "net_buy_activity": 40, "market_uptrend": True, "signal_date": analysis_date, "last_trade_date": analysis_date}
     ]
 
 class MockYFTickerMixed:
     def __init__(self, ticker):
         self.ticker = ticker
         db = {
-            "TRAP": {"sector": "Technology", "industry": "Software", "marketCap": 10_000_000_000, "beta": 1.2, "forwardPE": 20, "debtToEquity": 40},
-            "BEAR": {"sector": "Healthcare", "industry": "Medical", "marketCap": 20_000_000_000, "beta": 0.9, "forwardPE": 15, "debtToEquity": 50},
-            "BUBB": {"sector": "Technology", "industry": "AI", "marketCap": 5_000_000_000, "beta": 2.5, "forwardPE": 1000, "debtToEquity": 10}, # P/E is 1000! Bubble!
+            # Give MOH great fundamentals so the ONLY reason to pass is the Insider Selling Trap
+            "MOH": {"sector": "Technology", "industry": "Software", "marketCap": 10_000_000_000, "beta": 1.2, "forwardPE": 20, "debtToEquity": 40}, 
+            "BE": {"sector": "Healthcare", "industry": "Medical", "marketCap": 20_000_000_000, "beta": 0.9, "forwardPE": 15, "debtToEquity": 50},
+            # Give NDAQ a massive valuation bubble!
+            "NDAQ": {"sector": "Technology", "industry": "Finance", "marketCap": 5_000_000_000, "beta": 2.5, "forwardPE": 1000, "debtToEquity": 10}, 
         }
         self.info = db.get(ticker.upper(), {"sector": "Unknown", "marketCap": 0, "beta": 1.0, "forwardPE": 10, "debtToEquity": 10})
 
@@ -434,8 +439,8 @@ class MockLobbyingQueryMixed:
     def __init__(self, ticker):
         self.ticker = ticker
     def result(self):
-        # Let's give TRAP and BEAR some lobbying to make them look like "Golden Signals" on the surface
-        if self.ticker in ["TRAP", "BEAR"]:
+        # Give MOH and BE strong lobbying to make them look like Golden Signals initially
+        if self.ticker in ["MOH", "BE"]:
             class Row:
                 ticker = self.ticker
                 client_name = f"{self.ticker} Corp"
@@ -451,16 +456,6 @@ class MockLobbyingClientMixed:
     def query(self, query, job_config=None):
         return MockLobbyingQueryMixed(job_config.query_parameters[0].value)
 
-def mock_fetch_form4_mixed(ticker: str, analysis_date: str=""):
-    """Custom Form4 Mock for Test 3 to force conflicting insider signals."""
-    db = {
-        "TRAP": {"ticker": "TRAP", "insider_title": "CFO", "transaction_type": "Sell", "signal_strength": "Warning - Insider Dumping"},
-        "BEAR": {"ticker": "BEAR", "insider_title": "CEO", "transaction_type": "Buy", "signal_strength": "Strong Buy Confluence"},
-        "BUBB": {"ticker": "BUBB", "insider_title": "Director", "transaction_type": "Hold", "signal_strength": "Neutral"}
-    }
-    return json.dumps(db.get(ticker.upper(), {"ticker": ticker, "signal_strength": "Neutral"}))
-
-
 # =============================================================================
 # INTEGRATION TEST 3: CONFLICTING SIGNALS & MACRO
 # =============================================================================
@@ -470,12 +465,10 @@ async def test_alpha_pipeline_mixed_cases(mocker, alpha_workflow_runner):
     """Tests Agent handling of conflicting signals, bad macro, and valuation bubbles."""
     runner, session_service = alpha_workflow_runner 
 
-    # 🎯 PATCH WITH THE MIXED MOCKS
+    # 🎯 PATCH WITH THE MIXED MOCKS (No need to patch Form4 anymore!)
     mocker.patch('congress_trades_agent.tools._get_bq_data', side_effect=mock_get_bq_data_mixed)
     mocker.patch('congress_trades_agent.tools.yf.Ticker', side_effect=MockYFTickerMixed)
     mocker.patch('congress_trades_agent.extra_tools.bigquery.Client', side_effect=MockLobbyingClientMixed)
-    # Patch the form4 tool specifically for this test so we can test the CFO dump
-    mocker.patch('congress_trades_agent.extra_tools.fetch_form4_signals_tool', side_effect=mock_fetch_form4_mixed)
 
     session_id = "test_session_mixed_002"
     user_id = "test_quant"
@@ -493,12 +486,8 @@ async def test_alpha_pipeline_mixed_cases(mocker, alpha_workflow_runner):
     print("🕵️ TRACE: Mixed Conflicting Cases Testing")
     print("="*70)
 
-    # We will print the Agent's thoughts here because it's fascinating to see how it resolves conflicts
     async for event in final_events_generator:
-        if hasattr(event, 'model_response') and event.model_response:
-            thought = event.model_response.text.strip()
-            if thought:
-                print(f"🧠 [THOUGHT]: {thought[:150]}...\n") 
+        pass 
 
     final_session = await session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
     final_plan_str = final_session.state.get('final_trade_plan')
@@ -509,19 +498,18 @@ async def test_alpha_pipeline_mixed_cases(mocker, alpha_workflow_runner):
     
     print(f"######----- Returned Mixed Actions: {actions} -----")
     
-    # 🎯 Pattern 1: The Trap (Insider Dumping)
-    assert "TRAP" in actions, "Agent skipped TRAP!"
-    assert "PASS" in actions["TRAP"], f"Agent bought TRAP despite CFO dumping shares! Action: {actions['TRAP']}"
+    # 🎯 Pattern 1: The Trap (MOH - Insider Dumping overrides Congress Buying)
+    assert "MOH" in actions, "Agent skipped MOH!"
+    assert "PASS" in actions["MOH"], f"Agent bought MOH despite CFO dumping shares! Action: {actions['MOH']}"
 
-    # 🎯 Pattern 2: The Macro Headwind (Bear Market)
-    assert "BEAR" in actions, "Agent skipped BEAR!"
-    assert "STRONG BUY" not in actions["BEAR"], "Agent issued a Strong Buy in a Bear Market!"
-    assert "PASS" in actions["BEAR"] or "HOLD" in actions["BEAR"], f"Agent failed to respect bearish regime! Action: {actions['BEAR']}"
+    # 🎯 Pattern 2: The Macro Headwind (BE - Bear Market overrides Golden Signal)
+    assert "BE" in actions, "Agent skipped BE!"
+    assert "STRONG BUY" not in actions["BE"], "Agent issued a Strong Buy in a Bear Market!"
+    assert "PASS" in actions["BE"] or "HOLD" in actions["BE"], f"Agent failed to respect bearish regime! Action: {actions['BE']}"
 
-    # 🎯 Pattern 3: Valuation Bubble (P/E 1000)
-    assert "BUBB" in actions, "Agent skipped BUBB!"
-    assert "BUY" not in actions["BUBB"], f"Agent bought a massive bubble (P/E 1000)! Action: {actions['BUBB']}"
-    assert "PASS" in actions["BUBB"] or "HOLD" in actions["BUBB"], "Agent should have passed on BUBB due to valuation."
+    # 🎯 Pattern 3: Valuation Bubble (NDAQ - P/E 1000 overrides Congress Buying)
+    assert "NDAQ" in actions, "Agent skipped NDAQ!"
+    assert "BUY" not in actions["NDAQ"], f"Agent bought a massive bubble (P/E 1000)! Action: {actions['NDAQ']}"
+    assert "PASS" in actions["NDAQ"] or "HOLD" in actions["NDAQ"], "Agent should have passed on NDAQ due to valuation."
 
     print("✅ All Mixed Conflicting Cases passed successfully!")
-
