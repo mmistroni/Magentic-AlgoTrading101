@@ -119,22 +119,32 @@ def get_squeeze_metrics(ticker: str):
     
     try:
         api_key = os.environ['FMP_API_KEY']
+        
         # 1. Get Short Interest
         short_url = f"https://financialmodelingprep.com/api/v4/stock-short-interest?symbol={ticker}&apikey={api_key}"
         short_data = requests.get(short_url).json()
+        
         if short_data and isinstance(short_data, list):
-            short_pct = float(short_data[0].get('shortPercentOfFloat', 0))
+            raw_short = short_data[0].get('shortPercentOfFloat')
+            # Only convert to float if it's not None
+            short_pct = float(raw_short) if raw_short is not None else 0.0
             
         # 2. Get Float
         float_url = f"https://financialmodelingprep.com/api/v4/shares_float?symbol={ticker}&apikey={api_key}"
         float_data = requests.get(float_url).json()
+        
         if float_data and isinstance(float_data, list):
-            free_float = float(float_data[0].get('freeFloat', 999999999))
+            raw_float = float_data[0].get('freeFloat')
+            # Only convert to float if it's not None
+            free_float = float(raw_float) if raw_float is not None else 999999999.0
             
     except Exception as e:
         logging.warning(f"Failed to fetch squeeze metrics for {ticker}: {e}")
         
     return short_pct, free_float
+
+
+
 
 # ==========================================
 # 1. BIGQUERY INITIATOR 
