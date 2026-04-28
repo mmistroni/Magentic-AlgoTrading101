@@ -1,53 +1,144 @@
-# Assuming get_short_squeeze_filter is imported from your finviz_tools
-from .finviz_tools import get_short_squeeze_filter 
-from .schemas import BiggestLosersReport, InsiderTrade, BlacklistReport, MarketLoser, \
-    StockNewsReport, InsiderTradingReport, NewsArticle
+# short_selling_agent/tools.py
+
+from .finviz_tools import get_short_squeeze_filter
+from .schemas import (
+    BiggestLosersReport,
+    MarketLoser,
+    StockNewsReport,
+    NewsArticle,
+    InsiderTradingReport,
+    InsiderTrade,
+)
 import logging
 import requests
 import os
 from datetime import datetime, timedelta
 from google.cloud import bigquery
-import logging
 
 
-
-def get_fmp_bigger_losers() -> BiggestLosersReport:
+# -----------------------------------------------------------------------------
+def get_fmp_bigger_losers(
+    as_of_date: str | None = None
+) -> BiggestLosersReport:
     """
-    Fetches the list of the biggest losing stocks in the market today.
-    AGENT INSTRUCTIONS: Call this to find initial candidates that are gapping down.
+    Fetches the biggest market losers for a given date.
+
+    AGENT INSTRUCTIONS:
+      • If `as_of_date` is None: calls the live FMP “biggest-losers” endpoint
+        and returns today’s losers.
+      • If `as_of_date` is a string "YYYY-MM-DD": 
+          – delegates to your historical BQ table via get_bq_short_candidates()
+          – wraps those rows in MarketLoser objects and returns a BiggestLosersReport.
+    
+    Example:
+      # live (today)
+      get_fmp_bigger_losers()
+    
+      # historical (June 1, 2023)
+      get_fmp_bigger_losers(as_of_date="2023-06-01")
     """
-    fmp_url = f"https://financialmodelingprep.com/stable/biggest-losers?apikey={os.environ['FMP_API_KEY']}"
+    # Historical path: use your BigQuery ingestion table
+    if as_of_date:
+        rows = get_bq_short_candidates(limit=10, as_of_date=as_of_date)
+        losers = [
+            MarketLoser(
+                ticker=r["ticker"],
+                price=r["price"],
+                change_pct=r["change_pct"]
+            )
+            for r in rows
+        ]
+        return BiggestLosersReport(losers=losers)
+
+    # Live path: FinancialModelingPrep API
+    api_key = os.environ.get("FMP_API_KEY", "")
+    url = (
+        f"https://financialmodelingprep.com/stable/biggest-losers"
+        f"?apikey={api_key}"
+    )
     try:
-        data = requests.get(fmp_url).json()
-        losers = []
-        for item in data:
-            losers.append(MarketLoser(
-                ticker=item.get('symbol', ''),
-                price=float(item.get('price', 0.0)),
-                change_pct=float(item.get('changesPercentage', 0.0))
-            ))
+        data = requests.get(url).json()
+        losers = [
+            MarketLoser(
+                ticker=item.get("symbol", ""),
+                price=float(item.get("price", 0.0)),
+                change_pct=float(item.get("changesPercentage", 0.0)),
+            )
+            for item in data or []
+        ]
         return BiggestLosersReport(losers=losers)
     except Exception as e:
-        logging.error(f"Failed to retrieve biggest losers: {str(e)}")
+        logging.error(f"Failed to retrieve biggest losers: {e}")
         return BiggestLosersReport(losers=[], error_message=str(e))
 
 
-def get_fmp_news(ticker: str) -> StockNewsReport:
+# -----------------------------------------------------------------------------
+def get_fmp_news(
+    ticker: str,
+    as_of_date: str | None = None
+) -> StockNewsReport:
     """
-    Fetches the most recent news headlines for a specific stock ticker.
-    AGENT INSTRUCTIONS: Use this to determine if a price drop is caused by permanent damage.
-    """
-    logging.info(f"Fetching news for {ticker}...")
-    api_key = os.environ.get('FMP_API_KEY')
-    url = f"https://financialmodelingprep.com/api/v3/stock-news?tickers={ticker}&limit=10&apikey={api_key}"
+    Fetches recent news for a stock, live or historical.
+
+    AGENT INSTRUCTIONS:
+      • For real-time use (`as_of_date=None`), calls the FMP stock-news API.
+      • For backtests (`as_of_date="YYYY-MM-DD"`), queries your BQ table:
+          your_project.historical_news(
+            ticker STRING,
+            publishedDate TIMESTAMP,
+            title STRING
+          )
     
+    Returns:
+      StockNewsReport(ticker, List[NewsArticle], optional error_message)
+    """
+    if as_of_date:
+        client = bigquery.Client(project=os.environ.get("GCP_PROJECT_ID"))
+        sql = """
+          SELECT publishedDate, title
+          FROM `your_project.historical_news`
+          WHERE ticker = @ticker
+            AND DATE(publishedDate) = @dt
+          ORDER BY publishedDate DESC
+          LIMIT 10
+        """
+        job = client.query(
+            sql,
+            job_config=bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("ticker", "STRING", ticker),
+                    bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
+                ]
+            ),
+        )
+        rows = list(job.result())
+        if not rows:
+            return StockNewsReport(
+                ticker=ticker,
+                articles=[],
+                error_message="No historical news for that date."
+            )
+        articles = [
+            NewsArticle(date=row.publishedDate.isoformat(), title=row.title)
+            for row in rows
+        ]
+        return StockNewsReport(ticker=ticker, articles=articles)
+
+    # Live API path
+    api_key = os.environ.get("FMP_API_KEY", "")
+    url = (
+        f"https://financialmodelingprep.com/api/v3/stock-news"
+        f"?tickers={ticker}&limit=10&apikey={api_key}"
+    )
     try:
-        data = requests.get(url).json()
+        data = requests.get(url).json() or []
         if not data:
             return StockNewsReport(ticker=ticker, articles=[], error_message="No news found.")
-            
         articles = [
-            NewsArticle(date=item.get('publishedDate', ''), title=item.get('title', '')) 
+            NewsArticle(
+                date=item.get("publishedDate", ""),
+                title=item.get("title", ""),
+            )
             for item in data
         ]
         return StockNewsReport(ticker=ticker, articles=articles)
@@ -56,110 +147,261 @@ def get_fmp_news(ticker: str) -> StockNewsReport:
         return StockNewsReport(ticker=ticker, articles=[], error_message=str(e))
 
 
-def get_bearish_insider_sales(ticker: str, days_back: int = 180, min_value: int = 250000) -> InsiderTradingReport:
+# -----------------------------------------------------------------------------
+def get_bearish_insider_sales(
+    ticker: str,
+    days_back: int = 180,
+    min_value: int = 250_000,
+    as_of_date: str | None = None
+) -> InsiderTradingReport:
     """
-    Fetches SEC Form 4 insider trading data to detect C-Suite stock dumping.
-    AGENT INSTRUCTIONS: Use this to verify management conviction. High dumping = high bearish score.
+    Fetches C-Suite SEC Form 4 insider sales, live or historical.
+
+    AGENT INSTRUCTIONS:
+      • For real-time (`as_of_date=None`):
+          calls FMP insider-trading API.
+      • For backtest (`as_of_date="YYYY-MM-DD"`):
+          queries your BQ table:
+            your_project.historical_form4(
+              symbol STRING,
+              transactionDate TIMESTAMP,
+              transactionType STRING,
+              securitiesTransacted FLOAT,
+              price FLOAT,
+              typeOfOwner STRING,
+              reportingName STRING
+            )
+          and filters for:
+            – transactionType = 'S-Sale'
+            – within `days_back` of as_of_date
+            – dollar value ≥ `min_value`
+            – owner titles in [CEO, CFO, COO, PRESIDENT, DIRECTOR]
+
+    Returns:
+      InsiderTradingReport(ticker, total_dollars_dumped, List[InsiderTrade], optional error_message)
     """
-    logging.info(f"Checking Form 4 Insider Sales for {ticker}...")
-    api_key = os.environ.get('FMP_API_KEY')
-    url = f"https://financialmodelingprep.com/api/v4/insider-trading?symbol={ticker}&page=0&apikey={api_key}"
-    
-    try:
-        data = requests.get(url).json()
-        if not data or not isinstance(data, list):
-            return InsiderTradingReport(ticker=ticker, total_dollars_dumped=0.0, significant_sales=[], error_message="No insider activity found.")
-
-        cutoff_date = datetime.now() - timedelta(days=days_back)
-        significant_sales = []
-        total_dollars_dumped = 0.0
-        target_roles = ['CEO', 'CHIEF EXECUTIVE', 'CFO', 'CHIEF FINANCIAL', 'COO', 'PRESIDENT', 'DIRECTOR']
-
-        for trade in data:
-            tx_date_str = trade.get('transactionDate')
-            if not tx_date_str or trade.get('transactionType') != 'S-Sale':
-                continue
-                
-            tx_date = datetime.strptime(tx_date_str[:10], '%Y-%m-%d')
-            if tx_date < cutoff_date:
-                continue 
-
-            shares = trade.get('securitiesTransacted', 0)
-            price = trade.get('price', 0)
-            if not shares or not price:
-                continue
-                
-            dollar_value = float(shares) * float(price)
-            if dollar_value < min_value:
-                continue
-
-            title = str(trade.get('typeOfOwner', '')).upper()
-            if any(role in title for role in target_roles):
-                total_dollars_dumped += dollar_value
-                significant_sales.append(InsiderTrade(
-                    date=tx_date_str[:10],
-                    name=trade.get('reportingName', 'Unknown'),
-                    title=title,
-                    value_sold=dollar_value
-                ))
-
-        return InsiderTradingReport(
-            ticker=ticker,
-            total_dollars_dumped=round(total_dollars_dumped, 2),
-            significant_sales=significant_sales
+    if as_of_date:
+        client = bigquery.Client(project=os.environ.get("GCP_PROJECT_ID"))
+        sql = """
+          SELECT
+            transactionDate,
+            transactionType,
+            securitiesTransacted,
+            price,
+            typeOfOwner,
+            reportingName
+          FROM `your_project.historical_form4`
+          WHERE symbol = @ticker
+            AND DATE(transactionDate) >= DATE_SUB(@dt, INTERVAL @db DAY)
+        """
+        job = client.query(
+            sql,
+            job_config=bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("ticker", "STRING", ticker),
+                    bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
+                    bigquery.ScalarQueryParameter("db", "INT64", days_back),
+                ]
+            ),
         )
-    except Exception as e:
-        logging.error(f"Error processing Form 4 data: {str(e)}")
-        return InsiderTradingReport(ticker=ticker, total_dollars_dumped=0.0, significant_sales=[], error_message=str(e))
+        data = list(job.result())
+    else:
+        api_key = os.environ.get("FMP_API_KEY", "")
+        url = (
+            f"https://financialmodelingprep.com/api/v4/insider-trading"
+            f"?symbol={ticker}&apikey={api_key}"
+        )
+        try:
+            data = requests.get(url).json() or []
+            if not isinstance(data, list):
+                data = []
+        except Exception as e:
+            logging.error(f"Error Form4 API: {e}")
+            return InsiderTradingReport(
+                ticker=ticker,
+                total_dollars_dumped=0.0,
+                significant_sales=[],
+                error_message=str(e)
+            )
 
-def get_squeeze_metrics(ticker: str):
-    """Fetches Float and Short Interest from FMP for historical tracking."""
+    cutoff = (
+        datetime.fromisoformat(as_of_date) if as_of_date else datetime.now()
+    ) - timedelta(days=days_back)
+
+    total_dumped = 0.0
+    significant_sales: list[InsiderTrade] = []
+    target_roles = {'CEO','CFO','COO','PRESIDENT','DIRECTOR'}
+
+    for trade in data:
+        dt_str = trade.get("transactionDate", "")[:10]
+        if trade.get("transactionType") != "S-Sale":
+            continue
+        tx_dt = datetime.strptime(dt_str, "%Y-%m-%d")
+        if tx_dt < cutoff:
+            continue
+
+        shares = float(trade.get("securitiesTransacted", 0) or 0)
+        price  = float(trade.get("price", 0) or 0)
+        value  = shares * price
+        if value < min_value:
+            continue
+
+        owner = str(trade.get("typeOfOwner", "")).upper()
+        if not any(role in owner for role in target_roles):
+            continue
+
+        total_dumped += value
+        significant_sales.append(
+            InsiderTrade(
+                date=dt_str,
+                name=trade.get("reportingName", ""),
+                title=owner,
+                value_sold=value,
+            )
+        )
+
+    return InsiderTradingReport(
+        ticker=ticker,
+        total_dollars_dumped=round(total_dumped, 2),
+        significant_sales=significant_sales
+    )
+
+
+# -----------------------------------------------------------------------------
+def get_squeeze_metrics(
+    ticker: str,
+    as_of_date: str | None = None
+) -> tuple[float, float]:
+    """
+    Fetches short‐interest % and free float, live or historical.
+
+    AGENT INSTRUCTIONS:
+      • For real-time (`as_of_date=None`):
+          calls FMP endpoints:
+            – /api/v4/stock-short-interest
+            – /api/v4/shares_float
+      • For backtest (`as_of_date="YYYY-MM-DD"`):
+          queries your BQ tables:
+            historical_stock_short_interest(symbol, date, shortPercentOfFloat)
+            historical_shares_float(symbol, date, freeFloat)
+          and returns that row’s values.
+
+    Returns: (short_pct: float, free_float: float)
+    """
+    if as_of_date:
+        client = bigquery.Client(project=os.environ.get("GCP_PROJECT_ID"))
+        # Query short interest
+        sql1 = """
+          SELECT shortPercentOfFloat
+          FROM `your_project.historical_stock_short_interest`
+          WHERE symbol=@ticker AND date=@dt
+          LIMIT 1
+        """
+        job1 = client.query(
+            sql1,
+            job_config=bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("ticker","STRING",ticker),
+                    bigquery.ScalarQueryParameter("dt","DATE",as_of_date),
+                ]
+            )
+        )
+        rec1 = list(job1.result())
+        short_pct = float(rec1[0].shortPercentOfFloat or 0.0) if rec1 else 0.0
+
+        # Query free float
+        sql2 = """
+          SELECT freeFloat
+          FROM `your_project.historical_shares_float`
+          WHERE symbol=@ticker AND date=@dt
+          LIMIT 1
+        """
+        job2 = client.query(
+            sql2,
+            job_config=bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("ticker","STRING",ticker),
+                    bigquery.ScalarQueryParameter("dt","DATE",as_of_date),
+                ]
+            )
+        )
+        rec2 = list(job2.result())
+        free_float = float(rec2[0].freeFloat or 0.0) if rec2 else 0.0
+
+        return short_pct, free_float
+
+    # Live API path
     short_pct = 0.0
-    free_float = 999999999.0
-    
+    free_float = 999_999_999.0
     try:
-        api_key = os.environ['FMP_API_KEY']
-        
-        # 1. Get Short Interest
-        short_url = f"https://financialmodelingprep.com/api/v4/stock-short-interest?symbol={ticker}&apikey={api_key}"
-        short_data = requests.get(short_url).json()
-        
-        if short_data and isinstance(short_data, list):
-            raw_short = short_data[0].get('shortPercentOfFloat')
-            # Only convert to float if it's not None
-            short_pct = float(raw_short) if raw_short is not None else 0.0
-            
-        # 2. Get Float
-        float_url = f"https://financialmodelingprep.com/api/v4/shares_float?symbol={ticker}&apikey={api_key}"
-        float_data = requests.get(float_url).json()
-        
-        if float_data and isinstance(float_data, list):
-            raw_float = float_data[0].get('freeFloat')
-            # Only convert to float if it's not None
-            free_float = float(raw_float) if raw_float is not None else 999999999.0
-            
+        key = os.environ["FMP_API_KEY"]
+        # 1) short interest
+        si = requests.get(
+            f"https://financialmodelingprep.com/api/v4/stock-short-interest"
+            f"?symbol={ticker}&apikey={key}"
+        ).json() or []
+        if si and isinstance(si, list):
+            raw = si[0].get("shortPercentOfFloat")
+            short_pct = float(raw) if raw is not None else 0.0
+
+        # 2) free float
+        ff = requests.get(
+            f"https://financialmodelingprep.com/api/v4/shares_float"
+            f"?symbol={ticker}&apikey={key}"
+        ).json() or []
+        if ff and isinstance(ff, list):
+            raw = ff[0].get("freeFloat")
+            free_float = float(raw) if raw is not None else free_float
+
     except Exception as e:
         logging.warning(f"Failed to fetch squeeze metrics for {ticker}: {e}")
-        
+
     return short_pct, free_float
 
 
-
-
-# ==========================================
-# 1. BIGQUERY INITIATOR 
-# ==========================================
-def get_bq_short_candidates(limit: int = 3) -> list[dict]:
-    """Fetches the top dropping stocks from today's BigQuery ingestion."""
-    client = bigquery.Client(project='datascience-projects')
-    query = """
-        SELECT ticker, price, change_pct, short_interest_pct, free_float, is_squeeze_risk 
-        FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
-        WHERE scrape_date = CURRENT_DATE() AND price >= 5.0
-        ORDER BY change_pct ASC LIMIT @limit
+# -----------------------------------------------------------------------------
+def get_bq_short_candidates(
+    limit: int = 3,
+    as_of_date: str | None = None
+) -> list[dict]:
     """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[bigquery.ScalarQueryParameter("limit", "INT64", limit)]
+    Fetches the top dropping stocks from your BigQuery ingestion table.
+
+    AGENT INSTRUCTIONS:
+      • To backtest a historical date, pass `as_of_date="YYYY-MM-DD"`.
+      • If omitted, defaults to CURRENT_DATE().
+      • Returns a list of dicts with keys:
+          ticker, price, change_pct, short_interest_pct, free_float, is_squeeze_risk.
+
+    Example:
+      get_bq_short_candidates(limit=5, as_of_date="2023-06-01")
+    """
+    client = bigquery.Client(project="datascience-projects")
+    if as_of_date:
+        date_filter = f"DATE '{as_of_date}'"
+    else:
+        date_filter = "CURRENT_DATE()"
+
+    sql = f"""
+      SELECT
+        ticker,
+        price,
+        change_pct,
+        short_interest_pct,
+        free_float,
+        is_squeeze_risk
+      FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
+      WHERE scrape_date = {date_filter}
+        AND price >= 5.0
+      ORDER BY change_pct ASC
+      LIMIT @limit
+    """
+    job = client.query(
+        sql,
+        job_config=bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        ),
     )
-    results = client.query(query, job_config=job_config).result()
-    return [dict(row) for row in results]
+    return [dict(row) for row in job.result()]

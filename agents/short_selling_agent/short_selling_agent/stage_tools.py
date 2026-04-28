@@ -1,101 +1,163 @@
-# agent_tools.py
-from google.cloud import bigquery
+# short_selling_agent/stage_tools.py
 
-# 1. Import your original tools
-from short_selling_agent.tools import get_fmp_news, get_bearish_insider_sales
-from short_selling_agent.schemas import MarketLoser
-
-# 2. IMPORT THE SHARED STATE FROM FILE 1
-from short_selling_agent.state import CURRENT_RUN_STATE 
-
-from google.cloud import bigquery
-from short_selling_agent.tools import get_fmp_news, get_bearish_insider_sales
-from short_selling_agent.schemas import MarketLoser
 import os
 import logging
 from google.cloud import bigquery
-from short_selling_agent.schemas import Plus500UniverseReport
+
+from .tools import (
+    get_bq_short_candidates,
+    get_fmp_news,
+    get_bearish_insider_sales,
+)
+from .schemas import MarketLoser
+from .state import CURRENT_RUN_STATE
+from .schemas import Plus500UniverseReport
 
 
-
-# --- AGENT 1'S ONLY TOOL ---
-def tool_fetch_bq_candidates() -> str:
+# -----------------------------------------------------------------------------
+def tool_fetch_bq_candidates(
+    as_of_date: str | None = None,
+    limit: int = 3
+) -> str:
     """
-    Fetches the market losers from BigQuery and saves them to the shared state.
-    Returns a comma-separated list of the tickers found.
+    AGENT INSTRUCTIONS:
+      • Call this tool (exactly once in Step 1) to load your top market losers.
+      • Pass `as_of_date` as "YYYY-MM-DD" to backtest that historic date; omit or
+        pass None to use today’s data.
+      • `limit` controls how many tickers to fetch.
+      • This appends MarketLoser models into CURRENT_RUN_STATE.dossier.market_losers.
+      • Returns the string: "Tickers loaded: TICKER1, TICKER2, …"
+
+    Example:
+      tool_fetch_bq_candidates(as_of_date="2023-06-01", limit=5)
     """
-    client = bigquery.Client(project='datascience-projects')
-    query = "SELECT ticker, price, change_pct FROM `datascience-projects.finviz_blacklist.fmp_daily_losers` LIMIT 3"
-    results = client.query(query).result()
-    
+    # Delegate to the low-level tool
+    rows = get_bq_short_candidates(limit=limit, as_of_date=as_of_date)
+
     tickers = []
-    for row in results:
-        loser = MarketLoser(ticker=row.ticker, price=row.price, change_pct=row.change_pct)
-        CURRENT_RUN_STATE.dossier.market_losers.append(loser)
-        tickers.append(row.ticker)
-        
-    # We return the list of tickers so Agent 1 can pass them to Agent 2!
+    for r in rows:
+        # r is a dict with keys: ticker, price, change_pct, ...
+        CURRENT_RUN_STATE.dossier.market_losers.append(
+            MarketLoser(
+                ticker=r["ticker"],
+                price=r["price"],
+                change_pct=r["change_pct"]
+            )
+        )
+        tickers.append(r["ticker"])
+
     return f"Tickers loaded: {', '.join(tickers)}"
 
-# --- AGENT 2'S ONLY TOOL ---
-def tool_stage_news(ticker: str) -> str:
+
+# -----------------------------------------------------------------------------
+def tool_stage_news(
+    ticker: str,
+    as_of_date: str | None = None
+) -> str:
     """
-    Fetches the most recent news headlines for a specific stock ticker and saves it to the dossier.
+    AGENT INSTRUCTIONS:
+      • Call this tool once per ticker in Step 2 to fetch news.
+      • Pass the same `as_of_date` you used in tool_fetch_bq_candidates.
+      • Appends a StockNewsReport to CURRENT_RUN_STATE.dossier.news_reports.
+      • Returns the string: "Success: News for {ticker} saved to state."
+
+    Example:
+      tool_stage_news("AAPL", as_of_date="2023-06-01")
     """
-    news_report = get_fmp_news(ticker)
-    CURRENT_RUN_STATE.dossier.news_reports.append(news_report)
+    report = get_fmp_news(ticker, as_of_date=as_of_date)
+    CURRENT_RUN_STATE.dossier.news_reports.append(report)
     return f"Success: News for {ticker} saved to state."
 
-# --- AGENT 3'S ONLY TOOL ---
-def tool_stage_insiders(ticker: str) -> str:
+
+# -----------------------------------------------------------------------------
+def tool_stage_insiders(
+    ticker: str,
+    as_of_date: str | None = None
+) -> str:
     """
-    Fetches Form 4 Insider Sales for a specific stock ticker and saves it to the dossier.
+    AGENT INSTRUCTIONS:
+      • Call this tool once per ticker in Step 3 to fetch insider sales.
+      • Pass the same `as_of_date` you used in tool_fetch_bq_candidates.
+      • Appends an InsiderTradingReport to
+        CURRENT_RUN_STATE.dossier.insider_reports.
+      • Returns the string: "Success: Insiders for {ticker} saved to state."
+
+    Example:
+      tool_stage_insiders("AAPL", as_of_date="2023-06-01")
     """
-    insider_report = get_bearish_insider_sales(ticker)
-    CURRENT_RUN_STATE.dossier.insider_reports.append(insider_report)
+    report = get_bearish_insider_sales(ticker, as_of_date=as_of_date)
+    CURRENT_RUN_STATE.dossier.insider_reports.append(report)
     return f"Success: Insiders for {ticker} saved to state."
 
-# --- AGENT 4'S ONLY TOOL ---
+
+# -----------------------------------------------------------------------------
 def tool_read_full_dossier() -> str:
     """
-    Returns the complete JSON dataset of all staged Market Data, News, and Insider Sales.
+    AGENT INSTRUCTIONS:
+      • Call this tool once, in Step 4, after all market_losers, news_reports,
+        and insider_reports have been staged.
+      • Returns a JSON string of the full PipelineDossier.
+
+    Example:
+      tool_read_full_dossier()
     """
     return CURRENT_RUN_STATE.dossier.model_dump_json(indent=2)
 
 
-def get_plus500_universe() -> Plus500UniverseReport:
+# -----------------------------------------------------------------------------
+def get_plus500_universe(
+    as_of_date: str | None = None
+) -> Plus500UniverseReport:
     """
-    Fetches the complete universe of tradable stocks from the Plus500 BigQuery table.
-    
-    Returns:
-        Plus500UniverseReport: A Pydantic model containing a list of valid tickers.
+    Fetches the complete universe of tradable stocks from the Plus500 table,
+    either live or as of a historic date.
+
+    AGENT INSTRUCTIONS:
+      • Pass `as_of_date` to filter your historical-plus500 table on that date.
+      • If omitted, uses the live table (all-time distinct tickers).
+      • Returns Plus500UniverseReport(tickers=[...], optional error_message).
+
+    Historical table schema assumed:
+      your_project.historical_plus500(
+        ticker STRING,
+        date DATE
+      )
+
+    Example:
+      get_plus500_universe(as_of_date="2023-06-01")
     """
-    logging.info("Fetching Plus500 tradable universe from BigQuery...")
-    
-    # You can hardcode this or use the env variable
     project_id = os.environ.get("GCP_PROJECT_ID", "datascience-projects")
-    table_id = f"{project_id}.gcp_shareloader.plus500"
-    
+
+    if as_of_date:
+        table = f"`{project_id}.historical_plus500`"
+        sql = f"""
+          SELECT DISTINCT ticker
+          FROM {table}
+          WHERE date = @dt
+            AND ticker IS NOT NULL
+        """
+        params = [
+            bigquery.ScalarQueryParameter("dt", "DATE", as_of_date)
+        ]
+    else:
+        table = f"`{project_id}.gcp_shareloader.plus500`"
+        sql = f"""
+          SELECT DISTINCT ticker
+          FROM {table}
+          WHERE ticker IS NOT NULL
+        """
+        params = []
+
     try:
         client = bigquery.Client(project=project_id)
-        
-        # Querying the ticker/symbol column. 
-        # (If your exact column name is 'symbol', change 'ticker' to 'symbol' below)
-        query = f"""
-            SELECT DISTINCT ticker 
-            FROM `{table_id}`
-            WHERE ticker IS NOT NULL
-        """
-        
-        query_job = client.query(query)
-        results = query_job.result()
-        
-        # Extract tickers into a clean list, converting to uppercase just in case
-        valid_tickers = [row.ticker.strip().upper() for row in results if row.ticker]
-        
-        logging.info(f"Successfully loaded {len(valid_tickers)} tradable stocks from Plus500.")
-        return Plus500UniverseReport(tickers=valid_tickers)
-
+        job = client.query(
+            sql,
+            job_config=bigquery.QueryJobConfig(query_parameters=params)
+        )
+        rows = job.result()
+        tickers = [row.ticker.strip().upper() for row in rows if row.ticker]
+        logging.info(f"Loaded {len(tickers)} Plus500 tickers as_of={as_of_date or 'LIVE'}.")
+        return Plus500UniverseReport(tickers=tickers)
     except Exception as e:
-        logging.error(f"Failed to fetch Plus500 universe: {str(e)}")
+        logging.error(f"Failed to fetch Plus500 universe: {e}")
         return Plus500UniverseReport(tickers=[], error_message=str(e))
