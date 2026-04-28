@@ -6,12 +6,11 @@ from short_selling_agent.tools import get_fmp_news, get_bearish_insider_sales
 from short_selling_agent.schemas import MarketLoser
 
 # 2. IMPORT THE SHARED STATE FROM FILE 1
-from state import CURRENT_RUN_STATE 
+from short_selling_agent.state import CURRENT_RUN_STATE 
 
 from google.cloud import bigquery
 from short_selling_agent.tools import get_fmp_news, get_bearish_insider_sales
 from short_selling_agent.schemas import MarketLoser
-from state import CURRENT_RUN_STATE 
 import os
 import logging
 from google.cloud import bigquery
