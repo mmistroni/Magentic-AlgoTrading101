@@ -97,15 +97,20 @@ def test_get_fmp_news_no_data(monkeypatch):
 
 def test_get_fmp_news_success(monkeypatch):
     payload = [
-        {"publishedDate": "2026-04-28", "title": "Big Drop!"},
-        {"publishedDate": "2026-04-27", "title": "Earnings Miss"},
+        {"symbol": "ABC", "publishedDate": "2026-04-28", "title": "Big Drop!"},
+        {"symbol": "ABC", "publishedDate": "2026-04-27", "title": "Earnings Miss"},
+        {"symbol": "XYZ", "publishedDate": "2026-04-27", "title": "Ignore this"},
     ]
     monkeypatch.setattr(requests, "get", lambda url: DummyResponse(payload))
     resp = get_fmp_news("ABC")
     assert resp.ticker == "ABC"
+    
+    # It should find exactly the 2 ABC articles and ignore XYZ
     assert len(resp.articles) == 2
     assert resp.error_message is None
     assert resp.articles[0].title == "Big Drop!"
+
+
 
 
 #------------------------------------------------------------------------------

@@ -62,31 +62,48 @@ def test_get_bq_short_candidates_live(monkeypatch):
 
 
 # ---------------------------------------------------------------------
+#------------------------------------------------------------------------------
+# Tests for get_fmp_news (Historical & Live)
+#------------------------------------------------------------------------------
 def test_get_fmp_news_historical(monkeypatch):
-    # fake two rows from historical table
-    class NewsRow:
-        def __init__(self, publishedDate, title):
-            self.publishedDate = publishedDate
-            self.title = title
-
-    monkeypatch.setattr(tools.bigquery, "Client", lambda project=None: DummyClient())
-    DummyClient._rows = [
-        NewsRow(publishedDate=datetime(2023,6,1,9,0,0), title="News A"),
-        NewsRow(publishedDate=datetime(2023,6,1,8,0,0), title="News B"),
+    # Fake response: one matching ABC, one matching XYZ, one matching ABC
+    sample = [
+        {"symbol": "ABC", "publishedDate": "2023-06-01", "title": "News A"},
+        {"symbol": "XYZ", "publishedDate": "2023-06-01", "title": "Other News"},
+        {"symbol": "ABC", "publishedDate": "2023-06-01", "title": "News B"},
     ]
+    
+    # We now mock requests.get because we removed BigQuery for news
+    class DummyResponse:
+        def json(self): return sample
+        
+    monkeypatch.setattr(requests, "get", lambda url: DummyResponse())
 
     rpt = get_fmp_news("ABC", as_of_date="2023-06-01")
     assert rpt.ticker == "ABC"
+    assert rpt.error_message is None
+    # Should only keep the 2 ABC articles
     assert len(rpt.articles) == 2
-    assert rpt.articles[0].title == "News A"
+    titles = [a.title for a in rpt.articles]
+    assert "News A" in titles and "News B" in titles
+
 
 def test_get_fmp_news_live(monkeypatch):
-    # patch requests.get for live path
-    fake = [{"publishedDate":"2026-04-29","title":"Today’s Drop"}]
-    monkeypatch.setattr(requests, "get", lambda url: type("R",(object,),{"json":lambda self: fake})())
+    # patch requests.get for live path. ADD "symbol": "XYZ" so the filter catches it
+    fake = [{"symbol": "XYZ", "publishedDate": "2026-04-29", "title": "Today’s Drop"}]
+    
+    class DummyResponse:
+        def json(self): return fake
+        
+    monkeypatch.setattr(requests, "get", lambda url: DummyResponse())
+    
     rpt = get_fmp_news("XYZ", as_of_date=None)
     assert rpt.error_message is None
+    assert len(rpt.articles) == 1
     assert rpt.articles[0].title == "Today’s Drop"
+
+
+
 
 
 # ---------------------------------------------------------------------
