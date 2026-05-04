@@ -55,7 +55,7 @@ def tool_fetch_bq_candidates(
 # -----------------------------------------------------------------------------
 def tool_stage_news(
     ticker: str,
-    as_of_date: str | None = None
+    as_of_date: str = ""
 ) -> str:
     """
     AGENT INSTRUCTIONS:
@@ -75,7 +75,7 @@ def tool_stage_news(
 # -----------------------------------------------------------------------------
 def tool_stage_insiders(
     ticker: str,
-    as_of_date: str | None = None
+    as_of_date: str = ""
 ) -> str:
     """
     AGENT INSTRUCTIONS:
@@ -109,7 +109,7 @@ def tool_read_full_dossier() -> str:
 
 # -----------------------------------------------------------------------------
 def get_plus500_universe(
-    as_of_date: str | None = None
+    as_of_date: str = ""
 ) -> Plus500UniverseReport:
     """
     Fetches the complete universe of tradable stocks from the Plus500 table,
