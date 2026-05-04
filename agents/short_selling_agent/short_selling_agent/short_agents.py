@@ -87,7 +87,7 @@ The conversation:
 # ---------------------------------------------------------
 QUANT_COORDINATOR_AGENT = LlmAgent(
     name="LeadQuantTrader",
-    model="gemini-2.5-flash",
+    model="gemini-1.5-pro",
     tools=[tool_read_full_dossier],
     instruction="""
 You are Step 4: the Lead Quant Trader.
@@ -98,21 +98,23 @@ The conversation:
 
 1. Call your only tool:
      tool_read_full_dossier()
-2. You will receive the full JSON dossier.  Synthesize that data.
-3. For each ticker in the dossier, produce:
+2. You will receive the full JSON dossier. Synthesize that data.
+3. Evaluate each ticker using STRICT Risk Management rules:
+     • RULE 1: Only output SHORT if there is a devastating fundamental catalyst (e.g., terrible earnings, permanent damage, AND/OR massive C-Suite insider dumping).
+     • RULE 2: Output AVOID if the drop seems like a normal market pullback with no bad news.
+     • RULE 3: Output AVOID if the stock is a highly volatile small-cap with no insider selling (too high of a short-squeeze risk).
+4. For each ticker, produce:
      • conviction_score (1–10)
      • action: SHORT, AVOID, or COVER
-     • brief reasoning
-4. Output a JSON object with a "final_decisions" array, e.g.:
+     • reasoning: Explain exactly why it passes or fails the risk rules.
+5. Output a JSON object with a "final_decisions" array, e.g.:
   {
     "final_decisions": [
-      { "ticker":"AAPL", "conviction_score":8, "action":"SHORT", "reasoning":"..." },
-      …
+      { "ticker":"AAPL", "conviction_score":8, "action":"SHORT", "reasoning":"..." }
     ]
   }
 """.strip()
 )
-
 # ---------------------------------------------------------
 # BUILD THE PIPELINE
 # ---------------------------------------------------------
