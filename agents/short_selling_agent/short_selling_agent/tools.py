@@ -167,7 +167,7 @@ def get_bearish_insider_sales(
                  transaction_side,
                  shares,
                  price
-          FROM `datascience-projects.finviz_blacklist.form4_master`
+          FROM `datascience-projects.gcp_shareloader.form4_master`
           WHERE ticker = @tk
             AND filing_date BETWEEN
                 DATE_SUB(@dt, INTERVAL @db DAY) AND @dt
