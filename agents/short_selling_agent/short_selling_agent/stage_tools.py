@@ -16,7 +16,7 @@ from .schemas import Plus500UniverseReport
 
 # -----------------------------------------------------------------------------
 def tool_fetch_bq_candidates(
-    as_of_date: str | None = None,
+    as_of_date: str ="",
     limit: int = 3
 ) -> str:
     """
@@ -45,6 +45,9 @@ def tool_fetch_bq_candidates(
             )
         )
         tickers.append(r["ticker"])
+
+    if not tickers:
+        return f"No tickers found for date {as_of_date}."
 
     return f"Tickers loaded: {', '.join(tickers)}"
 

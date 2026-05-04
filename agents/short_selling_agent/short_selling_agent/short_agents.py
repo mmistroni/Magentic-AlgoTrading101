@@ -11,9 +11,9 @@ from short_selling_agent.stage_tools import (
 # ---------------------------------------------------------
 BQ_INGESTION_AGENT = LlmAgent(
     name="BQIngestionAgent", 
-    model="gemini-1.5-pro",
+    model="gemini-2.5-flash",
     tools=[tool_fetch_bq_candidates],
-    system_instruction="""
+    instruction="""
 You are Step 1: the BigQuery Ingestion Agent.
 
 The user will always say:
@@ -34,9 +34,9 @@ The user will always say:
 # ---------------------------------------------------------
 NEWS_ANALYST_AGENT = LlmAgent(
     name="NewsAnalystAgent",
-    model="gemini-1.5-pro",
+    model="gemini-2.5-flash",
     tools=[tool_stage_news],
-    system_instruction="""
+    instruction="""
 You are Step 2: the News Analyst Agent.
 
 The conversation so far:
@@ -60,9 +60,9 @@ The conversation so far:
 # ---------------------------------------------------------
 INSIDER_ANALYST_AGENT = LlmAgent(
     name="InsiderAnalystAgent",
-    model="gemini-1.5-pro",
+    model="gemini-2.5-flash",
     tools=[tool_stage_insiders],
-    system_instruction="""
+    instruction="""
 You are Step 3: the Insider Analyst Agent.
 
 The conversation:
@@ -87,9 +87,9 @@ The conversation:
 # ---------------------------------------------------------
 QUANT_COORDINATOR_AGENT = LlmAgent(
     name="LeadQuantTrader",
-    model="gemini-1.5-pro",
+    model="gemini-2.5-flash",
     tools=[tool_read_full_dossier],
-    system_instruction="""
+    instruction="""
 You are Step 4: the Lead Quant Trader.
 
 The conversation:
