@@ -59,26 +59,35 @@ def generate_all_signals():
         # 5. Ask Gemini (Lead Quant Trader) for the verdict
         print(f"   -> Asking Lead Quant Trader for final verdict...")
         prompt = f"{AGENT_4_INSTRUCTIONS}\n\nHere is the Dossier:\n{dossier_json}"
-        
+        response = None
         try:
             response = model.generate_content(prompt)
-            print(f'--------- RESPONSE IS \n{response.text}\n---------')
-            clean_output = response.text.replace("```json", "").replace("```", "").strip()
+            raw_text = response.text
             
-            decisions = json.loads(clean_output).get("final_decisions", [])
+            start_idx = raw_text.find('{')
+            end_idx = raw_text.rfind('}')
             
-            for dec in decisions:
-                if dec.get("action") == "SHORT":
-                    print(f"      🚨 SIGNAL: SHORT {dec['ticker']} (Score: {dec.get('conviction_score')})")
-                    all_signals.append({
-                        "date": test_date,
-                        "ticker": dec["ticker"],
-                        "conviction_score": dec.get("conviction_score"),
-                        "reasoning": dec.get("reasoning")
-                    })
-                else:
-                    print(f"      🛡️ SIGNAL: AVOID {dec['ticker']}")
-                    
+            if start_idx != -1 and end_idx != -1:
+                clean_json_str = raw_text[start_idx:end_idx+1]
+                decisions = json.loads(clean_json_str).get("final_decisions", [])
+                for dec in decisions:
+                    ticker = dec.get("ticker", "UNKNOWN")
+                    action = dec.get("action", "AVOID")
+                    score = dec.get("conviction_score", 0)
+                    reasoning = dec.get("reasoning", "No explanation provided.")
+
+                    if action == "SHORT":
+                        print(f"      🚨 SIGNAL: SHORT {ticker} (Score: {score})")
+                        print(f"         Explain: {reasoning}")
+                        all_signals.append({
+                            "date": test_date,
+                            "ticker": ticker,
+                            "conviction_score": score,
+                            "reasoning": reasoning
+                        })
+                    else:
+                        print(f"      🛡️ SIGNAL: {action} {ticker}")
+                        print(f"         Explain: {reasoning}")    
         except Exception as e:
             print(f"⚠️ Error generating LLM response for {test_date}: {e}")
 
