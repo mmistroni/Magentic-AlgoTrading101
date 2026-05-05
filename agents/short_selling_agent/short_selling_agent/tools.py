@@ -116,7 +116,7 @@ def get_fmp_news(
         # Only keep articles for our ticker
         filtered = [
             item for item in data
-            if item.get("symbol","").upper() == ticker.upper()
+            if (item.get("symbol") or "").upper() == (ticker or "").upper()
         ]
         if not filtered:
             return StockNewsReport(
