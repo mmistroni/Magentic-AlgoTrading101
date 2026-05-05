@@ -4,6 +4,7 @@ import google.generativeai as genai
 
 # Import your tools and state
 from short_selling_agent.state import CURRENT_RUN_STATE
+from short_selling_agent.prompts import QUANT_COORDINATOR_INSTRUCTIONS
 from short_selling_agent.stage_tools import (
     tool_fetch_bq_candidates,
     tool_stage_news,
@@ -26,21 +27,7 @@ DATES_TO_TEST = [
     "2026-04-29", "2026-04-30", "2026-05-01", "2026-05-04"
 ]
 
-AGENT_4_INSTRUCTIONS = """
-You are the Lead Quant Trader. I am providing you with a JSON dossier containing Market Data, News, and Form 4 Insider Sales for a specific date.
-
-Synthesize this data using STRICT Risk Management rules:
-  • RULE 1: Only output SHORT if there is a devastating fundamental catalyst (e.g., terrible earnings, permanent damage, AND/OR massive C-Suite insider dumping).
-  • RULE 2: Output AVOID if the drop seems like a normal market pullback with no bad news.
-  • RULE 3: Output AVOID if the stock is a highly volatile small-cap with no insider selling (too high of a short-squeeze risk).
-
-For each ticker, output a JSON object exactly like this (do not output any markdown formatting, ONLY valid JSON):
-{
-  "final_decisions": [
-    { "ticker": "AAPL", "conviction_score": 8, "action": "SHORT", "reasoning": "Explain why..." }
-  ]
-}
-"""
+AGENT_4_INSTRUCTIONS = QUANT_COORDINATOR_INSTRUCTIONS
 
 def generate_all_signals():
     all_signals = []
