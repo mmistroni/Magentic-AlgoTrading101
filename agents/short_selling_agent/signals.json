@@ -1,1 +1,128 @@
-[]
+[
+    {
+        "date": "2026-03-26",
+        "ticker": "WVE",
+        "conviction_score": 9,
+        "reasoning": "The stock is experiencing an unexplained collapse of nearly 50% (-49.59%) with no reported negative news and no significant C-Suite insider selling. This scenario strongly indicates a 'pump and dump' unwinding, consistent with Rule 1C (unexplained collapse of 20%+ with no news)."
+    },
+    {
+        "date": "2026-03-26",
+        "ticker": "BATL",
+        "conviction_score": 9,
+        "reasoning": "The stock is experiencing an unexplained collapse of over 42% (-42.67%) with no reported negative news and no significant C-Suite insider selling. This scenario strongly indicates a 'pump and dump' unwinding, consistent with Rule 1C (unexplained collapse of 20%+ with no news)."
+    },
+    {
+        "date": "2026-03-27",
+        "ticker": "UGRO",
+        "conviction_score": 8,
+        "reasoning": "Massive unexplained collapse (-37.11%) with no devastating negative news or C-suite insider dumping. This aligns with Rule 1C, indicating a potential 'pump and dump' unwinding. The strict short-squeeze veto (Rule 2) could not be applied due to missing Free Float and Short Interest data in the dossier."
+    },
+    {
+        "date": "2026-03-27",
+        "ticker": "VCX",
+        "conviction_score": 8,
+        "reasoning": "Massive unexplained collapse (-32.64%) with no devastating negative news or C-suite insider dumping. This aligns with Rule 1C, indicating a potential 'pump and dump' unwinding. The strict short-squeeze veto (Rule 2) could not be applied due to missing Free Float and Short Interest data in the dossier."
+    },
+    {
+        "date": "2026-03-27",
+        "ticker": "CDT",
+        "conviction_score": 8,
+        "reasoning": "Massive unexplained collapse (-20.06%) with no devastating negative news or C-suite insider dumping. This aligns with Rule 1C, indicating a potential 'pump and dump' unwinding. The strict short-squeeze veto (Rule 2) could not be applied due to missing Free Float and Short Interest data in the dossier."
+    },
+    {
+        "date": "2026-03-30",
+        "ticker": "UGRO",
+        "conviction_score": 8,
+        "reasoning": "The stock is experiencing a massive, unexplained collapse, dropping over 37% with no corresponding news or significant insider selling. This aligns with Rule 1(C), indicating a potential 'pump and dump' unwinding. Short-squeeze veto conditions (Free Float, Short Interest) could not be assessed due to lack of data."
+    },
+    {
+        "date": "2026-03-30",
+        "ticker": "VCX",
+        "conviction_score": 8,
+        "reasoning": "The stock is undergoing a significant, unexplained collapse, dropping over 32% with no associated news or notable insider selling. This meets the criteria of Rule 1(C), suggesting an unwinding often seen in 'pump and dump' schemes. Short-squeeze veto conditions (Free Float, Short Interest) could not be assessed due to lack of data."
+    },
+    {
+        "date": "2026-03-30",
+        "ticker": "CDT",
+        "conviction_score": 8,
+        "reasoning": "The stock is experiencing a substantial, unexplained decline, falling over 20% without any accompanying news or significant insider selling. This fulfills the conditions of Rule 1(C), indicating a potential 'pump and dump' unwinding. Short-squeeze veto conditions (Free Float, Short Interest) could not be assessed due to lack of data."
+    },
+    {
+        "date": "2026-03-31",
+        "ticker": "QGRD",
+        "conviction_score": 9,
+        "reasoning": "The stock has experienced a massive and unexplained collapse of over 98%, which triggers RULE 1 (C). There is no devastating negative news reported (RULE 1 A not met), nor any C-Suite insider dumping detected (RULE 1 B not met). The absence of a clear catalyst for such a severe drop, coupled with no insider selling, strongly suggests a 'pump and dump' unwinding. RULE 3 (Noise Filter) is not applicable as the drop is far greater than 10%. Data for RULE 2 (Short-Squeeze Veto) was not provided, therefore, no veto was applied."
+    },
+    {
+        "date": "2026-03-31",
+        "ticker": "VCX",
+        "conviction_score": 8,
+        "reasoning": "The stock is down over 35%, representing a significant, unexplained collapse which triggers RULE 1 (C). No devastating negative news was found (RULE 1 A not met), and there is no evidence of C-Suite insider dumping (RULE 1 B not met). This suggests an unwinding of an undisclosed situation. RULE 3 (Noise Filter) is not applicable as the drop significantly exceeds 10%. Data for RULE 2 (Short-Squeeze Veto) was not provided, therefore, no veto was applied."
+    },
+    {
+        "date": "2026-03-31",
+        "ticker": "VRDN",
+        "conviction_score": 8,
+        "reasoning": "The stock has fallen over 32% with no apparent news catalyst or insider selling, aligning with RULE 1 (C) for an unexplained collapse. RULE 1 (A) and (B) conditions are not met. This significant drop without any public reason often indicates underlying issues or a 'pump and dump' unwinding. RULE 3 (Noise Filter) is not applicable as the decline is much greater than 10%. Data for RULE 2 (Short-Squeeze Veto) was not provided, therefore, no veto was applied."
+    },
+    {
+        "date": "2026-04-01",
+        "ticker": "CDT",
+        "conviction_score": 8,
+        "reasoning": "The stock is experiencing a massive drop of -45.45% with no apparent negative news or significant insider selling. This aligns with Rule 1C, indicating an unexplained collapse often associated with a 'pump and dump' unwinding."
+    },
+    {
+        "date": "2026-04-01",
+        "ticker": "PHR",
+        "conviction_score": 8,
+        "reasoning": "The stock is experiencing a massive drop of -26.56% with no apparent negative news or significant insider selling. This aligns with Rule 1C, indicating an unexplained collapse often associated with a 'pump and dump' unwinding."
+    },
+    {
+        "date": "2026-04-01",
+        "ticker": "RKLZ",
+        "conviction_score": 8,
+        "reasoning": "The stock is experiencing a massive drop of -23.92% with no apparent negative news or significant insider selling. This aligns with Rule 1C, indicating an unexplained collapse often associated with a 'pump and dump' unwinding."
+    },
+    {
+        "date": "2026-04-02",
+        "ticker": "ORIC",
+        "conviction_score": 9,
+        "reasoning": "The stock is experiencing a massive, unexplained collapse, dropping over 41% with no negative news and no recent insider dumping. This aligns with Rule 1C, indicative of a potential 'pump and dump' unwinding. (Note: Free Float and Short Interest data were not available to assess for a Short-Squeeze Veto under Rule 2.)"
+    },
+    {
+        "date": "2026-04-02",
+        "ticker": "RH",
+        "conviction_score": 7,
+        "reasoning": "The stock is gapping down significantly by over 19% without any accompanying negative news or insider selling. While just under the '20%+' example threshold for Rule 1C, the magnitude of the drop suggests an unexplained collapse warranting a short. (Note: Free Float and Short Interest data were not available to assess for a Short-Squeeze Veto under Rule 2.)"
+    },
+    {
+        "date": "2026-04-03",
+        "ticker": "ELAB",
+        "conviction_score": 9,
+        "reasoning": "The stock is suffering a massive drop of -59.14%. No negative news was found, and there is no record of C-Suite insider dumping. This fits Rule 1.C (unexplained collapse of 20%+ with no news), signaling a potential pump and dump unwinding."
+    },
+    {
+        "date": "2026-04-03",
+        "ticker": "EEIQ",
+        "conviction_score": 8,
+        "reasoning": "The stock is experiencing a significant drop of -31.47%. There is no negative news reported, and no C-Suite insider selling was identified. This aligns with Rule 1.C (unexplained collapse of 20%+ with no news)."
+    },
+    {
+        "date": "2026-04-06",
+        "ticker": "POWL",
+        "conviction_score": 10,
+        "reasoning": "The stock is experiencing a massive drop of -67.04%, making it a significant daily loser. There is no devastating negative news reported (Rule 1A) and no C-Suite insider dumping detected (Rule 1B). This scenario perfectly aligns with Rule 1C: an unexplained collapse (dropping 20%+) with NO news, which often signals a 'pump and dump' unwinding. Rule 2 (Short-Squeeze Veto) cannot be applied as crucial Free Float and Short Interest data, necessary to determine if it's a short-squeeze trap, are not provided in the dossier. Rule 3 (Noise Filter) does not apply as the drop is significantly greater than 10%."
+    },
+    {
+        "date": "2026-04-06",
+        "ticker": "ELAB",
+        "conviction_score": 10,
+        "reasoning": "The stock is experiencing a massive drop of -59.14%, making it a significant daily loser. There is no devastating negative news reported (Rule 1A) and no C-Suite insider dumping detected (Rule 1B). This scenario perfectly aligns with Rule 1C: an unexplained collapse (dropping 20%+) with NO news, which often signals a 'pump and dump' unwinding. Rule 2 (Short-Squeeze Veto) cannot be applied as crucial Free Float and Short Interest data, necessary to determine if it's a short-squeeze trap, are not provided in the dossier. Rule 3 (Noise Filter) does not apply as the drop is significantly greater than 10%."
+    },
+    {
+        "date": "2026-04-06",
+        "ticker": "EEIQ",
+        "conviction_score": 10,
+        "reasoning": "The stock is experiencing a massive drop of -31.47%, making it a significant daily loser. There is no devastating negative news reported (Rule 1A) and no C-Suite insider dumping detected (Rule 1B). This scenario perfectly aligns with Rule 1C: an unexplained collapse (dropping 20%+) with NO news, which often signals a 'pump and dump' unwinding. Rule 2 (Short-Squeeze Veto) cannot be applied as crucial Free Float and Short Interest data, necessary to determine if it's a short-squeeze trap, are not provided in the dossier. Rule 3 (Noise Filter) does not apply as the drop is significantly greater than 10%."
+    }
+]
