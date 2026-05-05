@@ -15,7 +15,7 @@ from short_selling_agent.stage_tools import (
 # Configure Gemini directly (make sure GEMINI_API_KEY is in your environment)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY", os.environ.get("GOOGLE_API_KEY")))
 # Using 1.5 Pro to match your Lead Quant Trader
-model = genai.GenerativeModel("gemini-1.5-pro")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 DATES_TO_TEST = [
     "2026-03-26", "2026-03-27", "2026-03-30", "2026-03-31",

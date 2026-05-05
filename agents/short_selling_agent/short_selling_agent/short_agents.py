@@ -42,7 +42,7 @@ INSIDER_ANALYST_AGENT = LlmAgent(
 # ---------------------------------------------------------
 QUANT_COORDINATOR_AGENT = LlmAgent(
     name="LeadQuantTrader",
-    model="gemini-1.5-pro",
+    model="gemini-2.5-flash",
     tools=[tool_read_full_dossier],
     instruction=QUANT_COORDINATOR_INSTRUCTIONS
 )
