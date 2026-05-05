@@ -62,6 +62,7 @@ def generate_all_signals():
         
         try:
             response = model.generate_content(prompt)
+            print(f'--------- RESPONSE IS \n{response.text}\n---------')
             clean_output = response.text.replace("```json", "").replace("```", "").strip()
             
             decisions = json.loads(clean_output).get("final_decisions", [])
