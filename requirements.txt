@@ -228,6 +228,7 @@ SQLAlchemy==2.0.41
 sse-starlette==2.3.5
 stack-data==0.6.3
 starlette==0.46.2
+ta
 tenacity==8.5.0
 tiktoken==0.9.0
 tld==0.13
