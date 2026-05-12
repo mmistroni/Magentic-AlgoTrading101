@@ -1,3 +1,5 @@
+from types import Dict, Any 
+
 # scoring.py
 def calculate_short_conviction_score(data: dict) -> Dict[str, Any]:
     """

@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta
 
 # Import your module
-from fmp_tools import (
+from short_selling_agent.fmp_tools import (
     get_historical_price_full,
     get_technical_indicators,
     get_short_interest,
