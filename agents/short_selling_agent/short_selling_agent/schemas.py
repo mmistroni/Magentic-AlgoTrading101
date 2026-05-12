@@ -1,77 +1,110 @@
+# schemas/dossier.py — or wherever you keep models
+
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime, timedelta
-import requests
-import os
-import logging
+from datetime import datetime
 
-# --- MODELS FOR FINVIZ BLACKLIST ---
-class BlacklistReport(BaseModel):
-    tickers: List[str] = Field(description="List of highly shorted ticker symbols to avoid.")
-    error_message: Optional[str] = Field(default=None, description="Error message if fetch failed.")
 
-# --- MODELS FOR FMP LOSERS ---
+# ------------------------------
+# 1. INPUT DATA MODELS (Keep existing ones)
+# ------------------------------
 class MarketLoser(BaseModel):
     ticker: str = Field(description="Stock ticker symbol")
     price: float = Field(description="Current price")
     change_pct: float = Field(description="Percentage drop today")
 
-class BiggestLosersReport(BaseModel):
-    losers: List[MarketLoser] = Field(description="List of the biggest market losers today.")
-    error_message: Optional[str] = Field(default=None)
-
-# --- MODELS FOR FMP NEWS ---
 class NewsArticle(BaseModel):
-    date: str = Field(description="Publication date of the article")
-    title: str = Field(description="Headline of the article")
+    date: str = Field(description="Publication date")
+    title: str = Field(description="Headline")
+    content: str = Field(default="", description="Snippet or body")
 
 class StockNewsReport(BaseModel):
-    ticker: str = Field(description="The stock ticker symbol")
-    articles: List[NewsArticle] = Field(description="Chronological list of recent news articles")
-    error_message: Optional[str] = Field(default=None)
+    ticker: str
+    articles: List[NewsArticle]
+    error_message: Optional[str] = None
 
-# --- MODELS FOR FORM 4 INSIDER DATA ---
 class InsiderTrade(BaseModel):
-    date: str = Field(description="Date the transaction occurred")
-    name: str = Field(description="Name of the executive")
-    title: str = Field(description="Corporate title (e.g., CEO, CFO)")
-    value_sold: float = Field(description="Total dollar value of the stock sold")
+    date: str
+    name: str
+    title: str
+    value_sold: float
 
 class InsiderTradingReport(BaseModel):
-    ticker: str = Field(description="The stock ticker symbol")
-    total_dollars_dumped: float = Field(description="Aggregate dollar amount sold by C-Suite in the time window")
-    significant_sales: List[InsiderTrade] = Field(description="List of major individual sale transactions")
-    error_message: Optional[str] = Field(default=None)
+    ticker: str
+    total_dollars_dumped: float
+    significant_sales: List[InsiderTrade]
+    error_message: Optional[str] = None
 
 
-from pydantic import BaseModel
-from typing import List, Optional
+# ------------------------------
+# 2. QUANT SIGNAL MODEL (NEW)
+# ------------------------------
+class QuantitativeSignal(BaseModel):
+    """Full technical & fundamental health for a ticker as-of a date."""
+    ticker: str
 
-# Import your existing models
-from .schemas import MarketLoser, StockNewsReport, InsiderTradingReport
+    # Price Structure
+    latest_price: Optional[float] = None
+    price_below_sma200: Optional[bool] = None
+    price_below_sma50: Optional[bool] = None
+    sma50_below_sma200: Optional[bool] = None  # Bearish alignment
 
+    # Momentum
+    rsi_14: Optional[float] = None
+    adx_14: Optional[float] = None  # Trend strength
+    choppiness: Optional[float] = None
+
+    # Volume & Short
+    volume_ratio_to_avg: Optional[float] = None  # e.g., 1.8x average
+    short_interest_pct: Optional[float] = None
+    short_squeeze_risk: Optional[bool] = None  # >20% short interest
+
+    # Catalysts
+    recent_earnings_miss: Optional[bool] = None
+    large_insider_selling: Optional[bool] = None
+
+    # Metadata
+    as_of_date: str
+
+
+# ------------------------------
+# 3. AGENT DECISION MODEL
+# ------------------------------
 class QuantDecision(BaseModel):
     ticker: str
-    conviction_score: int
+    conviction_score: int = Field(ge=0, le=10)  # Gemini-scale: 1–10
     action: str  # SHORT, AVOID, COVER
     reasoning: str
 
+
+# ------------------------------
+# 4. UNIFIED PipelineDossier
+# ------------------------------
 class PipelineDossier(BaseModel):
-    """This is the state object passed from Agent to Agent."""
-    
-    # Populated by Agent 1 (BQ Ingestion)
-    market_losers: List[MarketLoser] 
-    
-    # Populated by Agent 2 (News)
-    news_reports: Optional[List[StockNewsReport]] = []
-    
-    # Populated by Agent 3 (Insiders)
-    insider_reports: Optional[List[InsiderTradingReport]] = []
-    
-    # Populated by Agent 4 (Quant Coordinator)
-    final_decisions: Optional[List[QuantDecision]] = []
+    """
+    The ONE true state object. Evolves through the pipeline.
+    """
+
+    # Stage 1: Biggest Movers
+    market_losers: List[MarketLoser] = Field(default_factory=list)
+
+    # Stage 2: News Context
+    news_reports: List[StockNewsReport] = Field(default_factory=list)
+
+    # Stage 3: Insider Activity
+    insider_reports: List[InsiderTradingReport] = Field(default_factory=list)
+
+    # Stage 4: Quantitative Analysis (your new fmp_tools output)
+    quant_reports: List[QuantitativeSignal] = Field(default_factory=list)  # ✅ Added
+
+    # Stage 5: Final Agent Decision
+    final_decisions: List[QuantDecision] = Field(default_factory=list)  # ✅ Already there
+
+    # Runtime
+    as_of_date: Optional[str] = None
+    run_id: Optional[str] = None
+
+    # Optional: if you want logging
+    metadata: dict = Field(default_factory=dict)
 
 
-class Plus500UniverseReport(BaseModel):
-    tickers: List[str] = Field(description="List of tradable ticker symbols on Plus500")
-    error_message: Optional[str] = Field(default=None)

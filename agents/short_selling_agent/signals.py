@@ -1,3 +1,5 @@
+# signal_generator.py
+
 import json
 import os
 import google.generativeai as genai
@@ -8,97 +10,134 @@ from short_selling_agent.stage_tools import (
     tool_fetch_bq_candidates,
     tool_stage_news,
     tool_stage_insiders,
+    tool_stage_quant_data,              # ✅ Added
     tool_read_full_dossier
 )
 
-# Configure Gemini directly
+# Configure Gemini
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY", os.environ.get("GOOGLE_API_KEY")))
-model = genai.GenerativeModel("gemini-2.5-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")  # ✅ Use stable model version
 
-DATES_TO_TEST = [
-    "2026-03-26", "2026-03-27", "2026-03-30", "2026-03-31",
-    "2026-04-01", "2026-04-02", "2026-04-03", "2026-04-06",
-    "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10",
-    "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16",
-    "2026-04-17", "2026-04-20", "2026-04-21", "2026-04-23",
-    "2026-04-24", "2026-04-26", "2026-04-27", "2026-04-28",
-    "2026-04-29", "2026-04-30", "2026-05-01", "2026-05-04"
+# -----------------------------
+# HISTORICAL DATES (FIX: REMOVE FUTURE DATES)
+# -----------------------------
+# ❌ Old: future fake dates
+# ✅ New: real, historical backtest range
+HISTORICAL_DATES = [
+    "2023-09-11", "2023-09-18", "2023-09-25",
+    "2023-10-02", "2023-10-09", "2023-10-16",
+    "2023-10-23", "2023-10-30", "2023-11-06",
+    "2023-11-13", "2023-11-20", "2023-11-27",
+    "2023-12-04", "2023-12-11", "2023-12-18"
 ]
 
-AGENT_4_INSTRUCTIONS = """
-You are the Lead Quant Trader. I am providing you with a JSON dossier containing Market Data, News, and Form 4 Insider Sales for a specific date.
-Keep in mind: Every stock in this dossier is ALREADY one of the biggest daily losers in the market (gapping down significantly).
+AGENT_INSTRUCTIONS = """
+You are the Lead Quant Trader. I am providing you with a JSON dossier containing:
 
-Synthesize this data using the following Balanced Risk Management rules:
+- Market Losers (biggest daily downers)
+- Latest News Headlines
+- Form 4 Insider Sales
+- Quantitative Technicals (RSI, ADX, SMA, Short Interest) ✅
 
-• RULE 1 (The Short Triggers): You should output SHORT if the stock is suffering a massive drop AND you see either:
-    A) Devastating negative news (earnings miss, dilution, FDA rejection).
-    B) Massive C-Suite insider dumping in the recent months (showing management abandoned ship).
-    C) An unexplained collapse (e.g., dropping 20%+) with NO news, which often signals a "pump and dump" unwinding.
+Every stock in this list is already a major loser.
 
-• RULE 2 (The Short-Squeeze Veto - STRICT): Output AVOID immediately, no matter how bad the news is, if the stock is a severe short-squeeze trap. This means:
-    - Free Float is very low (e.g., under 15 million shares), OR
-    - Short Interest is dangerously high (e.g., over 20%).
+RULES:
 
-• RULE 3 (The Noise Filter): Output AVOID if the stock is only down a small amount (e.g., less than 10%) with no bad news and no insider selling, as this is just normal market noise.
+• RULE 1 (Short Triggers): Only SHORT if:
+    A) There is devastating news AND the stock broke key support.
+    B) Massive C-suite insider selling.
+    C) An unexplained 20%+ collapse with no news → "pump and dump unwinding".
 
-For each ticker, output a JSON object exactly like this (do not output any markdown formatting, ONLY valid JSON):
+• RULE 2 (Short-Squeeze Veto – STRICT):
+    → AVOID if short interest > 20% (high squeeze risk).
+    → AVOID if free float < 15M shares.
+    ✅ Always check these.
+
+• RULE 3 (Noise Filter): AVOID if:
+    - The drop is < 10% AND no news
+    - OR RSI > 60 → not bearish
+    - OR price is above SMA200 → still in uptrend
+
+• Use Quant Data:
+    - RSI < 40 → supports bearish view
+    - ADX > 25 → trend strength → supports breakout
+    - Price below SMA200 → structural breakdown
+    - Short Interest > 20% → VETO (critical)
+
+For each ticker, output only this JSON format:
 {
   "final_decisions": [
-    { "ticker": "AAPL", "conviction_score": 8, "action": "SHORT", "reasoning": "Explain why..." }
+    {
+      "ticker": "AAPL",
+      "conviction_score": 8,  // 1–10
+      "action": "SHORT",      // or "AVOID"
+      "reasoning": "Explain using BOTH news and quantitative data"
+    }
   ]
 }
 """
 
 def generate_all_signals():
     all_signals = []
-    print("🚀 Generating signals. This will run quietly to maximize speed...")
+    print("🚀 Starting historical short-signal generation...")
 
-    for test_date in DATES_TO_TEST:
-        CURRENT_RUN_STATE.reset()
-        
-        tool_fetch_bq_candidates(as_of_date=test_date, limit=3)
+    for test_date in HISTORICAL_DATES:
+        print(f"\n📅 Processing date: {test_date}")
+        CURRENT_RUN_STATE.reset()  # ← Critical
+
+        # Step 1: Get market losers
+        tool_fetch_bq_candidates(as_of_date=test_date, limit=5)
         tickers = [loser.ticker for loser in CURRENT_RUN_STATE.dossier.market_losers]
-        
+
         if not tickers:
-            print(f"[{test_date}] No data. Skipped.")
+            print(f"  ⚠️ No tickers for {test_date}")
             continue
-            
+
+        # Step 2: For each ticker → stage data
         for ticker in tickers:
+            print(f"  → Processing: {ticker}")
             tool_stage_news(ticker, as_of_date=test_date)
             tool_stage_insiders(ticker, as_of_date=test_date)
-            
+            tool_stage_quant_data(ticker, as_of_date=test_date)  # ✅ ADDED
+
+        # Step 3: Build dossier → send to Agent
         dossier_json = tool_read_full_dossier()
-        prompt = f"{AGENT_4_INSTRUCTIONS}\n\nHere is the Dossier:\n{dossier_json}"
-        
+        prompt = f"{AGENT_INSTRUCTIONS}\n\nHere is the Dossier:\n{dossier_json}"
+
         try:
             response = model.generate_content(prompt)
-            raw_text = response.text
-            start_idx = raw_text.find('{')
-            end_idx = raw_text.rfind('}')
-            
-            if start_idx != -1 and end_idx != -1:
-                clean_json_str = raw_text[start_idx:end_idx+1]
-                decisions = json.loads(clean_json_str).get("final_decisions", [])
-                
-                for dec in decisions:
-                    if dec.get("action") == "SHORT":
-                        all_signals.append({
-                            "date": test_date,
-                            "ticker": dec.get("ticker", "UNKNOWN"),
-                            "conviction_score": dec.get("conviction_score", 0),
-                            "reasoning": dec.get("reasoning", "")
-                        })
-        except Exception:
-            pass # Fails silently to keep speed up
+            raw_text = response.text.strip()
 
-        # Save quietly in the background
+            # Parse JSON safely
+            start_idx = raw_text.find('{')
+            end_idx = raw_text.rfind('}') + 1
+            if start_idx == -1 or end_idx == 0:
+                continue
+
+            clean_json_str = raw_text[start_idx:end_idx]
+            decisions_data = json.loads(clean_json_str)
+
+            for decision in decisions_data.get("final_decisions", []):
+                if decision.get("action") == "SHORT":
+                    all_signals.append({
+                        "date": test_date,
+                        "ticker": decision["ticker"],
+                        "conviction_score": decision["conviction_score"],
+                        "reasoning": decision["reasoning"]
+                    })
+
+        except Exception as e:
+            print(f"  ❌ Failure on {test_date}: {str(e)}")
+            continue
+
+        # Save continuously
         with open("signals.json", "w") as f:
             json.dump(all_signals, f, indent=4)
-            
-        print(f"[{test_date}] Processed. Total shorts found so far: {len(all_signals)}")
 
-    print(f"\n✅ Finished! Saved {len(all_signals)} total short signals to signals.json")
+        print(f"  ✅ Done. Total shorts so far: {len(all_signals)}")
+
+    print(f"\n✅ Backtest complete. {len(all_signals)} signals saved to 'signals.json'")
+
 
 if __name__ == "__main__":
     generate_all_signals()
