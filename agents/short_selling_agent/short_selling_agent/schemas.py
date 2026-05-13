@@ -28,11 +28,14 @@ class BiggestLosersReport(BaseModel):
     error_message: Optional[str] = Field(default=None, description="Error message if fetch failed.")
 
 
-
 class NewsArticle(BaseModel):
     date: str = Field(description="Publication date")
     title: str = Field(description="Headline")
     content: str = Field(default="", description="Snippet or body")
+
+class Plus500UniverseReport(BaseModel):
+    tickers: List[str] = Field(description="List of tradable ticker symbols on Plus500")
+    error_message: Optional[str] = Field(default=None)
 
 class StockNewsReport(BaseModel):
     ticker: str
