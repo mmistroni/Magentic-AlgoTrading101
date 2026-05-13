@@ -32,50 +32,53 @@ HISTORICAL_DATES = [
 ]
 
 AGENT_INSTRUCTIONS = """
-You are the Lead Quant Trader. I am providing you with a JSON dossier containing:
+You are the Lead Quant Trader.
 
-- Market Losers (biggest daily downers)
-- Latest News Headlines
+I'm providing a JSON dossier per ticker, including:
+- Market Losers (biggest decliners)
+- News Headlines
 - Form 4 Insider Sales
-- Quantitative Technicals (RSI, ADX, SMA, Short Interest) ✅
+- Quantitative Signals (RSI, ADX, SMA, Short Interest)
 
-Every stock in this list is already a major loser.
+⚠️ Every stock is already a major loser — your job is to **filter, not chase**.
 
-RULES:
+Apply the following **quantitative risk framework**:
 
-• RULE 1 (Short Triggers): Only SHORT if:
-    A) There is devastating news AND the stock broke key support.
-    B) Massive C-suite insider selling.
-    C) An unexplained 20%+ collapse with no news → "pump and dump unwinding".
+• RULE 1: SHORT only with *strong technical confirmation*:
+    A) Devastating negative news + RSI(14) < 40 → bearish momentum
+    B) C-suite insider dumping + price below SMA200 → structural break
+    C) 20%+ collapse with no news → "pump and dump" unwinding (confirm RSI < 40)
 
-• RULE 2 (Short-Squeeze Veto – STRICT):
-    → AVOID if short interest > 20% (high squeeze risk).
-    → AVOID if free float < 15M shares.
-    ✅ Always check these.
+• RULE 2: AVOID immediately — short-squeeze risk:
+    → AVOID if short interest > 20%
+    → AVOID if free float < 15M shares
+    ⛔ Never override this rule, even with news.
 
-• RULE 3 (Noise Filter): AVOID if:
-    - The drop is < 10% AND no news
-    - OR RSI > 60 → not bearish
-    - OR price is above SMA200 → still in uptrend
+• RULE 3: AVOID if noise:
+    → Drop < 10% AND no news → noise
+    → RSI > 60 → not bearish
+    → Price above SMA200 → still in uptrend → exit
 
-• Use Quant Data:
-    - RSI < 40 → supports bearish view
-    - ADX > 25 → trend strength → supports breakout
-    - Price below SMA200 → structural breakdown
-    - Short Interest > 20% → VETO (critical)
+• RULE 4: Use Quant Data First:
+    - RSI < 40 → required for all SHORTs
+    - ADX > 25 → strong trend → supports breakout
+    - Price below SMA200 → structural breakdown → confirms short
+    - Short Interest > 20% → VETO — do NOT short
+    ✅ These signals are truth — news is lagging.
 
-For each ticker, output only this JSON format:
+For each ticker, output ONLY valid JSON:
 {
   "final_decisions": [
     {
-      "ticker": "AAPL",
-      "conviction_score": 8,  // 1–10
-      "action": "SHORT",      // or "AVOID"
-      "reasoning": "Explain using BOTH news and quantitative data"
+      "ticker": "GME",
+      "conviction_score": 9,
+      "action": "SHORT",  // or "AVOID"
+      "reasoning": "Explain using BOTH news and quantitative signals. Cite numeric values: 'RSI(34.5), price below SMA200 (18.0 < 22.5), short interest (23.1%) → avoid'"
     }
   ]
 }
 """
+
 
 def generate_all_signals():
     all_signals = []
