@@ -12,11 +12,9 @@ from pprint import pprint
 # CONFIG
 # -----------------------------
 FMP_API_KEY = os.getenv('FMP_API_KEY')
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # Check env vars
 assert FMP_API_KEY, "❌ FMP_API_KEY not set. Run: export FMP_API_KEY=your_key"
-assert GEMINI_API_KEY, "❌ GEMINI_API_KEY not set. Run: export GEMINI_API_KEY=your_key"
 
 TEST_TICKER = "GME"
 TEST_DATE = "2023-09-11"

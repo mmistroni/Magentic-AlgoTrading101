@@ -13,6 +13,22 @@ class MarketLoser(BaseModel):
     price: float = Field(description="Current price")
     change_pct: float = Field(description="Percentage drop today")
 
+# -----------------------------
+# 1. MODELS FOR BQ LOSERS
+# -----------------------------
+class MarketLoser(BaseModel):
+    """Represents a significant market loser."""
+    ticker: str = Field(description="Stock ticker symbol")
+    price: float = Field(description="Current price")
+    change_pct: float = Field(description="Percentage drop today")
+
+class BiggestLosersReport(BaseModel):
+    """Report model for the list of biggest market losers from BQ."""
+    losers: List[MarketLoser] = Field(description="List of biggest market losers today.")
+    error_message: Optional[str] = Field(default=None, description="Error message if fetch failed.")
+
+
+
 class NewsArticle(BaseModel):
     date: str = Field(description="Publication date")
     title: str = Field(description="Headline")
