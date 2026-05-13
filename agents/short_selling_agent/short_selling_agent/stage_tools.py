@@ -95,13 +95,13 @@ def tool_stage_insiders(
 
 # -----------------------------------------------------------------------------
 # tools/stage_tools.py or agent_tools.py
-from short_selling_agent.schemas import CURRENT_RUN_STATE
 
 def tool_read_full_dossier() -> str:
     """
     Call this after all staging steps.
     Returns full JSON of the dossier — visible to the next agent.
     """
+    from .state import CURRENT_RUN_STATE
     return CURRENT_RUN_STATE.dossier.model_dump_json(indent=2)
 
 
@@ -168,7 +168,7 @@ def get_plus500_universe(
 
 import os
 from typing import Dict, Any
-import fmp_tools  # ← Your fmp_tools.py
+from .fmp_tools import get_all_data_for_ticker  # ← Your fmp_tools.py
 
 # short_selling_agent/stage_tools.py
 
@@ -186,10 +186,10 @@ def tool_stage_quant_data(ticker: str, as_of_date: str) -> None:
 
     try:
         # Use your fmp_tools to fetch full data as of that date
-        data = fmp_tools.get_all_data_for_ticker(
+        data = get_all_data_for_ticker(
             symbol=ticker,
             as_of_date=as_of_date,
-            lookback_days=180
+            lookback_days=365
         )
 
         if not data['price']:
@@ -226,6 +226,7 @@ def tool_stage_quant_data(ticker: str, as_of_date: str) -> None:
         short_pct = short_info['shortPercent']  # Already a float (e.g., 0.235)
         short_pct_pct = round(short_pct * 100, 1) if short_pct else None
         short_squeeze_risk = short_pct > 0.20 if short_pct else None  # >20%
+        print(f"✅ Found short interest from: {short_info['shortDate']} → {short_info['shortPercent']*100:.1f}%")
 
         # ------------------------------
         # Extract: Catalysts
@@ -235,7 +236,7 @@ def tool_stage_quant_data(ticker: str, as_of_date: str) -> None:
             any(e['surprise'] and e['surprise'] < -0.1 for e in earnings_list)
             if earnings_list else None
         )
-
+        
         insider_selling_events = len([
             t for t in data['fundamentals']['recent_earnings']
             if t.get('transaction_type') == 'SELL' and (t.get('value_sold', 0) > 1e6)

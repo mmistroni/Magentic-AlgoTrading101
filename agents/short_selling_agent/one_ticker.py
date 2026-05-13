@@ -8,6 +8,8 @@ import os
 import json
 from pprint import pprint
 
+from short_selling_agent.state import CURRENT_RUN_STATE
+
 # -----------------------------
 # CONFIG
 # -----------------------------
