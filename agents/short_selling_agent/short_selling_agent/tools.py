@@ -308,41 +308,147 @@ def get_squeeze_metrics(
 
     return short_pct, free_float
 
-
 # -----------------------------------------------------------------------------
-def get_bq_short_candidates(
-    limit: int = 5,
-    as_of_date: str | None = None
-) -> list[dict]:
-    """
-    Low-level BQ helper for losers.
+# tools/get_bq_short_candidates.py
+"""
+Fetch top market losers for a given date.
+Tries BigQuery first, then falls back to FMP.
+"""
+# tools/get_bq_short_candidates.py
+"""
+Low-level BQ helper for losers.
+Queries: `datascience-projects.finviz_blacklist.fmp_daily_losers`
+"""
 
+import os
+import requests
+import logging
+from google.cloud import bigquery
+import datetime
+from short_selling_agent.schemas import MarketLoser
+
+# -----------------------------
+# Main Tool: fetch big candidates
+# -----------------------------
+def get_bq_short_candidates(limit: int = 3, as_of_date: str = None):
+    """
     AGENT INSTRUCTIONS:
-      • Pass as_of_date to query scrape_date=as_of_date,
-        otherwise CURRENT_DATE().
+      • Pass as_of_date to query scrape_date = as_of_date,
+        otherwise DEFAULT to CURRENT_DATE().
+      • Returns List[MarketLoser] with ticker, price, change_pct.
+      • Uses `datascience-projects.finviz_blacklist.fmp_daily_losers`
     """
-    client = bigquery.Client(project="datascience-projects")
-    date_filter = f"DATE '{as_of_date}'" if as_of_date else "CURRENT_DATE()"
-    sql = f"""
-      SELECT
-        ticker,
-        price,
-        change_pct,
-        short_interest_pct,
-        free_float,
-        is_squeeze_risk
-      FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
-      WHERE scrape_date = {date_filter}
-        AND price >= 5.0
-      ORDER BY change_pct ASC
-      LIMIT @lim
+    table_ref = "datascience-projects.finviz_blacklist.fmp_daily_losers"
+
+    # Choose date
+    if as_of_date:
+        query_date = as_of_date  # "YYYY-MM-DD"
+    else:
+        # Default to yesterday
+        query_date = (
+            datetime.datetime.now().date() - datetime.timedelta(days=1)
+        ).isoformat()
+
+    return _fetch_from_bigquery(table_ref, limit, query_date)
+
+
+# -----------------------------
+# 1. Fetch from BigQuery
+# -----------------------------
+def _fetch_from_bigquery(table_ref: str, limit: int, query_date: str):
     """
-    job = client.query(
-        sql,
-        job_config=bigquery.QueryJobConfig(
+    Load big losers where `scrape_date` = query_date
+    Schema:
+        scrape_date DATE
+        ticker STRING
+        currentPrice FLOAT
+        change FLOAT  → e.g., -0.145 for -14.5%
+    """
+    project_id = os.environ.get("GCP_PROJECT_ID", "datascience-projects")
+    client = bigquery.Client()
+
+    query = f"""
+        SELECT
+            ticker,
+            currentPrice AS price,
+            change * 100 AS change_pct  -- to percent (-0.145 → -14.5)
+        FROM `{table_ref}`
+        WHERE DATE(scrape_date) = @target_date  -- Aligns with as_of_date
+        AND change < 0
+        ORDER BY change ASC
+        LIMIT {limit}
+    """
+
+    try:
+        job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("lim","INT64",limit)
+                bigquery.ScalarQueryParameter("target_date", "DATE", query_date)
             ]
         )
-    )
-    return [dict(row) for row in job.result()]
+
+        rows = client.query(query, job_config=job_config).result()
+
+        return [
+            MarketLoser(
+                ticker=row["ticker"].strip(),
+                price=row["price"],
+                change_pct=round(row["change_pct"], 1)
+            )
+            for row in rows
+        ]
+
+    except Exception as e:
+        logging.error(f"❌ BQ fetch failed: {e}")
+        return None
+
+
+# -----------------------------
+# 2. Fallback: FMP - Earnings Miss + Drop
+# -----------------------------
+def _fetch_from_fmp_approx(target_date: str, limit: int) -> list:
+    """
+    Fallback: Use FMP earnings calendar to get big decliners.
+    """
+    FMP_KEY = os.getenv('FMP_API_KEY')
+    if not FMP_KEY:
+        return []
+
+    try:
+        url = (
+            f"https://financialmodelingprep.com/api/v4/earning_calendar"
+            f"?from={target_date}&to={target_date}&apikey={FMP_KEY}"
+        )
+        resp = requests.get(url, timeout=10)
+        if resp.status_code != 200:
+            return []
+
+        earnings = resp.json()
+        losers = []
+
+        for e in earnings:
+            ticker = e.get("ticker")
+            close_price = e.get("close", 0)
+            change = e.get("percentage", 0)  # in % (e.g., -12.3)
+
+            if change < -10.0:  # big drop
+                losers.append(
+                    MarketLoser(
+                        ticker=ticker,
+                        price=close_price,
+                        change_pct=round(change, 1)
+                    )
+                )
+                if len(losers) >= limit:
+                    break
+
+        return losers
+
+    except Exception as e:
+        logging.error(f"🔴 FMP fallback error: {e}")
+        return []
+
+
+# -----------------------------
+# Final Public Function
+# -----------------------------
+# Already defined up top: `get_bq_short_candidates(...)`
