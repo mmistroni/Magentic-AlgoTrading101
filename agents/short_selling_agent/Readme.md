@@ -19,3 +19,9 @@ User prompt
 Updated agent definitions
 – Each agent will simply re-parse that same date from the conversation history and forward it to its tool.
 – You always supply a date, so no need for a fallback.
+
+
+--- test tickers
+ one_tickers.py tests the flow
+ signals.py run multiple signals
+ run_backtest clculates pnl

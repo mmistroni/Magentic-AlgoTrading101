@@ -21,24 +21,7 @@
       "error_message": null
     }
   ],
-  "quant_reports": [
-    {
-      "ticker": "GME",
-      "latest_price": 17.02,
-      "price_below_sma200": null,
-      "price_below_sma50": true,
-      "sma50_below_sma200": null,
-      "rsi_14": 34.5,
-      "adx_14": 23.6,
-      "choppiness": null,
-      "volume_ratio_to_avg": 1.06,
-      "short_interest_pct": null,
-      "short_squeeze_risk": null,
-      "recent_earnings_miss": null,
-      "large_insider_selling": false,
-      "as_of_date": "2023-09-11"
-    }
-  ],
+  "quant_reports": [],
   "final_decisions": [],
   "as_of_date": null,
   "run_id": null,
