@@ -34,6 +34,7 @@ def get_fmp_bigger_losers(
     # ———————————————————————————————————
     # Case A: Historical Request → BQ + Fallback
     # ———————————————————————————————————
+    print(f"🔍 [get_fmp_bigger_losers] Starting fetch: as_of_date={as_of_date}, limit={limit}")
     if as_of_date:
         logging.info(f"🔍 [get_fmp_bigger_losers] Historical mode: fetching losers for {as_of_date}, limit={limit}")
 
