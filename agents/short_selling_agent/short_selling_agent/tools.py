@@ -35,12 +35,15 @@ def get_fmp_bigger_losers(
     if as_of_date:
         client = bigquery.Client(project="datascience-projects")
         sql = """
-          SELECT symbol AS ticker,
-                 price,
-                 changesPercentage AS change_pct
+          SELECT ticker,
+                    price,
+                    change_pct,
+                    short_interest_pct,
+                    free_float,
+                    is_squeeze_risk
           FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
           WHERE scrape_date = @dt
-          ORDER BY changesPercentage ASC
+          ORDER BY change_pct ASC
           LIMIT @lim
         """
         job = client.query(
