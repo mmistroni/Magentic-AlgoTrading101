@@ -19,7 +19,6 @@ from .schemas import (
 # -----------------------------------------------------------------------------
 # short_selling_agent/tools.py
 
-#from .get_bq_short_candidates import get_bq_short_candidates, _fetch_from_fmp_earning_drop_fallback
 from .schemas import BiggestLosersReport
 
 
