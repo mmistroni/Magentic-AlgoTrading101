@@ -368,37 +368,86 @@ def get_bq_short_candidates(
     as_of_date: str | None = None
 ) -> list[dict]:
     """
-    Low-level BQ helper for losers.
+    Fetch top EOD losers:
+      - Try BigQuery fmp_daily_losers first
+      - If empty/fail → fall back to FMP earning_calendar
 
-    AGENT INSTRUCTIONS:
-      • Pass as_of_date to query scrape_date=as_of_date,
-        otherwise CURRENT_DATE().
+    Returns list of dicts with:
+      {ticker, price, change_pct, short_interest_pct, free_float, is_squeeze_risk}
     """
-    client = bigquery.Client(project="datascience-projects")
-    date_filter = f"DATE '{as_of_date}'" if as_of_date else "CURRENT_DATE()"
-    sql = f"""
-      SELECT
-        ticker,
-        price,
-        change_pct,
-        short_interest_pct,
-        free_float,
-        is_squeeze_risk
-      FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
-      WHERE scrape_date = {date_filter}
-        AND price >= 5.0
-      ORDER BY change_pct ASC
-      LIMIT @lim
-    """
-    job = client.query(
-        sql,
-        job_config=bigquery.QueryJobConfig(
+    # Determine date
+    if as_of_date:
+        query_date = as_of_date
+    else:
+        query_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    logging.info(f"🔍 [get_bq_short_candidates] Fetching for date={query_date}, limit={limit}")
+
+    # -------------------------------
+    # Step 1: Try BigQuery
+    # -------------------------------
+    try:
+        client = bigquery.Client(project="datascience-projects")
+        sql = """
+          SELECT ticker, price, change_pct, short_interest_pct, free_float, is_squeeze_risk
+          FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
+          WHERE DATE(scrape_date) = @dt
+            AND price >= 5.0
+            AND change_pct IS NOT NULL
+          ORDER BY change_pct ASC
+          LIMIT @lim
+        """
+        job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("lim","INT64",limit)
+                bigquery.ScalarQueryParameter("dt", "DATE", query_date),
+                bigquery.ScalarQueryParameter("lim", "INT64", limit),
             ]
         )
-    )
-    return [dict(row) for row in job.result()]
+        job = client.query(sql, job_config=job_config)
+        rows = list(job.result())
+
+        if rows:
+            result = [dict(row) for row in rows]
+            logging.info(f"✅ BQ success: {len(result)} tickers = {[r['ticker'] for r in result]}")
+            return result
+        else:
+            logging.warning(f"⚠️ BQ returned no data for {query_date}")
+
+    except Exception as e:
+        logging.error(f"❌ BQ query failed: {e}")
+
+    # -------------------------------
+    # Step 2: Fall back to FMP earning_calendar
+    # -------------------------------
+    logging.warning(f"📡 [FALLBACK] No BQ data for {query_date} → falling back to FMP earning_calendar")
+    try:
+        fmp_losers = _fetch_from_fmp_earning_drop_fallback(query_date, limit)
+        if fmp_losers:
+            # Convert to dict format; fill missing S/Risk fields with default
+            result = [
+                {
+                    "ticker": ml.ticker,
+                    "price": ml.price,
+                    "change_pct": ml.change_pct,
+                    "short_interest_pct": 0.0,
+                    "free_float": 0.0,
+                    "is_squeeze_risk": False,
+                }
+                for ml in fmp_losers
+            ]
+            logging.info(f"✅ Fallback success: {len(result)} tickers = {[r['ticker'] for r in result]}")
+            return result
+        else:
+            logging.info(f"❌ FMP fallback returned no data for {query_date}")
+
+    except Exception as e:
+        logging.error(f"💥 FMP fallback failed: {e}")
+
+    # -------------------------------
+    # Final: Nothing worked
+    # -------------------------------
+    logging.warning(f"🛑 No candidates found for {query_date}")
+    return []
 
 
 # -----------------------------------------------------------------------------

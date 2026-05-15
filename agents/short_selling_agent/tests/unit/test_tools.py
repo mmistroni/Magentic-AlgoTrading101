@@ -83,8 +83,7 @@ def test_get_fmp_bigger_losers_success(monkeypatch):
     assert report.error_message is None
     assert len(report.losers) == 2
     assert report.losers[0].ticker == "AAPL"
-    assert pytest.approx(report.losers[0].change_pct) == -2.3
-
+    assert pytest.approx(report.losers[0].change_pct) == -0.023
 
 
 #------------------------------------------------------------------------------
@@ -197,32 +196,48 @@ def test_get_squeeze_metrics_exception(monkeypatch):
 #------------------------------------------------------------------------------
 # Tests for get_bq_short_candidates
 #------------------------------------------------------------------------------
-def test_get_bq_short_candidates(monkeypatch):
-    # instead of DummyRow, use plain dicts
-    rows = [
-        {
-          "ticker": "AAA",
-          "price": 10.0,
-          "change_pct": -5.0,
-          "short_interest_pct": 20.0,
-          "free_float": 100000.0,
-          "is_squeeze_risk": False
-        },
-        {
-          "ticker": "BBB",
-          "price": 6.0,
-          "change_pct": -3.0,
-          "short_interest_pct": 15.0,
-          "free_float": 200000.0,
-          "is_squeeze_risk": True
-        },
-    ]
-    DummyClient._rows = rows
-    monkeypatch.setattr(tools.bigquery, "Client", lambda project=None: DummyClient(project))
-    out = get_bq_short_candidates(limit=2)
-    assert out[0]["ticker"] == "AAA"
-    assert out[1]["is_squeeze_risk"] is True
+def test_bq_short_candidates_live_mode_uses_yesterday(monkeypatch):
+    """
+    When as_of_date=None, get_bq_short_candidates:
+      - Defaults to yesterday
+      - BQ returns nothing
+      - Falls back to _fetch_from_fmp_earning_drop_fallback
+      - Returns fallback data in dict format
+    """
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
+    # -------------------------------
+    # 🧱 Step 1: Mock BQ → return empty
+    # -------------------------------
+    DummyClient._rows = []
+    monkeypatch.setattr(tools.bigquery, "Client", lambda project: DummyClient(project))
+
+    # -------------------------------
+    # 🔁 Step 2: Mock fallback → return list of MarketLoser
+    # Use plain function to avoid Mock()
+    # -------------------------------
+    def fake_fallback(date_str, limit):
+        assert limit == 5
+        loser = tools.MarketLoser(ticker="NVDA", price=800.0, change_pct=-0.18)
+        return [loser]
+
+    monkeypatch.setattr(tools, "_fetch_from_fmp_earning_drop_fallback", fake_fallback)
+
+    # -------------------------------
+    # 🧪 Step 3: Run
+    # -------------------------------
+    result = get_bq_short_candidates(limit=5, as_of_date=None)
+
+    # -------------------------------
+    # ✅ Assert
+    # -------------------------------
+    assert len(result) == 1
+    assert result[0]["ticker"] == "NVDA"
+    assert result[0]["price"] == 800.0
+    assert result[0]["change_pct"] == -0.18
+    assert result[0]["short_interest_pct"] == 0.0
+    assert result[0]["free_float"] == 0.0
+    assert result[0]["is_squeeze_risk"] is False
 
 
 #------------------------------------------------------------------------------

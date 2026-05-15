@@ -170,3 +170,79 @@ def test_get_fmp_bigger_losers_historical_bq_success(monkeypatch):
     assert report.losers[0].change_pct == -0.15
     assert report.error_message is None
     mock_fallback.assert_not_called()
+
+
+def test_get_bq_short_candidates_fallback_to_fmp_historical(monkeypatch):
+    """
+    When BQ returns no data for a historical date, it should fall back to FMP.
+    """
+    # -------------------------------
+    # 1. Mock BQ → return empty
+    # -------------------------------
+    DummyClient._rows = []
+    monkeypatch.setattr(tools.bigquery, "Client", lambda project: DummyClient(project))
+
+    # -------------------------------
+    # 2. Mock fallback → return a known loser
+    # -------------------------------
+    def fake_fallback(target_date: str, limit: int):
+        assert target_date == "2023-10-25"
+        assert limit == 5
+        return [tools.MarketLoser(ticker="AMD", price=160.0, change_pct=-0.15)]
+
+    monkeypatch.setattr(tools, "_fetch_from_fmp_earning_drop_fallback", fake_fallback)
+
+    # -------------------------------
+    # 3. Run
+    # -------------------------------
+    result = get_bq_short_candidates(limit=5, as_of_date="2023-10-25")
+
+    # -------------------------------
+    # 4. Assert
+    # -------------------------------
+    assert len(result) == 1
+    assert result[0]["ticker"] == "AMD"
+    assert result[0]["price"] == 160.0
+    assert result[0]["change_pct"] == -0.15
+    assert result[0]["short_interest_pct"] == 0.0
+    assert result[0]["free_float"] == 0.0
+    assert result[0]["is_squeeze_risk"] is False
+
+def test_get_bq_short_candidates_fallback_to_fmp_live_mode(monkeypatch):
+    """
+    When as_of_date=None, it defaults to yesterday and falls back to FMP if BQ has no data.
+    """
+    # Calculate expected target date: yesterday
+    expected_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # -------------------------------
+    # 1. Mock BQ → return empty
+    # -------------------------------
+    DummyClient._rows = []
+    monkeypatch.setattr(tools.bigquery, "Client", lambda project: DummyClient(project))
+
+    # -------------------------------
+    # 2. Mock fallback → return NVDA drop
+    # -------------------------------
+    def fake_fallback(target_date: str, limit: int):
+        assert target_date == expected_date
+        assert limit == 5
+        return [tools.MarketLoser(ticker="NVDA", price=800.0, change_pct=-0.18)]
+
+    monkeypatch.setattr(tools, "_fetch_from_fmp_earning_drop_fallback", fake_fallback)
+
+    # -------------------------------
+    # 3. Run
+    # -------------------------------
+    result = get_bq_short_candidates(limit=5, as_of_date=None)
+
+    # -------------------------------
+    # 4. Assert
+    # -------------------------------
+    assert len(result) == 1
+    assert result[0]["ticker"] == "NVDA"
+    assert result[0]["price"] == 800.0
+    assert result[0]["change_pct"] == -0.18
+    assert result[0]["short_interest_pct"] == 0.0
+    assert result[0]["free_float"] == 0.0
+    assert result[0]["is_squeeze_risk"] is False
