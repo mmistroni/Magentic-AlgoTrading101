@@ -26,7 +26,7 @@ def get_fmp_bigger_losers(
     Fetch biggest losers with fallback only for historical dates.
 
     • Live (as_of_date=None): Use FMP's /stable/biggest-losers
-    • Historical (as_of_date=YYYY-MM-DD): 
+    • Historical (as_of_date=YYYY-MM-DD):
         1. Try BigQuery `fmp_daily_losers`
         2. If empty, fall back to FMP earning_calendar
         3. If both fail → error
@@ -35,7 +35,8 @@ def get_fmp_bigger_losers(
     # Case A: Historical Request → BQ + Fallback
     # ———————————————————————————————————
     if as_of_date:
-        # Try BQ first
+        logging.info(f"🔍 [get_fmp_bigger_losers] Historical mode: fetching losers for {as_of_date}, limit={limit}")
+
         try:
             client = bigquery.Client(project="datascience-projects")
             sql = """
@@ -47,16 +48,16 @@ def get_fmp_bigger_losers(
               ORDER BY change_pct ASC
               LIMIT @lim
             """
-            job = client.query(
-                sql,
-                job_config=bigquery.QueryJobConfig(
-                    query_parameters=[
-                        bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
-                        bigquery.ScalarQueryParameter("lim", "INT64", limit),
-                    ]
-                )
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
+                    bigquery.ScalarQueryParameter("lim", "INT64", limit),
+                ]
             )
-            rows = job.result()
+            job = client.query(sql, job_config=job_config)
+            rows = list(job.result())  # Force execution
+            logging.info(f"📊 BQ query completed: {len(rows)} row(s) returned")
+
             losers = [
                 MarketLoser(
                     ticker=row.ticker,
@@ -67,23 +68,26 @@ def get_fmp_bigger_losers(
             ]
 
             if losers:
+                logging.info(f"✅ BQ success: {len(losers)} losers: {[l.ticker for l in losers]}")
                 return BiggestLosersReport(losers=losers)
 
         except Exception as e:
-            # Log but keep going to fallback
-            logging.warning(f"BQ query failed in get_fmp_bigger_losers for {as_of_date}: {e}")
+            logging.error(f"❌ BQ query failed for {as_of_date}: {e}")
 
-        # Fallback: Use earning_calendar when BQ returns nothing
-        logging.info(f"No BQ data for {as_of_date}, falling back to FMP earning_calendar")
+        # ———————— Fallback: earning_calendar ————————
+        logging.warning(f"📡 [FALLBACK] No data from BQ for {as_of_date} → trying FMP earning_calendar")
         try:
             fmp_fallback = _fetch_from_fmp_earning_drop_fallback(as_of_date, limit)
             if fmp_fallback:
+                logging.info(f"✅ Fallback succeeded: {len(fmp_fallback)} losers: {[l.ticker for l in fmp_fallback]}")
                 return BiggestLosersReport(losers=fmp_fallback)
+            else:
+                logging.info(f"❌ Fallback returned 0 losers for {as_of_date}")
         except Exception as e:
-            logging.warning(f"FMP fallback failed: {e}")
+            logging.error(f"💥 FMP fallback failed: {e}")
 
-        # Final: Nothing worked
-        error_msg = f"No market losers found for {as_of_date} via BQ or FMP fallback"
+        # ———————— Final: Nothing worked ————————
+        error_msg = f"⚠️ No market losers found for {as_of_date} via BQ or FMP fallback"
         logging.warning(error_msg)
         return BiggestLosersReport(losers=[], error_message=error_msg)
 
@@ -92,33 +96,43 @@ def get_fmp_bigger_losers(
     # ———————————————————————————————————
     api_key = os.environ.get("FMP_API_KEY", "")
     if not api_key:
-        return BiggestLosersReport(losers=[], error_message="FMP_API_KEY missing")
+        error_msg = "FMP_API_KEY missing"
+        logging.error(error_msg)
+        return BiggestLosersReport(losers=[], error_message=error_msg)
 
     url = f"https://financialmodelingprep.com/stable/biggest-losers?apikey={api_key}"
+    logging.info("🚀 [Live] Fetching biggest losers from FMP")
     try:
         response = requests.get(url, timeout=10)
-        if response.status_code != 200:
-            logging.warning(f"FMP biggest-losers API returned {response.status_code}")
-            return BiggestLosersReport(losers=[], error_message="API request failed")
+        logging.debug(f"📡 FMP response status: {response.status_code}")
 
-        data = response.json() or []
+        if response.status_code != 200:
+            logging.warning(f"❌ FMP /biggest-losers returned {response.status_code}: {response.text[:200]}")
+            return BiggestLosersReport(losers=[], error_message=f"HTTP {response.status_code}")
+
+        data = response.json()
+        if not isinstance(data, list):
+            logging.warning(f"⚠️ FMP /biggest-losers did not return a list: got {type(data)}")
+            return BiggestLosersReport(losers=[], error_message="Invalid response format")
+
         items = data[:limit]
         losers = [
             MarketLoser(
                 ticker=item.get("symbol", ""),
                 price=float(item.get("price", 0.0)),
-                change_pct=float(item.get("changesPercentage", 0.0))
+                change_pct=float(item.get("changesPercentage", 0.0)) / 100.0
+                if item.get("changesPercentage") not in (None, "") else 0.0
             )
             for item in items
-            if item.get("symbol") and item.get("changesPercentage") is not None
+            if item.get("symbol")
         ]
+
+        logging.info(f"✅ Live mode: {len(losers)} losers fetched: {[l.ticker for l in losers]}")
         return BiggestLosersReport(losers=losers)
 
-    except (requests.RequestException, ValueError, TypeError) as e:
-        logging.error(f"Error fetching live biggest losers: {e}")
+    except Exception as e:
+        logging.error(f"💥 Error in live biggest-losers fetch: {e}")
         return BiggestLosersReport(losers=[], error_message=str(e))
-
-
 
 # -----------------------------------------------------------------------------
 # in short_selling_agent/tools.py, overwrite get_fmp_news:
@@ -389,32 +403,33 @@ def get_bq_short_candidates(
 # -----------------------------------------------------------------------------
 def _fetch_from_fmp_earning_drop_fallback(target_date: str, limit: int = 5) -> list[MarketLoser]:
     """
-    Fetch stocks with significant price drops on a given date using FMP's earning_calendar.
-
-    This is a fallback method when BigQuery has no data (e.g. ETL failure).
-
-    Returns up to `limit` MarketLoser entries with drops >10%, sorted by worst drop.
+    Fallback: Get big drop stocks via FMP earning_calendar for missing historical days.
+    Only used when BigQuery has no data.
     """
     FMP_KEY = os.environ.get("FMP_API_KEY")
     if not FMP_KEY:
-        logging.warning("FMP_API_KEY not set, skipping earning_calendar fallback")
+        logging.error("❌ FMP_API_KEY not set in _fetch_from_fmp_earning_drop_fallback")
         return []
 
+    url = (
+        f"https://financialmodelingprep.com/api/v4/earning_calendar"
+        f"?from={target_date}&to={target_date}&apikey={FMP_KEY}"
+    )
+    logging.info(f"📡 [FMP Fallback] Fetching earning_calendar data: {target_date}")
+
     try:
-        url = (
-            f"https://financialmodelingprep.com/api/v4/earning_calendar"
-            f"?from={target_date}&to={target_date}&apikey={FMP_KEY}"
-        )
         response = requests.get(url, timeout=10)
+        logging.debug(f"📡 [FMP Fallback] Response status: {response.status_code}")
+
         if response.status_code != 200:
-            logging.warning(f"FMP earning_calendar returned {response.status_code}: {response.text}")
+            logging.warning(f"❌ [FMP Fallback] Bad status: {response.status_code} → {response.text[:200]}")
             return []
 
         data = response.json()
+        logging.debug(f"📥 [FMP Fallback] Raw data: {data}")
 
-        # Ensure it's a list
         if not isinstance(data, list):
-            logging.warning("FMP earning_calendar did not return a list")
+            logging.warning(f"⚠️ [FMP Fallback] Expected list, got: {type(data)}")
             return []
 
         losers = []
@@ -422,33 +437,20 @@ def _fetch_from_fmp_earning_drop_fallback(target_date: str, limit: int = 5) -> l
             ticker = e.get("ticker", "").strip()
             if not ticker:
                 continue
-
-            # Close price
             close_price = float(e.get("close", 0.0) or 0.0)
-
-            # Percentage — e.g., -15.0 for -15%
             change_pct_raw = float(e.get("percentage", 0.0) or 0.0)
-            change_pct_decimal = change_pct_raw / 100.0  # Convert % → float (-0.15)
+            change_pct = change_pct_raw / 100.0
 
-            if change_pct_decimal < -0.10:  # More than 10% drop
+            if change_pct < -0.10:  # >10% drop
                 losers.append(
-                    MarketLoser(
-                        ticker=ticker,
-                        price=close_price,
-                        change_pct=change_pct_decimal
-                    )
+                    MarketLoser(ticker=ticker, price=close_price, change_pct=change_pct)
                 )
 
-        # Sort by worst drop, limit
+        # Sort worst first
         losers.sort(key=lambda x: x.change_pct)
+        logging.info(f"🎯 [FMP Fallback] Found {len(losers)} big-drop stocks: {[l.ticker for l in losers[:limit]]}")
         return losers[:limit]
 
-    except requests.RequestException as e:
-        logging.error(f"Network error fetching earning_calendar: {e}")
-        return []
-    except (ValueError, TypeError, KeyError) as e:
-        logging.error(f"Data error parsing earning_calendar response: {e}")
-        return []
     except Exception as e:
-        logging.error(f"Unexpected error in _fetch_from_fmp_earning_drop_fallback: {e}")
+        logging.error(f"💥 [FMP Fallback] Exception: {e}")
         return []
