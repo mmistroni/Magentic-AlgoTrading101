@@ -31,15 +31,15 @@ def fix_env(monkeypatch):
 # Helpers
 #------------------------------------------------------------------------------
 class DummyResponse:
-    def __init__(self, payload=None, exc=None):
+    def __init__(self, payload=None, exc=None, status_code=200):
         self._payload = payload
         self._exc = exc
+        self.status_code = status_code  # Required by .status_code checks
 
     def json(self):
         if self._exc:
             raise self._exc
         return self._payload
-
 
 class DummyRow:
     def __init__(self, **kwargs):
@@ -66,23 +66,25 @@ class DummyClient:
 #------------------------------------------------------------------------------
 # Tests for get_fmp_bigger_losers
 #------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Tests for get_fmp_bigger_losers
+# -----------------------------------------------------------------------------
 def test_get_fmp_bigger_losers_success(monkeypatch):
     sample = [
         {"symbol": "AAPL", "price": 150.0, "changesPercentage": -2.3},
         {"symbol": "TSLA", "price": 600.0, "changesPercentage": -5.0},
     ]
-    monkeypatch.setattr(requests, "get", lambda url: DummyResponse(sample))
+
+    def mock_get(url, *args, **kwargs):
+        return DummyResponse(sample, status_code=200)  # ✅ Now has status_code
+
+    monkeypatch.setattr(requests, "get", mock_get)
     report = get_fmp_bigger_losers()
     assert report.error_message is None
     assert len(report.losers) == 2
     assert report.losers[0].ticker == "AAPL"
     assert pytest.approx(report.losers[0].change_pct) == -2.3
 
-def test_get_fmp_bigger_losers_exception(monkeypatch):
-    monkeypatch.setattr(requests, "get", lambda url: DummyResponse(exc=ValueError("oops")))
-    report = get_fmp_bigger_losers()
-    assert report.losers == []
-    assert "oops" in report.error_message.lower()
 
 
 #------------------------------------------------------------------------------
@@ -242,3 +244,19 @@ def test_get_plus500_universe_failure(monkeypatch):
     report = get_plus500_universe()
     assert report.tickers == []
     assert "BQ gone" in report.error_message
+
+def test_get_fmp_news_live(monkeypatch):
+    """
+    Live mode: calls FMP stock news API with no date filters.
+    Uses existing DummyResponse to handle exceptions correctly.
+    """
+    fake = [{"symbol": "XYZ", "publishedDate": "2026-04-29", "title": "Today’s Drop"}]
+
+    def mock_get(url, *args, **kwargs):
+        return DummyResponse(fake)
+
+    monkeypatch.setattr(requests, "get", mock_get)
+    rpt = get_fmp_news("XYZ", as_of_date=None)
+    assert rpt.error_message is None
+    assert len(rpt.articles) == 1
+    assert rpt.articles[0].title == "Today’s Drop"

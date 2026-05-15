@@ -17,72 +17,107 @@ from .schemas import (
 
 
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def get_fmp_bigger_losers(
     limit: int = 5,
     as_of_date: str | None = None
 ) -> BiggestLosersReport:
     """
-    Fetch biggest losers either live or for a historical date.
+    Fetch biggest losers with fallback only for historical dates.
 
-    AGENT INSTRUCTIONS:
-    • Live (as_of_date=None): calls FMP “stable/biggest-losers” API.
-    • Historical (as_of_date set): queries BigQuery table
-      `finviz_blacklist.fmp_daily_losers` for scrape_date = as_of_date,
-      ordered by changesPercentage ASC, limit=limit.
-
-    Returns a BiggestLosersReport.
+    • Live (as_of_date=None): Use FMP's /stable/biggest-losers
+    • Historical (as_of_date=YYYY-MM-DD): 
+        1. Try BigQuery `fmp_daily_losers`
+        2. If empty, fall back to FMP earning_calendar
+        3. If both fail → error
     """
+    # ———————————————————————————————————
+    # Case A: Historical Request → BQ + Fallback
+    # ———————————————————————————————————
     if as_of_date:
-        client = bigquery.Client(project="datascience-projects")
-        sql = """
-          SELECT ticker,
-                    price,
-                    change_pct,
-                    short_interest_pct,
-                    free_float,
-                    is_squeeze_risk
-          FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
-          WHERE scrape_date = @dt
-          ORDER BY change_pct ASC
-          LIMIT @lim
-        """
-        job = client.query(
-            sql,
-            job_config=bigquery.QueryJobConfig(
-                query_parameters=[
-                    bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
-                    bigquery.ScalarQueryParameter("lim", "INT64", limit),
-                ]
+        # Try BQ first
+        try:
+            client = bigquery.Client(project="datascience-projects")
+            sql = """
+              SELECT ticker, price, change_pct
+              FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
+              WHERE DATE(scrape_date) = @dt
+                AND price >= 5.0
+                AND change_pct IS NOT NULL
+              ORDER BY change_pct ASC
+              LIMIT @lim
+            """
+            job = client.query(
+                sql,
+                job_config=bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
+                        bigquery.ScalarQueryParameter("lim", "INT64", limit),
+                    ]
+                )
             )
-        )
-        losers = [
-            MarketLoser(
-                ticker=row.ticker,
-                price=float(row.price),
-                change_pct=float(row.change_pct)
-            )
-            for row in job.result()
-        ]
-        return BiggestLosersReport(losers=losers)
+            rows = job.result()
+            losers = [
+                MarketLoser(
+                    ticker=row.ticker,
+                    price=float(row.price),
+                    change_pct=float(row.change_pct)
+                )
+                for row in rows
+            ]
 
-    # live path
+            if losers:
+                return BiggestLosersReport(losers=losers)
+
+        except Exception as e:
+            # Log but keep going to fallback
+            logging.warning(f"BQ query failed in get_fmp_bigger_losers for {as_of_date}: {e}")
+
+        # Fallback: Use earning_calendar when BQ returns nothing
+        logging.info(f"No BQ data for {as_of_date}, falling back to FMP earning_calendar")
+        try:
+            fmp_fallback = _fetch_from_fmp_earning_drop_fallback(as_of_date, limit)
+            if fmp_fallback:
+                return BiggestLosersReport(losers=fmp_fallback)
+        except Exception as e:
+            logging.warning(f"FMP fallback failed: {e}")
+
+        # Final: Nothing worked
+        error_msg = f"No market losers found for {as_of_date} via BQ or FMP fallback"
+        logging.warning(error_msg)
+        return BiggestLosersReport(losers=[], error_message=error_msg)
+
+    # ———————————————————————————————————
+    # Case B: Live Request → Use FMP Real-Time API
+    # ———————————————————————————————————
     api_key = os.environ.get("FMP_API_KEY", "")
+    if not api_key:
+        return BiggestLosersReport(losers=[], error_message="FMP_API_KEY missing")
+
     url = f"https://financialmodelingprep.com/stable/biggest-losers?apikey={api_key}"
     try:
-        data = requests.get(url).json() or []
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            logging.warning(f"FMP biggest-losers API returned {response.status_code}")
+            return BiggestLosersReport(losers=[], error_message="API request failed")
+
+        data = response.json() or []
         items = data[:limit]
         losers = [
             MarketLoser(
-                ticker=item.get("symbol",""),
-                price=float(item.get("price",0.0)),
-                change_pct=float(item.get("changesPercentage",0.0))
+                ticker=item.get("symbol", ""),
+                price=float(item.get("price", 0.0)),
+                change_pct=float(item.get("changesPercentage", 0.0))
             )
             for item in items
+            if item.get("symbol") and item.get("changesPercentage") is not None
         ]
         return BiggestLosersReport(losers=losers)
-    except Exception as e:
-        logging.error(f"get_fmp_bigger_losers error: {e}")
+
+    except (requests.RequestException, ValueError, TypeError) as e:
+        logging.error(f"Error fetching live biggest losers: {e}")
         return BiggestLosersReport(losers=[], error_message=str(e))
+
 
 
 # -----------------------------------------------------------------------------
@@ -349,3 +384,71 @@ def get_bq_short_candidates(
         )
     )
     return [dict(row) for row in job.result()]
+
+
+# -----------------------------------------------------------------------------
+def _fetch_from_fmp_earning_drop_fallback(target_date: str, limit: int = 5) -> list[MarketLoser]:
+    """
+    Fetch stocks with significant price drops on a given date using FMP's earning_calendar.
+
+    This is a fallback method when BigQuery has no data (e.g. ETL failure).
+
+    Returns up to `limit` MarketLoser entries with drops >10%, sorted by worst drop.
+    """
+    FMP_KEY = os.environ.get("FMP_API_KEY")
+    if not FMP_KEY:
+        logging.warning("FMP_API_KEY not set, skipping earning_calendar fallback")
+        return []
+
+    try:
+        url = (
+            f"https://financialmodelingprep.com/api/v4/earning_calendar"
+            f"?from={target_date}&to={target_date}&apikey={FMP_KEY}"
+        )
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            logging.warning(f"FMP earning_calendar returned {response.status_code}: {response.text}")
+            return []
+
+        data = response.json()
+
+        # Ensure it's a list
+        if not isinstance(data, list):
+            logging.warning("FMP earning_calendar did not return a list")
+            return []
+
+        losers = []
+        for e in data:
+            ticker = e.get("ticker", "").strip()
+            if not ticker:
+                continue
+
+            # Close price
+            close_price = float(e.get("close", 0.0) or 0.0)
+
+            # Percentage — e.g., -15.0 for -15%
+            change_pct_raw = float(e.get("percentage", 0.0) or 0.0)
+            change_pct_decimal = change_pct_raw / 100.0  # Convert % → float (-0.15)
+
+            if change_pct_decimal < -0.10:  # More than 10% drop
+                losers.append(
+                    MarketLoser(
+                        ticker=ticker,
+                        price=close_price,
+                        change_pct=change_pct_decimal
+                    )
+                )
+
+        # Sort by worst drop, limit
+        losers.sort(key=lambda x: x.change_pct)
+        return losers[:limit]
+
+    except requests.RequestException as e:
+        logging.error(f"Network error fetching earning_calendar: {e}")
+        return []
+    except (ValueError, TypeError, KeyError) as e:
+        logging.error(f"Data error parsing earning_calendar response: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error in _fetch_from_fmp_earning_drop_fallback: {e}")
+        return []

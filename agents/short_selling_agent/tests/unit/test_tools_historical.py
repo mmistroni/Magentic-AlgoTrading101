@@ -140,3 +140,33 @@ def test_get_bearish_insider_sales_live(monkeypatch):
     rpt = get_bearish_insider_sales("AAA", as_of_date=None)
     assert rpt.significant_sales == []
     assert rpt.total_dollars_dumped == 0.0
+
+# -----------------------------------------------------------------------------
+# Tests for get_fmp_bigger_losers (Historical with Fallback)
+# -----------------------------------------------------------------------------
+from unittest.mock import patch, Mock
+from short_selling_agent.tools import get_fmp_bigger_losers
+
+
+def test_get_fmp_bigger_losers_historical_bq_success(monkeypatch):
+    """
+    When BQ returns data for historical date, use it — skip fallback.
+    """
+    # Mock BQ
+    DummyClient._rows = [
+        DummyRow(ticker="NVDA", price=800.0, change_pct=-0.15),
+        DummyRow(ticker="TSLA", price=180.0, change_pct=-0.12),
+    ]
+    monkeypatch.setattr(tools.bigquery, "Client", lambda project=None: DummyClient())
+
+    # Mock fallback to ensure it's NOT called
+    mock_fallback = Mock(return_value=[])
+    monkeypatch.setattr(tools, "_fetch_from_fmp_earning_drop_fallback", mock_fallback)
+
+    report = get_fmp_bigger_losers(limit=2, as_of_date="2023-06-01")
+
+    assert len(report.losers) == 2
+    assert report.losers[0].ticker == "NVDA"
+    assert report.losers[0].change_pct == -0.15
+    assert report.error_message is None
+    mock_fallback.assert_not_called()
