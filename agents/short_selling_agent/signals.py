@@ -1,146 +1,106 @@
-# signal_generator.py
+# signals.py
+"""
+Short Signal Generator
+Generates historical short-sell candidates using:
+  1. BigQuery: primary source (fmp_daily_losers)
+  2. FMP earning_calendar: fallback for EOD big drops
 
-import json
-import os
-import google.generativeai as genai
-
-# Import your tools and state
-from short_selling_agent.state import CURRENT_RUN_STATE
-from short_selling_agent.stage_tools import (
-    tool_fetch_bq_candidates,
-    tool_stage_news,
-    tool_stage_insiders,
-    tool_stage_quant_data,              # ✅ Added
-    tool_read_full_dossier
-)
-
-# Configure Gemini
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", os.environ.get("GOOGLE_API_KEY")))
-model = genai.GenerativeModel("gemini-1.5-flash")  # ✅ Use stable model version
-
-# -----------------------------
-# HISTORICAL DATES (FIX: REMOVE FUTURE DATES)
-# -----------------------------
-# ❌ Old: future fake dates
-# ✅ New: real, historical backtest range
-HISTORICAL_DATES = [
-    "2023-09-11", "2023-09-18", "2023-09-25",
-    "2023-10-02", "2023-10-09", "2023-10-16",
-    "2023-10-23", "2023-10-30", "2023-11-06",
-    "2023-11-13", "2023-11-20", "2023-11-27",
-    "2023-12-04", "2023-12-11", "2023-12-18"
-]
-
-AGENT_INSTRUCTIONS = """
-You are the Lead Quant Trader.
-
-I'm providing a JSON dossier per ticker, including:
-- Market Losers (biggest decliners)
-- News Headlines
-- Form 4 Insider Sales
-- Quantitative Signals (RSI, ADX, SMA, Short Interest)
-
-⚠️ Every stock is already a major loser — your job is to **filter, not chase**.
-
-Apply the following **quantitative risk framework**:
-
-• RULE 1: SHORT only with *strong technical confirmation*:
-    A) Devastating negative news + RSI(14) < 40 → bearish momentum
-    B) C-suite insider dumping + price below SMA200 → structural break
-    C) 20%+ collapse with no news → "pump and dump" unwinding (confirm RSI < 40)
-
-• RULE 2: AVOID immediately — short-squeeze risk:
-    → AVOID if short interest > 20%
-    → AVOID if free float < 15M shares
-    ⛔ Never override this rule, even with news.
-
-• RULE 3: AVOID if noise:
-    → Drop < 10% AND no news → noise
-    → RSI > 60 → not bearish
-    → Price above SMA200 → still in uptrend → exit
-
-• RULE 4: Use Quant Data First:
-    - RSI < 40 → required for all SHORTs
-    - ADX > 25 → strong trend → supports breakout
-    - Price below SMA200 → structural breakdown → confirms short
-    - Short Interest > 20% → VETO — do NOT short
-    ✅ These signals are truth — news is lagging.
-
-For each ticker, output ONLY valid JSON:
-{
-  "final_decisions": [
-    {
-      "ticker": "GME",
-      "conviction_score": 9,
-      "action": "SHORT",  // or "AVOID"
-      "reasoning": "Explain using BOTH news and quantitative signals. Cite numeric values: 'RSI(34.5), price below SMA200 (18.0 < 22.5), short interest (23.1%) → avoid'"
-    }
-  ]
-}
+Only runs within 1-year window (required by FMP plan).
 """
 
+import os
+import logging
+import requests
+from datetime import datetime, timedelta
+from typing import List
 
-def generate_all_signals():
-    all_signals = []
-    print("🚀 Starting historical short-signal generation...")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    for test_date in HISTORICAL_DATES:
-        print(f"\n📅 Processing date: {test_date}")
-        CURRENT_RUN_STATE.reset()  # ← Critical
+# Import your tools
+import short_selling_agent.tools as tools
+from short_selling_agent.tools import get_bq_short_candidates
 
-        # Step 1: Get market losers
-        tool_fetch_bq_candidates(as_of_date=test_date, limit=5)
-        tickers = [loser.ticker for loser in CURRENT_RUN_STATE.dossier.market_losers]
 
-        if not tickers:
-            print(f"  ⚠️ No tickers for {test_date}")
-            continue
+# -------------------------------
+# 🔧 Config
+# -------------------------------
+FALLBACK_DAYS = 2  # ±2 days around date for earnings
+RECENT_WEEKS = 12  # Only look back 3 months to stay in FMP 1-year window
+DATE_FORMAT = "%Y-%m-%d"
 
-        # Step 2: For each ticker → stage data
-        for ticker in tickers:
-            print(f"  → Processing: {ticker}")
-            tool_stage_news(ticker, as_of_date=test_date)
-            tool_stage_insiders(ticker, as_of_date=test_date)
-            tool_stage_quant_data(ticker, as_of_date=test_date)  # ✅ ADDED
 
-        # Step 3: Build dossier → send to Agent
-        dossier_json = tool_read_full_dossier()
-        prompt = f"{AGENT_INSTRUCTIONS}\n\nHere is the Dossier:\n{dossier_json}"
+def generate_backtest_dates(num_weeks: int = RECENT_WEEKS) -> List[str]:
+    """
+    Generate a list of Fridays from N weeks back to now.
+    Helps anchor weekly signal generation.
+    """
+    today = datetime.now()
+    start = today - timedelta(weeks=num_weeks)
+    dates = []
+    current = start
+
+    while current.date() <= today.date():
+        if current.weekday() == 4:  # Friday
+            dates.append(current.strftime(DATE_FORMAT))
+        current += timedelta(days=1)
+    return dates
+
+
+def run_signal_pipeline():
+    """
+    Main signal generation loop:
+    • Iterates through recent Fridays
+    • Tries BQ first
+    • Falls back to FMP earning_calendar
+    • Tracks missing data
+    """
+    dates = generate_backtest_dates()
+    logger.info(f"🚀 Starting short-signal generation on {len(dates)} backtest dates...")
+
+    for target_date in dates:
+        logger.info(f"\n📅 Processing date: {target_date}")
 
         try:
-            response = model.generate_content(prompt)
-            raw_text = response.text.strip()
+            # 🧱 Primary: BQ → with fallback
+            candidates = get_bq_short_candidates(limit=5, as_of_date=target_date)
 
-            # Parse JSON safely
-            start_idx = raw_text.find('{')
-            end_idx = raw_text.rfind('}') + 1
-            if start_idx == -1 or end_idx == 0:
-                continue
-
-            clean_json_str = raw_text[start_idx:end_idx]
-            decisions_data = json.loads(clean_json_str)
-
-            for decision in decisions_data.get("final_decisions", []):
-                if decision.get("action") == "SHORT":
-                    all_signals.append({
-                        "date": test_date,
-                        "ticker": decision["ticker"],
-                        "conviction_score": decision["conviction_score"],
-                        "reasoning": decision["reasoning"]
-                    })
+            if candidates:
+                tickers = [c["ticker"] for c in candidates]
+                prices = [c["price"] for c in candidates]
+                logger.info(f"  ✅ Signal: {tickers}")
+            else:
+                logger.warning(f"  ⚠️ No tickers for {target_date}")
 
         except Exception as e:
-            print(f"  ❌ Failure on {test_date}: {str(e)}")
-            continue
+            logger.error(f"❌ Error processing {target_date}: {e}")
 
-        # Save continuously
-        with open("signals.json", "w") as f:
-            json.dump(all_signals, f, indent=4)
-
-        print(f"  ✅ Done. Total shorts so far: {len(all_signals)}")
-
-    print(f"\n✅ Backtest complete. {len(all_signals)} signals saved to 'signals.json'")
+    logger.info("\n🎯 Signal generation complete. Review output above.")
 
 
+# -------------------------------
+# 🧪 Test FMP Fallback (Optional)
+# -------------------------------
+def test_fallback_single_date(date: str):
+    """
+    Test fallback for one date. For debugging only.
+    """
+    logger.info(f"🧪 Testing fallback for {date}")
+    from short_selling_agent.tools import _fetch_from_fmp_earning_drop_fallback
+    result = _fetch_from_fmp_earning_drop_fallback(date, limit=5)
+    if result:
+        print("🎯 Found:", [(r.ticker, f"{r.change_pct:.1%}") for r in result])
+    else:
+        print("❌ No big drops found (check FMP access or date range).")
+
+
+# -------------------------------
+# 🚀 Run Script
+# -------------------------------
 if __name__ == "__main__":
-    generate_all_signals()
+    # 🔁 Generate and run on last 12 weeks only
+    run_signal_pipeline()
+
+    # 💡 Optional: Test fallback directly
+    # test_fallback_single_date("2025-04-01")
