@@ -1,6 +1,6 @@
 from google.adk.agents import LlmAgent, SequentialAgent  
-from agents.short_selling_agent.short_selling_agent.prompts import BQ_ANALYST_INSTRUCTIONS
-from short_selling_agent
+from short_selling_agent.prompts import BQ_ANALYST_INSTRUCTIONS,\
+                    NEWS_ANALYST_INSTRUCTIONS, INSIDER_ANALYST_INSTRUCTIONS, QUANT_COORDINATOR_INSTRUCTIONS
 from short_selling_agent.stage_tools import (
     tool_fetch_bq_candidates, 
     tool_stage_news, 
@@ -16,6 +16,7 @@ BQ_INGESTION_AGENT = LlmAgent(
     model="gemini-2.5-flash",
     tools=[tool_fetch_bq_candidates],
     instruction=BQ_ANALYST_INSTRUCTIONS
+)
 
 # ---------------------------------------------------------
 # AGENT 2: News Analyst

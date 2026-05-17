@@ -8,7 +8,7 @@ here is how to run the backtest
 
 Run the short-selling pipeline [for YYYY-MM-DD].”
 
-• Run the short-selling pipeline for 2023-06-01.
+• Run the short-selling pipeline for 2025-05-12.
 • Run the short-selling pipeline.
 
 
