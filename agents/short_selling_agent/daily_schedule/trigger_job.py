@@ -2,22 +2,17 @@ import os
 import json
 import subprocess
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any
 from datetime import datetime
 import httpx 
 import sys
-from google.cloud import bigquery
 
 # --- Configuration (Dynamic) ---
 APP_URL = os.environ.get("AGENT_SERVICE_URL", "https://short-selling-agent-service-682143946483.us-central1.run.app")
 USER_ID = "automated_cron_job"
+# Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}" 
 APP_NAME = "short_selling_agent"
-
-# BigQuery Source Details
-PROJECT_ID = "datascience-projects"
-DATASET_ID = "finviz_blacklist"
-TABLE_ID = "fmp_daily_losers"
 
 # --- Authentication Function (ASYNC) ---
 
@@ -85,7 +80,7 @@ async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, da
         raise
 
 async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str):
-    """Executes a single POST request to the /run_sse endpoint and parses output chunks."""
+    """Executes a single POST request to the /run_sse endpoint."""
     print(f"\n[User] -> Sending message: '{message}'")
     
     run_data = {
@@ -128,53 +123,18 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
     except Exception as e:
         print(f"❌ Agent request failed: {e}")
 
-# --- BigQuery Ticker Extractor ---
-
-def get_tickers_from_bigquery(today_str: str) -> List[str]:
-    """Queries the daily losers table for tickers corresponding to the given date."""
-    print(f"🔍 Querying BigQuery for losers tracked on: {today_str}")
-    bq_client = bigquery.Client(project=PROJECT_ID)
-    
-    query = f"""
-        SELECT ticker 
-        FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}` 
-        WHERE scrape_date = '{today_str}'
-    """
-    query_job = bq_client.query(query)
-    results = query_job.result()
-    return [row.ticker for row in results]
-
 # --- Main Logic (ASYNC) ---
 
-async def amain():
-    """Main function to query tickers, run a single interaction, and clean up."""
-    print(f"\n🤖 Starting Automated Ingestion Trigger | Session: **{SESSION_ID}**")
+async def amain(message_to_send: str):
+    """Main function to run a single interaction and then cleanup."""
+    print(f"\n🤖 Starting Single-Run Client | Session: **{SESSION_ID}**")
     
-    # 1. Fetch Today's Date and Tickers
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
-    try:
-        tickers = get_tickers_from_bigquery(today_str)
-        if not tickers:
-            print(f"⚠️ No tickers found in BigQuery for date {today_str}. Exiting gracefully.")
-            return
-        print(f"📊 Found {len(tickers)} candidates to scan today: {tickers}")
-    except Exception as e:
-        print(f"❌ Failed to fetch tickers from BigQuery: {e}")
-        sys.exit(1)
-
-    # 2. Build the dynamic pipeline query string
-    tickers_payload = ", ".join(tickers)
-    query_message = (
-        f"Run short-selling scans for the following candidates: {tickers_payload}. "
-        "Evaluate fundamentals, technical trends, and insider activity."
-    )
-
-    session_data = {"state": {"preferred_language": "English", "visit_count": 1}}
+    session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
     current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
     
-    async with httpx.AsyncClient(timeout=600.0) as client: # Large timeout for deep agent analytics
+    async with httpx.AsyncClient(timeout=600.0) as client: # Generous timeout for deep agent analytics
         
-        # 3. Create Session
+        # 1. Create Session
         try:
             await make_request(client, "POST", current_session_endpoint, data=session_data)
             print(f"✅ Session created.")
@@ -182,16 +142,16 @@ async def amain():
             print(f"❌ Could not start session: {e}")
             return
 
-        # 4. Run Request with dynamically pulled tickers
-        print(f"--- 💬 Executing Pipeline Scan ---")
+        # 2. Run Single Request
+        print(f"--- 💬 Executing Single Task ---")
         try:
-            await run_agent_request(client, SESSION_ID, query_message)
+            await run_agent_request(client, SESSION_ID, message_to_send)
         except Exception as e:
             print(f"❌ Agent execution error: {e}")
         
-        # 5. Cleanup: Delete Session
+        # 3. Cleanup: Delete Session
         await asyncio.sleep(1) 
-        print(f"\n## Deleting Session: {SESSION_ID}")
+        print(f"\n## 3. Deleting Session: {SESSION_ID}")
         try:
             await make_request(client, "DELETE", current_session_endpoint)
             print("✅ Session deleted successfully.")
@@ -203,7 +163,11 @@ if __name__ == "__main__":
         print("🚨 ERROR: Python 3.9+ required.")
         sys.exit(1)
         
+    # Dynamically pick up today's date string (e.g., "2026-05-18")
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    QUERY = f"Run the short-selling pipeline for {today_str}."
+    
     try:
-        asyncio.run(amain())
+        asyncio.run(amain(QUERY))
     except Exception as e:
         print(f"FATAL ERROR: {e}")
