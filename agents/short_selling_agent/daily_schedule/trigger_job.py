@@ -124,7 +124,89 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
     if not final_text:
         raise ValueError("Agent response structure did not contain expected text contents.")
         
-    # Unpack potential LLM markdown decorations
-    if final_text.startswith("```"):
-        lines = final_text.split("\n")
-        if lines[0].startswith("
+    # Unpack potential LLM markdown decorations safely
+    clean_text = final_text.strip()
+    if clean_text.startswith("```"):
+        # Remove top backticks line (e.g., ```json or ```)
+        lines = clean_text.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        # Remove trailing backticks line
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        clean_text = "\n".join(lines).strip()
+        
+    try:
+        parsed_data = json.loads(clean_text)
+        # Ensure result is formatted as a structured list of JSON rows
+        return parsed_data if isinstance(parsed_data, list) else [parsed_data]
+    except json.JSONDecodeError as err:
+        logger.error(f"❌ Failed to parse processed LLM block into valid JSON structures: {clean_text}")
+        raise err
+
+
+async def main():
+    logger.info("🎬 --- STARTING AUTOMATED SHORT-SELLING AGENT CALL ---")
+    
+    # Generate unique session matching the current calendar batch date
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    session_id = f"session_batch_{today_str}"
+    
+    bq_client = bigquery.Client(project=PROJECT_ID)
+    
+    # Query today's exact tickers from the daily losers table
+    query = f"""
+        SELECT ticker 
+        FROM `{PROJECT_ID}.{DATASET_ID}.fmp_daily_losers` 
+        WHERE scrape_date = '{today_str}'
+    """
+    
+    try:
+        query_job = bq_client.query(query)
+        tickers = [row.ticker for row in query_job.result()]
+        
+        if not tickers:
+            logger.warning(f"⚠️ No candidates found in fmp_daily_losers table for date {today_str}. Stopping execution.")
+            sys.exit(0)
+            
+        logger.info(f"📊 Found {len(tickers)} candidates to scan today: {tickers}")
+        
+        # Build prompt listing specific candidates for the scanning agent
+        tickers_payload = ", ".join(tickers)
+        prompt_message = (
+            f"Run short-selling scans for the following candidates: {tickers_payload}. "
+            "Evaluate fundamentals, technical trends, insider activity, and output the final rows "
+            "matching your clean output JSON schema format."
+        )
+        
+        async with httpx.AsyncClient(timeout=600.0) as client:
+            # 1. Trigger the agent call
+            recommendations = await run_agent_request(client, session_id, prompt_message)
+            
+            # 2. Append standard timestamp track fields to each row
+            for row in recommendations:
+                row["scan_date"] = today_str
+                row["created_at"] = datetime.utcnow().isoformat()
+            
+            # 3. Stream data output straight into your BigQuery storage table
+            logger.info(f"📤 Streaming {len(recommendations)} evaluation logs into BigQuery: {TABLE_REF}")
+            errors = bq_client.insert_rows_json(TABLE_REF, recommendations)
+            
+            if errors:
+                logger.error(f"❌ BigQuery Write Exceptions occurred: {errors}")
+                sys.exit(1)
+            else:
+                logger.info("🎉 SUCCESS: Short-selling agent decisions successfully committed to BigQuery.")
+                
+            # 4. Clean up old conversational memory state for the next run
+            logger.info("🧹 Sweeping session conversational logs to keep memory state pristine...")
+            await make_request(client, "DELETE", f"/history/{APP_NAME}/{USER_ID}/{session_id}")
+            logger.info("✨ Cleanup complete.")
+            
+    except Exception as e:
+        logger.error(f"💥 Fatal pipeline execution failure: {e}", exc_info=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
