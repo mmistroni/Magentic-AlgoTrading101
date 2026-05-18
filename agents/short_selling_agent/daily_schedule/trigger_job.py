@@ -2,17 +2,23 @@ import os
 import json
 import subprocess
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 import httpx 
 import sys
+from google.cloud import bigquery
 
 # --- Configuration (Dynamic) ---
 APP_URL = os.environ.get("AGENT_SERVICE_URL", "https://short-selling-agent-service-682143946483.us-central1.run.app")
 USER_ID = "automated_cron_job"
-# Generate a single session ID for the entire conversation loop
 SESSION_ID = f"session_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}" 
 APP_NAME = "short_selling_agent"
+
+# BigQuery Destination Schema Configuration
+PROJECT_ID = "datascience-projects"
+DATASET_ID = "finviz_blacklist"
+TABLE_ID = "daily_recommendations"
+TABLE_REF = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
 
 # --- Authentication Function (ASYNC) ---
 
@@ -79,8 +85,8 @@ async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, da
         print(f"\n❌ An unexpected request error occurred: {err}")
         raise
 
-async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str):
-    """Executes a single POST request to the /run_sse endpoint."""
+async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str) -> str:
+    """Executes a single POST request to the /run_sse endpoint and returns the raw agent text string."""
     print(f"\n[User] -> Sending message: '{message}'")
     
     run_data = {
@@ -91,42 +97,31 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
         "streaming": False 
     }
     
-    try:
-        response = await make_request(client, "POST", "/run_sse", data=run_data)
-        raw_text = response.text.strip()
-        
-        # Multi-line SSE parsing logic
-        data_lines = [
-            line.strip() 
-            for line in raw_text.split('\n') 
-            if line.strip().startswith("data:")
-        ]
-        
-        if not data_lines:
-             raise json.JSONDecodeError("No 'data:' lines found in 200 response.", raw_text, 0)
-        
-        last_data_line = data_lines[-1]
-        json_payload = last_data_line[len("data:"):].strip()
-        agent_response = json.loads(json_payload)
-        
-        # Extract the final text 
-        final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', 'Agent response structure not recognized.')
-        
-        print(f"[Agent] -> {final_text}")
+    response = await make_request(client, "POST", "/run_sse", data=run_data)
+    raw_text = response.text.strip()
     
-    except json.JSONDecodeError as e:
-        print(f"\n🚨 **JSON PARSING FAILED**!")
-        print(f"   Error: {e}")
-        print("   --- RAW SERVER CONTENT ---")
-        print(raw_text)
-        print("   --------------------------")
-    except Exception as e:
-        print(f"❌ Agent request failed: {e}")
+    # Multi-line SSE parsing logic
+    data_lines = [
+        line.strip() 
+        for line in raw_text.split('\n') 
+        if line.strip().startswith("data:")
+    ]
+    
+    if not data_lines:
+         raise json.JSONDecodeError("No 'data:' lines found in 200 response.", raw_text, 0)
+    
+    last_data_line = data_lines[-1]
+    json_payload = last_data_line[len("data:"):].strip()
+    agent_response = json.loads(json_payload)
+    
+    # Extract the final text 
+    final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', 'Agent response structure not recognized.')
+    return final_text
 
 # --- Main Logic (ASYNC) ---
 
 async def amain(message_to_send: str):
-    """Main function to run a single interaction and then cleanup."""
+    """Main function to run a single interaction, parse recommendations, insert into BigQuery, and then cleanup."""
     print(f"\n🤖 Starting Single-Run Client | Session: **{SESSION_ID}**")
     
     session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
@@ -142,14 +137,65 @@ async def amain(message_to_send: str):
             print(f"❌ Could not start session: {e}")
             return
 
-        # 2. Run Single Request
+        # 2. Run Single Request & Capture Output Text
         print(f"--- 💬 Executing Single Task ---")
+        agent_text = ""
         try:
-            await run_agent_request(client, SESSION_ID, message_to_send)
+            agent_text = await run_agent_request(client, SESSION_ID, message_to_send)
+            print(f"[Agent] -> Raw Response Captured.")
         except Exception as e:
             print(f"❌ Agent execution error: {e}")
+            return
         
-        # 3. Cleanup: Delete Session
+        # 3. Parse Text Responses and Stream directly to BigQuery
+        if agent_text:
+            clean_text = agent_text.strip()
+            # Clean off any potential markdown wrappers if the agent wrapped its JSON block
+            if clean_text.startswith("```"):
+                lines = clean_text.splitlines()
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                clean_text = "\n".join(lines).strip()
+                
+            try:
+                # Expecting the agent output to be a list of dicts, or a single dict object
+                parsed_json = json.loads(clean_text)
+                raw_rows = parsed_json if isinstance(parsed_json, list) else [parsed_json]
+                
+                rows_to_insert = []
+                today_str = datetime.utcnow().strftime('%Y-%m-%d')
+                timestamp_now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+
+                for row in raw_rows:
+                    # Enforce exact BigQuery column mappings and data schema requirements
+                    rows_to_insert.append({
+                        "evaluation_date": row.get("evaluation_date", today_str),
+                        "ticker": str(row.get("ticker", "")).upper(),
+                        "conviction_score": int(row.get("conviction_score", 3)),
+                        "action": str(row.get("action", "WATCH")).upper(),
+                        "reasoning": row.get("reasoning", None),
+                        "inserted_at": timestamp_now
+                    })
+                
+                if rows_to_insert:
+                    print(f"📤 Streaming {len(rows_to_insert)} records to BigQuery table: {TABLE_REF}")
+                    bq_client = bigquery.Client(project=PROJECT_ID)
+                    errors = bq_client.insert_rows_json(TABLE_REF, rows_to_insert)
+                    
+                    if errors:
+                        print(f"❌ BigQuery Insert Errors occurred: {errors}")
+                    else:
+                        print("🎉 SUCCESS: All items parsed and recorded in BigQuery table.")
+                        
+            except json.JSONDecodeError:
+                print("🚨 Parse Error: Agent did not output a clean, parsable structured JSON response string.")
+                print(f"--- RAW UNPARSABLE TEXT ---\n{agent_text}\n---------------------------")
+            except Exception as bq_err:
+                print(f"❌ Failed to successfully compile or upload data to BigQuery: {bq_err}")
+
+        # 4. Cleanup: Delete Session
         await asyncio.sleep(1) 
         print(f"\n## 3. Deleting Session: {SESSION_ID}")
         try:
