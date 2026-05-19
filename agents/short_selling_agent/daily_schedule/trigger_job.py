@@ -109,7 +109,7 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
     
     if not data_lines:
          raise json.JSONDecodeError("No 'data:' lines found in 200 response.", raw_text, 0)
-    
+    print(f'=========== RESPONSE FROM CLIENT IS:\n{raw_text}')
     last_data_line = data_lines[-1]
     json_payload = last_data_line[len("data:"):].strip()
     agent_response = json.loads(json_payload)
