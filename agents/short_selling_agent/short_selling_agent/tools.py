@@ -144,48 +144,54 @@ def get_fmp_news(
     as_of_date: str = ''
 ) -> StockNewsReport:
     """
-    Fetches historical or live institutional newsheadlines, catalysts, and coverage feeds for an equity ticker.
+    Fetches historical or live institutional news headlines and catalysts for an equity ticker.
 
     AGENT INSTRUCTIONS:
-    • Calls the FMP Stock News Feed API endpoint:
-        https://financialmodelingprep.com/stable/news/stock-latest
-      with required parameters: page=0, limit=50, and apikey.
-    • Historical Scoping Mode (as_of_date is provided): Dynamically builds a trailing 3-day 
-      window (&from=as_of_date-3&to=as_of_date) to prevent calendar date context gaps.
-    • Live Scoping Mode (as_of_date is ''): Pulls global real-time streams.
-    • Post-Filter Constraints: Scans the array payload and filters records matching 
-      the targeted uppercase 'symbol' property.
+    • Calls the FMP Stock News Archive API endpoint:
+        https://financialmodelingprep.com/stable/news/stock
+      using the required 'symbols' parameter to unlock historical lookups.
+    • Historical Scoping Mode (as_of_date is provided): Dynamically builds a trailing 7-day 
+      window (&from=as_of_date-7&to=as_of_date) to ensure early-week or weekend catalysts are captured.
+    • Live Scoping Mode (as_of_date is ''): Falls back to global real-time streams via /news/stock-latest.
     • Outputs a truncated collection mapping up to 10 strict NewsArticle schemas.
 
     Args:
-        ticker (str): Capitalized market asset symbol string (e.g., 'NVDA', 'AAPL').
+        ticker (str): Capitalized market asset symbol string (e.g., 'LNZA', 'CTEV').
         as_of_date (str, optional): Target observation baseline formatted as 'YYYY-MM-DD'. 
             Defaults to an empty string '' for real-time streaming lookups.
 
     Returns:
-        StockNewsReport: Data payload containment object tracking filtered NewsArticle records 
-            mapping publication dates and titles. Supplies an explicit error_message string if empty.
+        StockNewsReport: Data payload containment object tracking filtered NewsArticle records.
+            Supplies an explicit error_message string if empty or if an error occurs.
     """
     api_key = os.environ.get("FMP_API_KEY", "")
-    # 🛠️ FIX: Target the symbol endpoint directly so FMP returns articles ONLY for this ticker
-    base = (
-        f"https://financialmodelingprep.com/stable/news/stock-latest"
-        f"?symbol={ticker.upper()}&page=0&limit=10&apikey={api_key}"
-    )
     
+    # 1. Trailing range logic utilizing the proper archive path and 'symbols' parameter
     if as_of_date:
         try:
             end_dt = datetime.strptime(as_of_date, "%Y-%m-%d")
-            start_dt = end_dt - timedelta(days=3)
+            # 🛠️ STRATEGY UPDATE: Expanded lookback window to a full 7 days
+            start_dt = end_dt - timedelta(days=7)
             from_str = start_dt.strftime("%Y-%m-%d")
-            # Appends the trailing parameters safely
-            url = f"{base}&from={from_str}&to={as_of_date}"
+            
+            url = (
+                f"https://financialmodelingprep.com/stable/news/stock"
+                f"?symbols={ticker.upper()}&from={from_str}&to={as_of_date}"
+                f"&page=0&limit=50&apikey={api_key}"
+            )
         except Exception:
-            url = f"{base}&from={as_of_date}&to={as_of_date}"
+            url = (
+                f"https://financialmodelingprep.com/stable/news/stock"
+                f"?symbols={ticker.upper()}&from={as_of_date}&to={as_of_date}"
+                f"&page=0&limit=50&apikey={api_key}"
+            )
     else:
-        url = base
+        # Fall back to live streaming if no date is specified
+        url = (
+            f"https://financialmodelingprep.com/stable/news/stock-latest"
+            f"?page=0&limit=50&apikey={api_key}"
+        )
 
-    # 🔬 DEBUG ASSISTANCE: Print statement to immediately copy-paste the URL out of Codespaces
     print(f"🚀 [DEBUG URL] get_fmp_news executing network fetch via:\n{url}")
 
     try:
@@ -203,33 +209,35 @@ def get_fmp_news(
             return StockNewsReport(
                 ticker=ticker, 
                 articles=[], 
-                error_message=f"FMP endpoint returned invalid response type layout: {str(data)[:100]}"
+                error_message=f"FMP endpoint returned unexpected response layout: {str(data)[:100]}"
             )
 
-        # Explicit type validation loop to step around the 'NoneType' crash
-        filtered = []
+        # Type-safe parsing loop to extract the records cleanly
+        articles = []
         for item in data:
-            if isinstance(item, dict) and item.get("symbol"):
-                if str(item.get("symbol")).upper() == ticker.upper():
-                    filtered.append(item)
+            if isinstance(item, dict):
+                # Double check that the article matches our target ticker
+                item_symbol = item.get("symbol") or ""
+                if item_symbol.upper() == ticker.upper():
+                    articles.append(
+                        NewsArticle(
+                            date=str(item.get("publishedDate") or ""),
+                            title=str(item.get("title") or "")
+                        )
+                    )
 
-        if not filtered:
+        if not articles:
             return StockNewsReport(
                 ticker=ticker, articles=[], error_message="No news found."
             )
             
-        articles = [
-            NewsArticle(
-                date=str(item.get("publishedDate") or ""),
-                title=str(item.get("title") or "")
-            )
-            for item in filtered[:10]
-        ]
-        return StockNewsReport(ticker=ticker, articles=articles)
+        # Return up to 10 matching news items
+        return StockNewsReport(ticker=ticker, articles=articles[:10])
         
     except Exception as e:
         logging.error(f"get_fmp_news error: {e}")
         return StockNewsReport(ticker=ticker, articles=[], error_message=str(e))
+
 
 
 
