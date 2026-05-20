@@ -41,14 +41,15 @@ def get_fmp_bigger_losers(
         try:
             client = bigquery.Client(project="datascience-projects")
             sql = """
-              SELECT ticker, price, change_pct
-              FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
-              WHERE DATE(scrape_date) = @dt
-                AND price >= 5.0
-                AND change_pct IS NOT NULL
-              ORDER BY change_pct ASC
-              LIMIT @lim
-            """
+                SELECT ticker, price, change_pct, short_interest_pct, free_float, is_squeeze_risk
+                FROM `datascience-projects.finviz_blacklist.fmp_daily_losers`
+                WHERE scrape_date >= TIMESTAMP(@dt)
+                    AND scrape_date < TIMESTAMP_ADD(TIMESTAMP(@dt), INTERVAL 1 DAY)
+                    AND price >= 5.0
+                    AND change_pct IS NOT NULL
+                ORDER BY change_pct ASC
+                LIMIT @lim
+                """
             job_config = bigquery.QueryJobConfig(
                 query_parameters=[
                     bigquery.ScalarQueryParameter("dt", "DATE", as_of_date),
@@ -154,13 +155,24 @@ def get_fmp_news(
     • Returns up to 10 matching NewsArticle items.
     • If no matches, returns error_message="No news found."
     """
+    # short_selling_agent/tools.py -> inside get_fmp_news
+
     api_key = os.environ.get("FMP_API_KEY", "")
     base = (
         "https://financialmodelingprep.com/stable/news/stock-latest"
         f"?page=0&limit=50&apikey={api_key}"
     )
+    
     if as_of_date:
-        url = f"{base}&from={as_of_date}&to={as_of_date}"
+        # 🛠️ FIX: Calculate a 3-day trailing window leading up to the target evaluation date
+        try:
+            end_dt = datetime.strptime(as_of_date, "%Y-%m-%d")
+            start_dt = end_dt - timedelta(days=3)
+            from_str = start_dt.strftime("%Y-%m-%d")
+            
+            url = f"{base}&from={from_str}&to={as_of_date}"
+        except Exception:
+            url = f"{base}&from={as_of_date}&to={as_of_date}"
     else:
         url = base
 
