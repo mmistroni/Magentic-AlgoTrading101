@@ -175,8 +175,13 @@ if __name__ == "__main__":
         
     # Define your single query here
 
-    QUERY = "Run the short-selling pipeline for 2025-05-18."
-    
+    from datetime import datetime, timedelta
+
+    # 1. Get the current date and subtract 2 days
+    target_date = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+
+    # 2. Inject it into your query string
+    QUERY = f"Run the short-selling pipeline for {target_date}."
     try:
         asyncio.run(amain(QUERY))
     except Exception as e:
