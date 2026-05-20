@@ -407,7 +407,7 @@ def get_bq_short_candidates(
         # 🛠️ FIX: Construct a dry-run preview string to see what is actually happening
         executed_sql_preview = sql.replace("@dt", f"'{query_date}'").replace("@lim", str(limit))
         print(f'Executing query:\n{executed_sql_preview}')
-        
+
         job = client.query(sql, job_config=job_config)
         rows = list(job.result())
 
@@ -458,54 +458,77 @@ def get_bq_short_candidates(
 # -----------------------------------------------------------------------------
 def _fetch_from_fmp_earning_drop_fallback(target_date: str, limit: int = 5) -> list[MarketLoser]:
     """
-    Fallback: Get big drop stocks via FMP earning_calendar for missing historical days.
-    Only used when BigQuery has no data.
+    Internal utility to extract high-magnitude historical price drop events using FMP's 
+    earning_calendar dataset endpoints. Executed as a fallback pipeline mechanism when 
+    the native primary BigQuery data frames return blank.
+
+    Updates: Now scans a trailing 7-day window leading up to target_date instead of a single day.
     """
-    print(f'Fetching fmp earning for {target_date}')
     FMP_KEY = os.environ.get("FMP_API_KEY")
     if not FMP_KEY:
         logging.error("❌ FMP_API_KEY not set in _fetch_from_fmp_earning_drop_fallback")
         return []
 
+    # 1. Parse the target execution date
+    try:
+        end_dt = datetime.strptime(target_date, "%Y-%m-%d")
+    except ValueError:
+        logging.error(f"❌ Invalid target_date format: '{target_date}'. Defaulting to today.")
+        end_dt = datetime.now()
+
+    # 2. Compute a trailing 7-day starting boundary
+    start_dt = end_dt - timedelta(days=7)
+    
+    from_date = start_dt.strftime("%Y-%m-%d")
+    to_date = end_dt.strftime("%Y-%m-%d")
+
+    # 3. Target FMP earning_calendar using the date range parameters
     url = (
         f"https://financialmodelingprep.com/api/v4/earning_calendar"
-        f"?from={target_date}&to={target_date}&apikey={FMP_KEY}"
+        f"?from={from_date}&to={to_date}&apikey={FMP_KEY}"
     )
-    print(f"📡 [FMP Fallback] Fetching earning_calendar data: {target_date}")
+    logging.info(f"📡 [FMP Fallback] Scanning 7-day window: from={from_date} to={to_date}")
 
     try:
         response = requests.get(url, timeout=10)
-        print(f"📡 [FMP Fallback] Response status: {response.status_code}")
-
         if response.status_code != 200:
-            logging.info(f"❌ [FMP Fallback] Bad status: {response.status_code} → {response.text[:200]}")
+            logging.warning(f"❌ [FMP Fallback] Bad status: {response.status_code}")
             return []
 
         data = response.json()
-        logging.info(f"📥 [FMP Fallback] Raw data: {data}")
-
         if not isinstance(data, list):
             logging.warning(f"⚠️ [FMP Fallback] Expected list, got: {type(data)}")
             return []
 
         losers = []
         for e in data:
-            ticker = e.get("ticker", "").strip()
+            ticker = str(e.get("ticker") or "").strip()
             if not ticker:
                 continue
-            close_price = float(e.get("close", 0.0) or 0.0)
-            change_pct_raw = float(e.get("percentage", 0.0) or 0.0)
+            
+            close_price = float(e.get("close") or 0.0)
+            change_pct_raw = float(e.get("percentage") or 0.0)
             change_pct = change_pct_raw / 100.0
 
-            if change_pct < -0.10:  # >10% drop
+            # Filter for significant setups (>10% drops)
+            if change_pct < -0.10:
                 losers.append(
                     MarketLoser(ticker=ticker, price=close_price, change_pct=change_pct)
                 )
 
-        # Sort worst first
+        # Sort absolute worst performers first across the whole week
         losers.sort(key=lambda x: x.change_pct)
-        logging.info(f"🎯 [FMP Fallback] Found {len(losers)} big-drop stocks: {[l.ticker for l in losers[:limit]]}")
-        return losers[:limit]
+        
+        # Deduplicate by ticker in case a symbol appears multiple times in the calendar feed
+        seen = set()
+        deduped_losers = []
+        for loser in losers:
+            if loser.ticker not in seen:
+                seen.add(loser.ticker)
+                deduped_losers.append(loser)
+
+        logging.info(f"🎯 [FMP Fallback] Found {len(deduped_losers)} unique big-drop stocks over the past week.")
+        return deduped_losers[:limit]
 
     except Exception as e:
         logging.error(f"💥 [FMP Fallback] Exception: {e}")
