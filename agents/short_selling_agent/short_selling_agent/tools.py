@@ -397,12 +397,17 @@ def get_bq_short_candidates(
           ORDER BY change_pct ASC
           LIMIT @lim
         """
+        print(f'Executing query:\n{sql}')
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("dt", "DATE", query_date),
                 bigquery.ScalarQueryParameter("lim", "INT64", limit),
             ]
         )
+        # 🛠️ FIX: Construct a dry-run preview string to see what is actually happening
+        executed_sql_preview = sql.replace("@dt", f"'{query_date}'").replace("@lim", str(limit))
+        print(f'Executing query:\n{executed_sql_preview}')
+        
         job = client.query(sql, job_config=job_config)
         rows = list(job.result())
 
@@ -411,7 +416,7 @@ def get_bq_short_candidates(
             logging.info(f"✅ BQ success: {len(result)} tickers = {[r['ticker'] for r in result]}")
             return result
         else:
-            logging.warning(f"⚠️ BQ returned no data for {query_date}")
+            logging.warning(f"⚠️ BQ returned no data for {query_date} and sql \n {sql}")
 
     except Exception as e:
         logging.error(f"❌ BQ query failed: {e}")
@@ -456,6 +461,7 @@ def _fetch_from_fmp_earning_drop_fallback(target_date: str, limit: int = 5) -> l
     Fallback: Get big drop stocks via FMP earning_calendar for missing historical days.
     Only used when BigQuery has no data.
     """
+    print(f'Fetching fmp earning for {target_date}')
     FMP_KEY = os.environ.get("FMP_API_KEY")
     if not FMP_KEY:
         logging.error("❌ FMP_API_KEY not set in _fetch_from_fmp_earning_drop_fallback")
@@ -465,18 +471,18 @@ def _fetch_from_fmp_earning_drop_fallback(target_date: str, limit: int = 5) -> l
         f"https://financialmodelingprep.com/api/v4/earning_calendar"
         f"?from={target_date}&to={target_date}&apikey={FMP_KEY}"
     )
-    logging.info(f"📡 [FMP Fallback] Fetching earning_calendar data: {target_date}")
+    print(f"📡 [FMP Fallback] Fetching earning_calendar data: {target_date}")
 
     try:
         response = requests.get(url, timeout=10)
-        logging.debug(f"📡 [FMP Fallback] Response status: {response.status_code}")
+        print(f"📡 [FMP Fallback] Response status: {response.status_code}")
 
         if response.status_code != 200:
-            logging.warning(f"❌ [FMP Fallback] Bad status: {response.status_code} → {response.text[:200]}")
+            logging.info(f"❌ [FMP Fallback] Bad status: {response.status_code} → {response.text[:200]}")
             return []
 
         data = response.json()
-        logging.debug(f"📥 [FMP Fallback] Raw data: {data}")
+        logging.info(f"📥 [FMP Fallback] Raw data: {data}")
 
         if not isinstance(data, list):
             logging.warning(f"⚠️ [FMP Fallback] Expected list, got: {type(data)}")

@@ -174,7 +174,8 @@ if __name__ == "__main__":
         sys.exit(1)
         
     # Define your single query here
-    QUERY = "Run the short-selling pipeline for 2025-05-12."
+
+    QUERY = "Run the short-selling pipeline for 2025-05-18."
     
     try:
         asyncio.run(amain(QUERY))

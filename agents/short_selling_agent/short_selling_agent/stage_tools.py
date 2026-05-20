@@ -17,7 +17,7 @@ from .schemas import Plus500UniverseReport
 # -----------------------------------------------------------------------------
 def tool_fetch_bq_candidates(
     as_of_date: str ="",
-    limit: int = 3
+    limit: int = 10
 ) -> str:
     """
     AGENT INSTRUCTIONS:
