@@ -141,63 +141,96 @@ def get_fmp_bigger_losers(
 
 def get_fmp_news(
     ticker: str,
-    as_of_date: str | None = None
+    as_of_date: str = ''
 ) -> StockNewsReport:
     """
-    Fetch recent news headlines for a ticker, live or for a backtest date.
+    Fetches historical or live institutional newsheadlines, catalysts, and coverage feeds for an equity ticker.
 
     AGENT INSTRUCTIONS:
-    • Always calls FMP Stock News Feed API:
+    • Calls the FMP Stock News Feed API endpoint:
         https://financialmodelingprep.com/stable/news/stock-latest
-      with parameters:
-        page=0, limit=50, apikey, and if as_of_date is set, &from=as_of_date&to=as_of_date.
-    • Filters returned articles to those whose 'symbol' field matches ticker.
-    • Returns up to 10 matching NewsArticle items.
-    • If no matches, returns error_message="No news found."
-    """
-    # short_selling_agent/tools.py -> inside get_fmp_news
+      with required parameters: page=0, limit=50, and apikey.
+    • Historical Scoping Mode (as_of_date is provided): Dynamically builds a trailing 3-day 
+      window (&from=as_of_date-3&to=as_of_date) to prevent calendar date context gaps.
+    • Live Scoping Mode (as_of_date is ''): Pulls global real-time streams.
+    • Post-Filter Constraints: Scans the array payload and filters records matching 
+      the targeted uppercase 'symbol' property.
+    • Outputs a truncated collection mapping up to 10 strict NewsArticle schemas.
 
+    Args:
+        ticker (str): Capitalized market asset symbol string (e.g., 'NVDA', 'AAPL').
+        as_of_date (str, optional): Target observation baseline formatted as 'YYYY-MM-DD'. 
+            Defaults to an empty string '' for real-time streaming lookups.
+
+    Returns:
+        StockNewsReport: Data payload containment object tracking filtered NewsArticle records 
+            mapping publication dates and titles. Supplies an explicit error_message string if empty.
+    """
     api_key = os.environ.get("FMP_API_KEY", "")
+    # 🛠️ FIX: Target the symbol endpoint directly so FMP returns articles ONLY for this ticker
     base = (
-        "https://financialmodelingprep.com/stable/news/stock-latest"
-        f"?page=0&limit=50&apikey={api_key}"
+        f"https://financialmodelingprep.com/stable/news/stock-latest"
+        f"?symbol={ticker.upper()}&page=0&limit=10&apikey={api_key}"
     )
     
     if as_of_date:
-        # 🛠️ FIX: Calculate a 3-day trailing window leading up to the target evaluation date
         try:
             end_dt = datetime.strptime(as_of_date, "%Y-%m-%d")
             start_dt = end_dt - timedelta(days=3)
             from_str = start_dt.strftime("%Y-%m-%d")
-            
+            # Appends the trailing parameters safely
             url = f"{base}&from={from_str}&to={as_of_date}"
         except Exception:
             url = f"{base}&from={as_of_date}&to={as_of_date}"
     else:
         url = base
 
+    # 🔬 DEBUG ASSISTANCE: Print statement to immediately copy-paste the URL out of Codespaces
+    print(f"🚀 [DEBUG URL] get_fmp_news executing network fetch via:\n{url}")
+
     try:
-        data = requests.get(url).json() or []
-        # Only keep articles for our ticker
-        filtered = [
-            item for item in data
-            if item.get("symbol","").upper() == ticker.upper()
-        ]
+        response = requests.get(url, timeout=10)
+        
+        # Guard against bad HTTP responses completely
+        if response.status_code != 200:
+            error_msg = f"HTTP {response.status_code}: {response.text[:100]}"
+            return StockNewsReport(ticker=ticker, articles=[], error_message=error_msg)
+            
+        data = response.json() or []
+        
+        # Guard against non-list structures (error dict responses from FMP)
+        if not isinstance(data, list):
+            return StockNewsReport(
+                ticker=ticker, 
+                articles=[], 
+                error_message=f"FMP endpoint returned invalid response type layout: {str(data)[:100]}"
+            )
+
+        # Explicit type validation loop to step around the 'NoneType' crash
+        filtered = []
+        for item in data:
+            if isinstance(item, dict) and item.get("symbol"):
+                if str(item.get("symbol")).upper() == ticker.upper():
+                    filtered.append(item)
+
         if not filtered:
             return StockNewsReport(
                 ticker=ticker, articles=[], error_message="No news found."
             )
+            
         articles = [
             NewsArticle(
-                date=item.get("publishedDate",""),
-                title=item.get("title","")
+                date=str(item.get("publishedDate") or ""),
+                title=str(item.get("title") or "")
             )
             for item in filtered[:10]
         ]
         return StockNewsReport(ticker=ticker, articles=articles)
+        
     except Exception as e:
         logging.error(f"get_fmp_news error: {e}")
         return StockNewsReport(ticker=ticker, articles=[], error_message=str(e))
+
 
 
 
