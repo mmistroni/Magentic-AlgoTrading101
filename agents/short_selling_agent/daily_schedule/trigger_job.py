@@ -134,4 +134,122 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
 
 async def amain(message_to_send: str):
     """Main function to run a single interaction, parse recommendations, insert into BigQuery, and then cleanup."""
-    print(f"\n🤖 Starting Single
+    print(f"\n🤖 Starting Single-Run Client | Session: **{SESSION_ID}**")
+    
+    session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
+    current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
+    
+    async with httpx.AsyncClient(timeout=600.0) as client: # Generous timeout for deep agent analytics
+        
+        # 1. Create Session
+        try:
+            await make_request(client, "POST", current_session_endpoint, data=session_data)
+            print(f"✅ Session state re-initialized successfully.")
+        except Exception as e:
+            print(f"❌ Could not start session framework: {e}")
+            return
+
+        # 2. Run Single Request & Capture Output Text
+        print(f"--- 💬 Executing Single Task ---")
+        agent_text = ""
+        try:
+            agent_text = await run_agent_request(client, SESSION_ID, message_to_send)
+            print(f"✅ [Agent] -> Raw Response Captured successfully.")
+        except Exception as e:
+            print(f"❌ Agent execution runtime error: {e}")
+            return
+        
+        # 3. Parse Text Responses and Stream directly to BigQuery
+        if agent_text:
+            clean_text = agent_text.strip()
+            # Clean off any potential markdown wrappers if the agent wrapped its JSON block
+            if clean_text.startswith("```"):
+                print("✂️ [PARSING] Detected Markdown block fences. Stripping wrappers out...")
+                lines = clean_text.splitlines()
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                clean_text = "\n".join(lines).strip()
+                
+            try:
+                print("🔍 [PARSING] Attempting to deserialize clean text block into JSON...")
+                parsed_json = json.loads(clean_text)
+                
+                # Double check if it's nested inside a 'final_decisions' wrapper dict element
+                if isinstance(parsed_json, dict) and "final_decisions" in parsed_json:
+                    print("📂 [PARSING] Detected 'final_decisions' nesting key object. Slicing inner array data...")
+                    raw_rows = parsed_json["final_decisions"]
+                else:
+                    raw_rows = parsed_json if isinstance(parsed_json, list) else [parsed_json]
+                
+                print(f"📊 [PARSING] Discovered {len(raw_rows)} individual target asset evaluation rows inside data payload.")
+                
+                rows_to_insert = []
+                today_str = datetime.utcnow().strftime('%Y-%m-%d')
+                timestamp_now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+
+                print("\n==================== 🛠️ COMPILING ROWS FOR BIGQUERY ====================")
+                for index, row in enumerate(raw_rows):
+                    compiled_row = {
+                        "evaluation_date": row.get("evaluation_date", today_str),
+                        "ticker": str(row.get("ticker", "")).upper(),
+                        "conviction_score": int(row.get("conviction_score", 3)),
+                        "action": str(row.get("action", "WATCH")).upper(),
+                        "reasoning": row.get("reasoning", None),
+                        "inserted_at": timestamp_now
+                    }
+                    print(f"👉 Row [{index}] Compiled Payload Architecture:")
+                    print(json.dumps(compiled_row, indent=2))
+                    rows_to_insert.append(compiled_row)
+                print("==========================================================================\n")
+                
+                if rows_to_insert:
+                    print(f"📤 [BIGQUERY] Initializing streaming upload framework target connection: {TABLE_REF}")
+                    bq_client = bigquery.Client(project=PROJECT_ID)
+                    
+                    print(f"📤 [BIGQUERY] Broadcasting packet chunk array ({len(rows_to_insert)} items) via streaming API call...")
+                    errors = bq_client.insert_rows_json(TABLE_REF, rows_to_insert)
+                    
+                    if errors:
+                        print("\n❌ ==================== 🔥 BIGQUERY INSERT ERRORS OCCURRED ====================")
+                        print(json.dumps(errors, indent=2))
+                        print("=================================================================================\n")
+                    else:
+                        print("🎉 ==================== 🚀 SUCCESSFUL BIGQUERY INGESTION ====================")
+                        print(f" All {len(rows_to_insert)} items successfully appended to BigQuery storage layer.")
+                        print("===============================================================================\n")
+                else:
+                    print("⚠️ [BIGQUERY] Aborting ingestion phase: No rows were successfully extracted or compiled.")
+                        
+            except json.JSONDecodeError as decode_error:
+                print("\n🚨 ==================== 💥 JSON PARSE ERROR OCCURRED ====================")
+                print(f"Message: Agent did not output a cleanly parsable JSON data block schema structure.")
+                print(f"Exception Track: {decode_error}")
+                print(f"--- RAW BLOCK INGESTION STRIPPED SOURCE ---\n{clean_text}")
+                print("============================================================================\n")
+            except Exception as bq_err:
+                print(f"❌ [BIGQUERY] Failed to complete execution or compile transaction context: {bq_err}")
+
+        # 4. Cleanup: Delete Session
+        await asyncio.sleep(1) 
+        print(f"\n## 3. Deleting active processing Session Context: {SESSION_ID}")
+        try:
+            await make_request(client, "DELETE", current_session_endpoint)
+            print("✅ Session state torn down cleanly.")
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to clear tracking frame out completely. {e}")
+
+if __name__ == "__main__":
+    if sys.version_info < (3, 9):
+        print("🚨 ERROR: Python 3.9+ required.")
+        sys.exit(1)
+        
+    # Dynamically pick up today's date string (e.g., "2026-05-30")
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    QUERY = f"Run the short-selling pipeline for {today_str}."
+    
+    try:
+        asyncio.run(amain(QUERY))
+    except Exception as e:
+        print(f"FATAL SYSTEM FAILURE EXECUTION TRACE: {e}")
