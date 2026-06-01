@@ -118,18 +118,36 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
         print(f"❌ [PARSING] Failed parsing core wrapper JSON response dictionary payload: {parse_err}")
         raise json.JSONDecodeError("Failed to parse standard Unary JSON response structure.", response.text, 0)
     
-    # Extract final text block cleanly from the structural model schema payload
-    final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', '')
+    # 🛠️ HARDENED EXTRACTION LAYER FOR LIST vs DICT CONTEXTS
+    print(f"ℹ️ [PARSING] Root payload type returned from server is: {type(agent_response)}")
+    
+    target_payload = agent_response
+    
+    # If the server wrapped the response array inside a top-level list, safely pull out the last or first item
+    if isinstance(agent_response, list):
+        if len(agent_response) == 0:
+            print("⚠️ [PARSING] Server returned an empty list [] payload.")
+            return 'Agent response structural text element was returned empty.'
+        
+        # Pull the last turn element in the conversation payload array
+        print("📂 [PARSING] Unwrapping list element to inspect underlying object attributes...")
+        target_payload = agent_response[-1]
+
+    # Inspect and safely extract text fields
+    if isinstance(target_payload, dict):
+        final_text = target_payload.get('content', {}).get('parts', [{}])[0].get('text', '')
+    else:
+        print(f"⚠️ [PARSING] Unexpected structure after list unwrapping: {type(target_payload)}")
+        final_text = str(target_payload)
     
     if not final_text:
-        print("⚠️ [PARSING] Warning: The 'text' block inside content.parts[0] was empty or missing.")
+        print("⚠️ [PARSING] Warning: The 'text' block was empty or missing.")
         final_text = 'Agent response structural text element was returned empty.'
         
     print("\n==================== 📑 EXTRACTED CLEAN AGENT TEXT STRING ====================")
     print(final_text)
     print("==============================================================================\n")
     return final_text
-
 # --- Main Logic (ASYNC) ---
 
 async def amain(message_to_send: str):
