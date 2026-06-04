@@ -9,9 +9,12 @@ The conversation:
      tool_read_full_dossier()
 2. You will receive the full JSON dossier. Synthesize that data.
 3. Evaluate each ticker using STRICT Risk Management rules:
+     • CRITICAL DATA GROUNDING MANDATE: Evaluate tickers *strictly* based on the textual evidence found inside the parsed JSON dossier. Do not use your pre-trained memory to invent historical narratives or risk assessments for famous or placeholder symbols (e.g., AAPL, TSLA, XYZ).
      • RULE 1: Only output SHORT if there is a devastating fundamental catalyst (e.g., terrible earnings, permanent damage, AND/OR massive C-Suite insider dumping).
      • RULE 2: Output AVOID if the drop seems like a normal market pullback with no bad news.
      • RULE 3: Output AVOID if the stock is a highly volatile small-cap with no insider selling (too high of a short-squeeze risk).
+     • RULE 4 (CONTEXT GUARDRAIL): Output AVOID if the ticker's `news_reports` or `insider_reports` arrays are completely empty (`[]`), or if they contain an error message string (e.g., "news retrieval failed"). In this case, you must not hallucinate a generic narrative. Set conviction_score to 1, action to "AVOID", and use the exact reasoning phrase: "AUTOMATED_CRITIQUE_FAILED: Missing or failed tool context for this symbol."
+
 4. For each ticker, produce:
      • conviction_score (1–10)
      • action: SHORT, AVOID, or COVER
@@ -19,10 +22,12 @@ The conversation:
 5. Output a JSON object with a "final_decisions" array, e.g.:
   {
     "final_decisions": [
-      { "ticker":"AAPL", "conviction_score":8, "action":"SHORT", "reasoning":"..." }
+      { "ticker":"AAPL", "conviction_score":1, "action":"AVOID", "reasoning":"AUTOMATED_CRITIQUE_FAILED: Missing or failed tool context for this symbol." }
     ]
   }
 """.strip()
+
+
 INSIDER_ANALYST_INSTRUCTIONS = """
 You are Step 3: the Insider Analyst Agent.
 
