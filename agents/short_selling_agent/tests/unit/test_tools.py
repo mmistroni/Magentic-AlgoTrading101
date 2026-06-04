@@ -89,20 +89,27 @@ def test_get_fmp_bigger_losers_success(monkeypatch):
 #------------------------------------------------------------------------------
 # Tests for get_fmp_news
 #------------------------------------------------------------------------------
-def test_get_fmp_news_no_data(monkeypatch):
-    monkeypatch.setattr(requests, "get", lambda url: DummyResponse([]))
+def test_get_fmp_news_no_data(monkeypatch, mocker):
+    # 1. 🛡️ PATCH: Spy on the BigQuery logging method using the mocker fixture
+    mock_log_bq = mocker.patch("short_selling_agent.tools.log_news_context_to_bigquery")
+    monkeypatch.setattr(requests, "get", lambda url, *args, **kwargs: DummyResponse([]))
     resp = get_fmp_news("XYZ")
     assert resp.ticker == "XYZ"
     assert resp.articles == []
     assert "no news found" in resp.error_message.lower()
+    mock_log_bq.assert_not_called()
 
-def test_get_fmp_news_success(monkeypatch):
+def test_get_fmp_news_success(monkeypatch, mocker):
+    # 1. 🛡️ PATCH: Spy on the BigQuery logging method using the mocker fixture
+    mock_log_bq = mocker.patch("short_selling_agent.tools.log_news_context_to_bigquery")
     payload = [
         {"symbol": "ABC", "publishedDate": "2026-04-28", "title": "Big Drop!"},
         {"symbol": "ABC", "publishedDate": "2026-04-27", "title": "Earnings Miss"},
         {"symbol": "XYZ", "publishedDate": "2026-04-27", "title": "Ignore this"},
     ]
-    monkeypatch.setattr(requests, "get", lambda url: DummyResponse(payload))
+    # 🛠️ Change this lambda signature here as well
+    monkeypatch.setattr(requests, "get", lambda url, *args, **kwargs: DummyResponse(payload))
+
     resp = get_fmp_news("ABC")
     assert resp.ticker == "ABC"
     
@@ -110,6 +117,15 @@ def test_get_fmp_news_success(monkeypatch):
     assert len(resp.articles) == 2
     assert resp.error_message is None
     assert resp.articles[0].title == "Big Drop!"
+
+    # 5. ✅ ASSERTION: Logging MUST be triggered since valid articles were compiled
+    mock_log_bq.assert_called_once()
+    
+    # 6. Deep inspection of the tracking parameters passed to your logging tool layer
+    called_args, called_kwargs = mock_log_bq.call_args
+    assert called_args[0] == "ABC"            # Validating ticker positional argument match
+    assert isinstance(called_args[2], list)    # Validating that data chunk payload is an extracted list
+    assert len(called_args[2]) == 2
 
 
 

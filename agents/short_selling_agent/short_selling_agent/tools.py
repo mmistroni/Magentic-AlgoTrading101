@@ -5,6 +5,15 @@ import logging
 import requests
 from datetime import datetime, timedelta
 from google.cloud import bigquery
+import os
+from datetime import datetime
+from typing import List, Dict, Any
+from google.cloud import bigquery
+
+# Configure destination from environment variables or defaults
+PROJECT_ID = "datascience-projects"
+DATASET_ID = "finviz_blacklist"
+NEWS_TABLE_REF = f"{PROJECT_ID}.{DATASET_ID}.daily_news_context"
 
 from .schemas import (
     BiggestLosersReport,
@@ -139,6 +148,48 @@ def get_fmp_bigger_losers(
 # -----------------------------------------------------------------------------
 # in short_selling_agent/tools.py, overwrite get_fmp_news:
 
+def log_news_context_to_bigquery(ticker: str, evaluation_date: str, news_items: List[Dict[str, Any]], 
+                                 source_name: str = "FMPNews"):
+    """
+    Utility function to instantly stream raw text evidence into BigQuery.
+    Inject this directly at the bottom of your news fetching tools!
+    """
+    if not news_items:
+        print(f"⚠️ [TOOL AUDIT] No news articles fetched for {ticker}. Skipping BigQuery logging.")
+        return
+
+    try:
+        bq_client = bigquery.Client(project=PROJECT_ID)
+        rows_to_insert = []
+        
+        # Capture the exact network transaction time
+        timestamp_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+
+        for item in news_items:
+            # Gracefully extract headline text regardless of dictionary shape
+            headline_text = item.get("headline") or item.get("title") or item.get("text")
+            
+            if not headline_text:
+                continue
+                
+            rows_to_insert.append({
+                "evaluation_date": evaluation_date,
+                "ticker": ticker.upper(),
+                "source": source_name,
+                "headline": str(headline_text).strip(),
+                "fetched_at": timestamp_now
+            })
+
+        if rows_to_insert:
+            print(f"📤 [TOOL AUDIT] Streaming {len(rows_to_insert)} raw news evidence rows to BigQuery for {ticker}...")
+            errors = bq_client.insert_rows_json(NEWS_TABLE_REF, rows_to_insert)
+            if errors:
+                print(f"❌ [TOOL AUDIT] BigQuery context logging errors occurred: {errors}")
+            else:
+                print(f"🎉 [TOOL AUDIT] Traceability verification successfully stored for {ticker}.")
+    except Exception as e:
+        print(f"💥 [TOOL AUDIT] Exception during BigQuery logging: {str(e)}")
+
 def get_fmp_news(
     ticker: str,
     as_of_date: str = ''
@@ -232,6 +283,8 @@ def get_fmp_news(
             )
             
         # Return up to 10 matching news items
+        print(f"🚀 [DEBUG URL] Storing news {len(articles[:10])} in Big query table")
+        log_news_context_to_bigquery(ticker, as_of_date or datetime.utcnow().strftime("%Y-%m-%d"), [a.model_dump() for a in articles[:10]])
         return StockNewsReport(ticker=ticker, articles=articles[:10])
         
     except Exception as e:
