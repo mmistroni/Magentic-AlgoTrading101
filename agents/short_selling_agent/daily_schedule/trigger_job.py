@@ -8,6 +8,10 @@ import httpx
 import sys
 from google.cloud import bigquery
 
+# --- SendGrid Imports ---
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, HtmlContent, Subject, To, From
+
 # --- Configuration (Dynamic) ---
 APP_URL = os.environ.get("AGENT_SERVICE_URL", "https://short-selling-agent-service-682143946483.us-central1.run.app")
 USER_ID = "automated_cron_job"
@@ -20,15 +24,104 @@ DATASET_ID = "finviz_blacklist"
 TABLE_ID = "daily_recommendations"
 TABLE_REF = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
 
+# --- EMAIL NOTIFICATION LAYER (SENDGRID) ---
+
+def send_summary_email(rows_inserted: List[Dict[str, Any]]):
+    """
+    Synchronous worker wrapping SendGrid HTTP API calls. 
+    Constructs an HTML summary matrix table from the compiled database records.
+    """
+    sendgrid_key = os.environ.get("SENDGRID_API_KEY")
+    if not sendgrid_key:
+        print("⚠️ [NOTIFICATION] SENDGRID_API_KEY env parameter missing. Aborting email dispatch.")
+        return
+
+    sender_email = "gcp_cloud_mm@outlook.com"
+    receiver_email = "mmistroni@gmail.com"
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+
+    # Build the HTML output rows dynamically from processed items
+    table_rows = ""
+    for r in rows_inserted:
+        action = r.get("action", "AVOID")
+        # Set conditional visual styling based on strategy actions
+        if action == "SHORT" and r.get("conviction_score", 0) >= 7:
+            bg_color = "#ffe6eb"
+            text_color = "#cc0033"
+        elif action == "SHORT":
+            bg_color = "#fff2e6"
+            text_color = "#b35900"
+        elif "AUTOMATED_CRITIQUE_FAILED" in str(r.get("reasoning", "")):
+            bg_color = "#f2f2f2"
+            text_color = "#666666"
+        else:
+            bg_color = "#e6f7e9"
+            text_color = "#1e5a2c"
+
+        table_rows += f"""
+        <tr style="background-color: {bg_color}; color: {text_color}; font-size: 13px;">
+            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{r.get('ticker')}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{action}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{r.get('conviction_score')}/10</td>
+            <td style="padding: 10px; border: 1px solid #ddd; line-height: 1.4;">{r.get('reasoning')}</td>
+        </tr>
+        """
+
+    # Assemble HTML document scaffolding
+    html_content = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333333; margin: 20px;">
+        <h2 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;">
+            🎯 Multi-Agent Pipeline Execution Summary
+        </h2>
+        <p><strong>Execution Date:</strong> {today_str}</p>
+        <p><strong>Session Context ID:</strong> <code>{SESSION_ID}</code></p>
+        <br>
+        <table style="width: 100%; border-collapse: collapse; min-width: 500px;">
+            <thead>
+                <tr style="background-color: #2c3e50; color: white; text-align: left;">
+                    <th style="padding: 12px; border: 1px solid #ddd;">Ticker</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Action</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Conviction</th>
+                    <th style="padding: 12px; border: 1px solid #ddd;">Analytical Reasoning / Telemetry Flags</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows if table_rows else "<tr><td colspan='4' style='padding:15px; text-align:center;'>No records evaluated.</td></tr>"}
+            </tbody>
+        </table>
+        <br>
+        <p style="font-size: 11px; color: #7f8c8d; border-top: 1px solid #eeeeee; padding-top: 10px;">
+            Automated Operational Signal • Generated via Short Selling Agent Cluster Node
+        </p>
+    </body>
+    </html>
+    """
+
+    message = Mail(
+        from_email=From(sender_email, "GCP Cloud Core System"),
+        to_emails=To(receiver_email),
+        subject=Subject(f"🚀 Algo Summary Report: {today_str} ({len(rows_inserted)} Assets Staged)"),
+        html_content=HtmlContent(html_content)
+    )
+
+    try:
+        print(f"📤 [NOTIFIER] Transmitting SendGrid payload from {sender_email} to {receiver_email}...")
+        sg = SendGridAPIClient(sendgrid_key)
+        response = sg.send(message)
+        if response.status_code in [200, 201, 202]:
+            print("📨 [NOTIFIER] Summary dashboard email successfully delivered to SendGrid network gateway.")
+        else:
+            print(f"⚠️ [NOTIFIER] Unexpected SendGrid API response status received: {response.status_code}")
+    except Exception as mail_err:
+        print(f"❌ [NOTIFIER] Failed sending execution alert through SendGrid API service: {mail_err}")
+
+
 # --- Authentication Function (ASYNC) ---
 
 async def get_auth_token() -> str:
-    """
-    Retrieves an OIDC Identity Token. 
-    Detects if it's running inside GCP (Metadata Server) or falls back to local gcloud.
-    """
+    """Retrieves an OIDC Identity Token."""
     print("🔑 [AUTH] Attempting to acquire OIDC token...")
-    # 1. Attempt to fetch from Google Cloud Metadata Server (When running live on Cloud Run)
     try:
         async with httpx.AsyncClient() as client:
             metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity"
@@ -42,7 +135,6 @@ async def get_auth_token() -> str:
     except Exception as e:
         print(f"ℹ️ [AUTH] Metadata Server approach skipped or failed: {e}")
 
-    # 2. Fallback: Run 'gcloud auth print-identity-token' (Local Codespaces Run)
     try:
         print("ℹ️ [AUTH] Falling back to local gcloud CLI token extraction...")
         proc = await asyncio.create_subprocess_exec(
@@ -92,10 +184,7 @@ async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, da
         raise
 
 async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str) -> str:
-    """
-    Executes a single POST request to the unary /run endpoint.
-    Bypasses chunked proxy streaming completely to protect message content delivery.
-    """
+    """Executes a single POST request to the unary /run endpoint."""
     print(f"\n[User] -> Sending request to Unary Endpoint: '{message}'")
     
     run_data = {
@@ -118,22 +207,15 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
         print(f"❌ [PARSING] Failed parsing core wrapper JSON response dictionary payload: {parse_err}")
         raise json.JSONDecodeError("Failed to parse standard Unary JSON response structure.", response.text, 0)
     
-    # 🛠️ HARDENED EXTRACTION LAYER FOR LIST vs DICT CONTEXTS
     print(f"ℹ️ [PARSING] Root payload type returned from server is: {type(agent_response)}")
-    
     target_payload = agent_response
     
-    # If the server wrapped the response array inside a top-level list, safely pull out the last or first item
     if isinstance(agent_response, list):
         if len(agent_response) == 0:
             print("⚠️ [PARSING] Server returned an empty list [] payload.")
             return 'Agent response structural text element was returned empty.'
-        
-        # Pull the last turn element in the conversation payload array
-        print("📂 [PARSING] Unwrapping list element to inspect underlying object attributes...")
         target_payload = agent_response[-1]
 
-    # Inspect and safely extract text fields
     if isinstance(target_payload, dict):
         final_text = target_payload.get('content', {}).get('parts', [{}])[0].get('text', '')
     else:
@@ -148,6 +230,7 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
     print(final_text)
     print("==============================================================================\n")
     return final_text
+
 # --- Main Logic (ASYNC) ---
 
 async def amain(message_to_send: str):
@@ -157,7 +240,7 @@ async def amain(message_to_send: str):
     session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
     current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
     
-    async with httpx.AsyncClient(timeout=600.0) as client: # Generous timeout for deep agent analytics
+    async with httpx.AsyncClient(timeout=600.0) as client:
         
         # 1. Create Session
         try:
@@ -180,7 +263,6 @@ async def amain(message_to_send: str):
         # 3. Parse Text Responses and Stream directly to BigQuery
         if agent_text:
             clean_text = agent_text.strip()
-            # Clean off any potential markdown wrappers if the agent wrapped its JSON block
             if clean_text.startswith("```"):
                 print("✂️ [PARSING] Detected Markdown block fences. Stripping wrappers out...")
                 lines = clean_text.splitlines()
@@ -194,7 +276,6 @@ async def amain(message_to_send: str):
                 print("🔍 [PARSING] Attempting to deserialize clean text block into JSON...")
                 parsed_json = json.loads(clean_text)
                 
-                # Double check if it's nested inside a 'final_decisions' wrapper dict element
                 if isinstance(parsed_json, dict) and "final_decisions" in parsed_json:
                     print("📂 [PARSING] Detected 'final_decisions' nesting key object. Slicing inner array data...")
                     raw_rows = parsed_json["final_decisions"]
@@ -237,6 +318,13 @@ async def amain(message_to_send: str):
                         print("🎉 ==================== 🚀 SUCCESSFUL BIGQUERY INGESTION ====================")
                         print(f" All {len(rows_to_insert)} items successfully appended to BigQuery storage layer.")
                         print("===============================================================================\n")
+                        
+                        # 📬 --- TRIGGER SENDGRID NOTIFICATION UPON SUCCESS ---
+                        # Run via standard loop executor since sendgrid's delivery client is synchronous
+                        print("📧 [ORCHESTRATOR] Initializing mail summary delivery dispatch...")
+                        loop = asyncio.get_running_loop()
+                        await loop.run_in_executor(None, send_summary_email, rows_to_insert)
+
                 else:
                     print("⚠️ [BIGQUERY] Aborting ingestion phase: No rows were successfully extracted or compiled.")
                         
@@ -263,7 +351,6 @@ if __name__ == "__main__":
         print("🚨 ERROR: Python 3.9+ required.")
         sys.exit(1)
         
-    # Dynamically pick up today's date string (e.g., "2026-05-30")
     today_str = datetime.utcnow().strftime('%Y-%m-%d')
     QUERY = f"Run the short-selling pipeline for {today_str}."
     

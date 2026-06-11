@@ -6,3 +6,4 @@ pandas
 pyarrow
 finvizfinance
 ta
+sendgrid
