@@ -5,7 +5,7 @@ from google.adk.agents import LlmAgent
 
 
 tfl_agent = LlmAgent(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     name="tfl_agent",
     description="Find best route between FAirlop and Bromley.",
     instruction=TFL_AGENT_INSTRUCTION,
