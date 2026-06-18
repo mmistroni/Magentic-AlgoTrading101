@@ -372,3 +372,57 @@ CI: +30.60%
 Critical Question: Did the 200-day SMA filter successfully protect the portfolio from the massive drawdowns in high-growth tech during this period?
 
 While the 200-day SMA filter aimed to select stronger-performing assets, the portfolio's overall negative average return of -4.68% indicates that it was not entirely immune to the "2022 Growth Crash." The win rate of 36.73% suggests that more than half of the selected stocks experienced negative returns. Several high-growth tech-related stocks like NVDA (-29.78%), ABNB (-34.35%), MU (-34.89%), and HOOD (-32.28%) still suffered significant drawdowns despite being above their 200-day SMA at the entry point. However, the portfolio did contain strong performers in sectors less affected by the growth crash, such as energy (LNG, DVN, XOM) and healthcare (MRK, UNH, JNJ), which provided positive alpha. The filter might have prevented even larger losses by excluding stocks already in downtrends, but it did not fully insulate the portfolio from the broader market downturn, particularly for high-beta growth names.
+
+
+
+====== 20260618 - Full sec 13 download. we try these prompts
+
+Prompt 1: The 2024 Historical Backtest Audit
+
+Use this prompt to test the BACKTEST data pipeline, the 45-day disclosure lag calculation, and the 180-day ROI tool chaining logic.
+
+Perform a High-Conviction Sniper Audit for the target date "2024-12-31".
+
+Execute the workflow strictly in order:
+1. Detect the mode based on the target date (set MODE = BACKTEST).
+2. Run Adaptive Discovery loops (Iterations 1-5) to discover consensus tickers. Start with strict_mode=True; if you have fewer than 15 tickers, pivot to strict_mode=False.
+3. Slice the Top 15 holdings sorted by Manager Count.
+4. Call get_forward_return_tool with sanitized tickers (no parenthetical metadata) to audit the 180-day performance starting 45 days after target_date (2025-02-14).
+5. Apply Phase 5 Critique Filters to categorize underperformers into Structural Losers (Below SMA200) vs Laggards (Above SMA200).
+
+Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary with Refined ROI metrics.
+
+
+
+
+
+Prompt 2: Live Execution Portfolio Deployment
+
+Use this prompt to run the live risk-mitigation pipeline. This triggers LIVE mode, bypasses future performance returns, and analyzes current technical trend structures to proactively shield capital.
+
+Initialize a live-execution strategy audit for the target date "2026-03-31".
+
+Execute the workflow strictly in order:
+1. Detect the mode based on the target date (set MODE = LIVE).
+2. Execute the discovery loops to gather current Elite consensus holdings, automatically paginating with fetch_consensus_holdings_tool.
+3. Perform current technical checks using get_technical_metrics_tool.
+4. Slice the Top 15 candidates by Manager Count.
+5. Apply the Proactive Critique Filter: immediately CUT any tickers showing "SMA200:DOWN" or "SMA50:DOWN" to protect our downside capital risk today.
+
+Format the output strictly as specified: Table 1 (Trend Status), Table 2 (Proactive Cuts), and the Executive Summary recommending the finalized execution tickers.
+
+
+Prompt 3: Deep Historical Bear Market Recovery Audit (2022)
+
+Use this prompt to run a historical test on a tough market period (Q4 2022) to verify how successfully the "Critique Filter" filters out structural losers from long-term holds.
+
+Run a High-Conviction Sniper Audit for the target date "2022-12-31".
+
+Execute the workflow strictly in order:
+1. Initialize in BACKTEST mode.
+2. Retrieve the consensus holdings from the Elite managers.
+3. Run the technical confirmation above the 200-day SMA, relaxing the strict requirements to active momentum if you fail to hit a 15-ticker baseline.
+4. Calculate the 180-day ROI starting from the February 2023 disclosure deadline.
+5. Execute the Phase 5 Critique Filter to prove if isolating "Structural Losers" (assets trading below their 200-day SMA) successfully protects the portfolio's aggregate ROI.
+
+Provide the full Table 1 and Table 2 reports alongside the Executive Summary detailing Strategy Status and your Recovery Verdict.
