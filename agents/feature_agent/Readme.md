@@ -416,13 +416,23 @@ Prompt 3: Deep Historical Bear Market Recovery Audit (2022)
 
 Use this prompt to run a historical test on a tough market period (Q4 2022) to verify how successfully the "Critique Filter" filters out structural losers from long-term holds.
 
-Run a High-Conviction Sniper Audit for the target date "2022-12-31".
+Perform a High-Conviction Sniper Audit for the target date "2022-12-31". 
+(Note: Replace the target date above with whichever date you want to backtest).
 
 Execute the workflow strictly in order:
-1. Initialize in BACKTEST mode.
-2. Retrieve the consensus holdings from the Elite managers.
-3. Run the technical confirmation above the 200-day SMA, relaxing the strict requirements to active momentum if you fail to hit a 15-ticker baseline.
-4. Calculate the 180-day ROI starting from the February 2023 disclosure deadline.
-5. Execute the Phase 5 Critique Filter to prove if isolating "Structural Losers" (assets trading below their 200-day SMA) successfully protects the portfolio's aggregate ROI.
 
-Provide the full Table 1 and Table 2 reports alongside the Executive Summary detailing Strategy Status and your Recovery Verdict.
+1. Mode Detection: Set MODE = BACKTEST based on the provided target date. Define a variable [TARGET_DATE] equal to this date.
+
+2. Adaptive Discovery: Run Adaptive Discovery loops (Iterations 1-5) to discover consensus tickers from Elite managers. Start with strict_mode=True; if you have fewer than 15 tickers, pivot to strict_mode=False.
+
+3. Slicing: Slice the Top 15 holdings sorted by Manager Count.
+
+4. Technical Confirmation (Phase 5 Critique Filter): Call get_technical_metrics_tool for each asset. You MUST evaluate the 200-day SMA status strictly AS OF [TARGET_DATE]. Do not use or look at any price action after [TARGET_DATE] for this step. Categorize underperformers into Structural Losers (Below SMA200 as of [TARGET_DATE]) vs Laggards (Above SMA200 as of [TARGET_DATE]).
+
+5. Forward Return Audit: Calculate a secondary date equal to exactly 45 days after [TARGET_DATE] (the Execution Date). Call get_forward_return_tool to audit the 180-day performance starting strictly from that 45-day delayed Execution Date.
+
+6. Comparative ROI Simulation: In the Executive Summary, you must calculate and compare two distinct metrics:
+   - ROI / Win Rate (Original): The actual 180-day performance of all original 15 tickers starting from the Execution Date.
+   - Refined ROI / Win Rate: The hypothetical 180-day performance of the portfolio starting from the Execution Date IF you had removed the "Structural Losers" identified in Step 4.
+
+Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary detailing Strategy Status, Comparative ROI Metrics, and your Recovery Verdict.
