@@ -199,7 +199,7 @@ pyproject_hooks==1.2.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
 python-multipart==0.0.20
-pytest
+pytest>=8.0.0
 pytest-asyncio
 pytest-mock
 pytz==2025.2
