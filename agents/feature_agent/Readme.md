@@ -144,10 +144,33 @@ Execute the workflow strictly in order:
 
 Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary with Refined ROI metrics.
 
+ok this is the 2023 result Table 1: Original Top 15 Selection (Backtest)
+
+TickerElite CountEntry Price6-mo ReturnAAPL893$186.97-3.79%MSFT761$327.3110.27%AMZN392$127.9013.03%GOOGL295$118.0514.52%GOOG228$118.9615.02%V166$229.0311.24%META136$279.0823.30%PG115$138.200.77%NVDA107$40.7417.60%MA107$380.908.59%SPLG77$49.557.57%MRK74$103.524.51%SPYG70$58.965.47%PEP69$165.61-5.38%XLK66$83.898.08%
+
+Table 2: Critique Filter Analysis
+
+TickerVerdict (Cut/Hold)Technical ReasonAAPLLaggard (HOLD)Negative return but trading above 200-day SMAMSFTPerformer (HOLD)Trading above 200-day SMAAMZNPerformer (HOLD)Trading above 200-day SMAGOOGLPerformer (HOLD)Trading above 200-day SMAGOOGPerformer (HOLD)Trading above 200-day SMAVPerformer (HOLD)Trading above 200-day SMAMETAPerformer (HOLD)Trading above 200-day SMAPGPerformer (HOLD)Trading above 200-day SMANVDAPerformer (HOLD)Trading above 200-day SMAMAPerformer (HOLD)Trading above 200-day SMASPLGPerformer (HOLD)Trading above 200-day SMAMRKPerformer (HOLD)Trading above 200-day SMASPYGPerformer (HOLD)Trading above 200-day SMAPEPLaggard (HOLD)Negative return but trading above 200-day SMAXLKPerformer (HOLD)Trading above 200-day SMA
+
+Executive Summary:
+
+ROI / Win Rate (Original): Average ROI: 8.65% & Win Rate: 86.67%
+
+Refined ROI: 8.65%
+
+Refined List for Execution: Not applicable for backtest mode.
+
+Strategy Status: Relaxed Mode was triggered
+
+Recovery Verdict:
+
+AAPL: HOLD
+
+PEP: HOLD 
 
 
 
-Prompt 3 : The 2023 Historical Backtest Aud
+Prompt 3 : The 2025 Historical Backtest Aud
 
 
 Perform a High-Conviction Sniper Audit for the target date "2025-06-30".
@@ -162,13 +185,69 @@ Execute the workflow strictly in order:
 Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary with Refined ROI metrics.
 
 
+Table 1: Original Top 15 Selection (Backtest)
+Ticker	Elite Count	Entry Price	6-mo Return
+AAPL	1217	$193.30	-0.62%
+MSFT	1050	$440.06	12.87%
+AMZN	770	$190.22	19.34%
+NVDA	644	$120.35	37.38%
+META	407	$501.99	12.28%
+GOOGL	372	$180.20	2.50%
+GOOG	264	$176.67	2.65%
+JPM	228	$196.24	0.99%
+TSM	119	$162.77	37.19%
+XLK	119	$244.60	17.58%
+SCHX	114	$62.62	4.88%
+SCHB	113	$66.19	4.70%
+PG	110	$154.51	-4.43%
+AVGO	110	$1573.57	10.99%
+JNJ	108	$150.15	-2.71%
+Table 2: Critique Filter Analysis
+Ticker	Verdict (Cut/Hold)	Technical Reason
+AAPL	Laggard (HOLD)	Negative return and trading above 200-day SMA
+MSFT	HOLD (Performer)	Trading above 200-day SMA
+AMZN	HOLD (Performer)	Trading above 200-day SMA
+NVDA	HOLD (Performer)	Trading above 200-day SMA
+META	HOLD (Performer)	Trading above 200-day SMA
+GOOGL	HOLD (Performer)	Trading above 200-day SMA
+GOOG	HOLD (Performer)	Trading above 200-day SMA
+JPM	HOLD (Performer)	Trading above 200-day SMA
+TSM	HOLD (Performer)	Trading above 200-day SMA
+XLK	HOLD (Performer)	Trading above 200-day SMA
+SCHX	HOLD (Performer)	Trading above 200-day SMA
+SCHB	HOLD (Performer)	Trading above 200-day SMA
+PG	Laggard (HOLD)	Negative return and trading above 200-day SMA
+AVGO	HOLD (Performer)	Trading above 200-day SMA
+JNJ	Laggard (HOLD)	Negative return and trading above 200-day SMA
+Executive Summary:
+ROI / Win Rate (Original): 9.07% / 80.00%
+Refined ROI: 11.33%
+Refined List for Execution: AAPL, MSFT, AMZN, NVDA, META, GOOGL, GOOG, JPM, TSM, XLK, SCHX, SCHB, PG, AVGO, JNJ
+Strategy Status: Relaxed Mode was triggered
+Recovery Verdict: For Laggards (AAPL, PG, JNJ), it is advised to hold as they are trading above their 200-day SMA, indicating underlying strength despite recent negative returns.
 
 
 
+Prompt 4
+1. The "False Breakout" / Sudden Regime Reversal
+Target Date: "2021-12-31"
 
+Forward ROI Start Date (Target + 45 days): 2022-02-14
 
+Why test this: This is the ultimate test of your downside protection. In late 2021, elite managers were still heavily long growth and tech. By mid-February 2022, the market was entering a brutal, year-long bear market.
 
+What this tests: Will your 200-day SMA filter actually trigger "Structural Risk (CUT)" quickly enough to save the portfolio, or will the 45-day lag trap you in cascading growth stocks that haven't crossed below their moving averages yet, but are about to collapse?
 
+Perform a High-Conviction Sniper Audit for the target date "2021-12-31".
+
+Execute the workflow strictly in order:
+1. Detect the mode based on the target date (set MODE = BACKTEST).
+2. Run Adaptive Discovery loops (Iterations 1-5) to discover consensus tickers. Start with strict_mode=True; if you have fewer than 15 tickers, pivot to strict_mode=False.
+3. Slice the Top 15 holdings sorted by Manager Count.
+4. Dynamically calculate the Entry Date as exactly 45 days after "2021-12-31". Call get_forward_return_tool with sanitized tickers to audit the 180-day performance starting on that calculated Entry Date.
+5. Apply Phase 5 Critique Filters to categorize underperformers into Structural Losers (Below SMA200) vs Laggards (Above SMA200).
+
+Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary with Refined ROI metrics.
 
 
 
