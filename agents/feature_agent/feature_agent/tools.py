@@ -75,7 +75,9 @@ import math # Add this at the top
 
 def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool = True, mode: str = "backtest") -> str:
     """
-    Step 2 & 5 Filter: Handles both historical audits and live March 2026 execution.
+    Step 2 & 5 Filter: Handles both historical audits and live execution.
+    Calculates 200-day SMA trends and a 30-day absolute price momentum check
+    to detect immediate trend reversals and save the portfolio from sudden corrections.
     
     Args:
         tickers (str): Space-separated tickers.
@@ -90,7 +92,6 @@ def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool
     from datetime import date, datetime, timedelta
 
     # --- 1. DETERMINE EVALUATION DATE ---
-    # If live, we use TODAY. If backtest, we use the 45-day delay logic.
     if mode == "live":
         eval_date = date.today()
     else:
@@ -98,7 +99,7 @@ def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool
 
     ticker_list = list(set(tickers.split())) 
     
-    # FETCH BENCHMARK DATA (SPY)
+    # --- 2. FETCH BENCHMARK DATA (SPY) ---
     spy_start = eval_date - timedelta(days=95)
     spy_data = yf.download("SPY", start=spy_start, end=eval_date, progress=False, auto_adjust=True)
     
@@ -106,7 +107,8 @@ def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool
     if not spy_data.empty and len(spy_data) >= 2:
         spy_return = (spy_data['Close'].iloc[-1] - spy_data['Close'].iloc[0]) / spy_data['Close'].iloc[0]
 
-    # FETCH PORTFOLIO DATA
+    # --- 3. FETCH PORTFOLIO DATA ---
+    # Pulling 365 days ensures we have enough trading days to calculate a clean 200 SMA
     history_start = eval_date - timedelta(days=365)
     data = yf.download(ticker_list, 
                        start=history_start, 
@@ -118,6 +120,7 @@ def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool
 
     results = []
     
+    # --- 4. EVALUATE EACH CANDIDATE ---
     for ticker in ticker_list:
         try:
             t_data = data[ticker] if len(ticker_list) > 1 else data
@@ -130,36 +133,44 @@ def get_technical_metrics_tool(tickers: str, target_date: str, strict_mode: bool
             sma_200 = float(t_data['Close'].rolling(window=200).mean().iloc[-1])
             sma_50 = float(t_data['Close'].rolling(window=50).mean().iloc[-1])
             
+            # --- 3-Month Return (Used for your original index relative-strength check) ---
             idx_3m = -63 if len(t_data) >= 63 else 0
             start_price_3m = float(t_data['Close'].iloc[idx_3m])
             stock_3m_return = (current_price - start_price_3m) / start_price_3m
             
-            if any(math.isnan(x) for x in [current_price, sma_200, stock_3m_return]):
+            # --- NEW: 30-Day Momentum Calculation (21 Trading Days) ---
+            idx_30d = -21 if len(t_data) >= 21 else 0
+            start_price_30d = float(t_data['Close'].iloc[idx_30d])
+            momentum_30d_return = (current_price - start_price_30d) / start_price_30d
+            
+            if any(math.isnan(x) for x in [current_price, sma_200, stock_3m_return, momentum_30d_return]):
                 continue
             
-            # --- SELECTION & CRITIQUE LOGIC ---
-            # Condition 1: Must be in a long-term uptrend (Crucial for Live Mode)
-            if current_price > sma_200:
-                is_passing = False
-                if strict_mode:
-                    if stock_3m_return > spy_return:
-                        is_passing = True
-                else:
-                    if stock_3m_return > 0:
-                        is_passing = True
+            # --- SELECTION CHECK (3-Month Threshold vs Benchmark) ---
+            is_passing = False
+            if strict_mode:
+                if stock_3m_return > spy_return:
+                    is_passing = True
+            else:
+                if stock_3m_return > 0:
+                    is_passing = True
+            
+            if is_passing:
+                # Determine statuses to pass forward as clear structural text tags
+                sma_status = "UP" if current_price > sma_200 else "DOWN"
+                momo_status = "POSITIVE" if momentum_30d_return > 0 else "NEGATIVE"
                 
-                if is_passing:
-                    # In addition to the ticker, we append technical metadata 
-                    # so the Critique Agent in Step 5 knows the SMA health.
-                    results.append(f"{ticker}(SMA200:UP|SMA50:{'UP' if current_price > sma_50 else 'DOWN'})")
+                # Append formatted payload for Phase 5 parser
+                results.append(f"{ticker}(SMA200:{sma_status}|MOMO30D:{momo_status})")
                 
         except Exception:
             continue
 
     mode_desc = f"{mode.upper()} - {'STRICT' if strict_mode else 'RELAXED'}"
-    print(f"🔍 [STEP 2/5] Mode: {mode_desc} | Date: {eval_date} | {len(results)} passed.")
+    print(f"🔍 [STEP 2/5] Mode: {mode_desc} | Date: {eval_date} | {len(results)} passed validation.")
     
     return " ".join(results)
+
 
 
 # --- TOOL 3: Performance Audit ---
