@@ -249,7 +249,46 @@ Execute the workflow strictly in order:
 
 Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary with Refined ROI metrics.
 
-
+Table 1: Original Top 15 Selection (Backtest)
+Ticker	Elite Count	Entry Price	6-mo Return
+AAPL	665	$170.92	-16.47%
+JNJ	127	$156.91	-7.44%
+V	123	$214.65	-16.01%
+MA	79	$348.44	-15.89%
+XOM	64	$71.48	26.05%
+PG	64	$136.96	-16.22%
+UNH	63	$471.70	2.48%
+WFC	53	$43.51	-11.76%
+XLE	52	$32.98	10.25%
+BAC	50	$37.01	-22.73%
+ABBV	40	$138.97	-11.91%
+PFE	40	$41.09	-15.44%
+BKNG	39	$91.98	-27.20%
+PEP	37	$145.77	-1.40%
+TSM	37	$97.37	-27.91%
+Table 2: Critique Filter Analysis
+Ticker	Verdict (Cut/Hold)	Technical Reason
+AAPL	Laggard (HOLD)	Negative return and trading above 200-day SMA
+JNJ	Laggard (HOLD)	Negative return and trading above 200-day SMA
+V	Laggard (HOLD)	Negative return and trading above 200-day SMA
+MA	Laggard (HOLD)	Negative return and trading above 200-day SMA
+XOM	HOLD (Performer)	Positive return and trading above 200-day SMA
+PG	Laggard (HOLD)	Negative return and trading above 200-day SMA
+UNH	HOLD (Performer)	Positive return and trading above 200-day SMA
+WFC	Laggard (HOLD)	Negative return and trading above 200-day SMA
+XLE	HOLD (Performer)	Positive return and trading above 200-day SMA
+BAC	Laggard (HOLD)	Negative return and trading above 200-day SMA
+ABBV	Laggard (HOLD)	Negative return and trading above 200-day SMA
+PFE	Laggard (HOLD)	Negative return and trading above 200-day SMA
+BKNG	Laggard (HOLD)	Negative return and trading above 200-day SMA
+PEP	Laggard (HOLD)	Negative return and trading above 200-day SMA
+TSM	Laggard (HOLD)	Negative return and trading above 200-day SMA
+Executive Summary:
+ROI / Win Rate (Original): -10.29% (Average ROI) / 20.00% (Win Rate)
+Refined ROI: -10.29%
+Refined List for Execution: Not applicable in backtest mode.
+Strategy Status: Relaxed Mode triggered.
+Recovery Verdict: All Laggards are advised to HOLD as they maintained an uptrend above their 200-day Simple Moving Average.
 
 
 
