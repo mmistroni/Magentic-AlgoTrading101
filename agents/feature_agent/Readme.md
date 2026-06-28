@@ -291,6 +291,66 @@ Strategy Status: Relaxed Mode triggered.
 Recovery Verdict: All Laggards are advised to HOLD as they maintained an uptrend above their 200-day Simple Moving Average.
 
 
+========== 20260628 ==============================
+
+2021-12-31
+here it is for 2021 12 31 Institutional Alpha Portfolio Report
+
+Target Snapshot Date: 2021-12-31Execution Setup: BACKTEST MODE
+
+Table 1: Original Top 15 Selection (Backtest)
+
+TickerElite CountEntry Price6-mo ReturnAAPL665$170.92-16.47%JNJ127$156.91-7.44%V123$214.65-16.01%MA79$348.44-15.89%XOM64$71.4826.05%PG64$136.96-16.22%UNH63$471.702.48%WFC53$43.51-11.76%XLE52$32.9810.25%BAC50$37.01-22.73%ABBV41$138.97-11.91%PFE40$41.09-15.44%BKNG39$91.98-27.20%VZ38$38.68-22.58%TSM37$97.37-27.91%
+
+Table 2: Critique Filter Analysis
+
+TickerVerdict (Cut/Hold)Technical ReasonAAPLStructural Risk (CUT)Short-term momentum trend reversal.JNJStructural Risk (CUT)Short-term momentum trend reversal.VEXECUTEConfirmed structural trend and upward momentum.MAEXECUTEConfirmed structural trend and upward momentum.XOMEXECUTEConfirmed structural trend and upward momentum.PGStructural Risk (CUT)Short-term momentum trend reversal.UNHEXECUTEConfirmed structural trend and upward momentum.WFCEXECUTEConfirmed structural trend and upward momentum.XLEEXECUTEConfirmed structural trend and upward momentum.BACStructural Risk (CUT)Short-term momentum trend reversal.ABBVEXECUTEConfirmed structural trend and upward momentum.PFEStructural Risk (CUT)Short-term momentum trend reversal.BKNGEXECUTEConfirmed structural trend and upward momentum.VZStructural Risk (CUT)Trading below the 200-day structural line.TSMStructural Risk (CUT)Short-term momentum trend reversal.
+
+Executive Summary:
+
+ROI / Win Rate (Original): -11.05% / 20.00%
+
+Refined ROI: -5.50%
+
+Refined List for Execution: V, MA, XOM, UNH, WFC, XLE, ABBV, BKNG
+
+Strategy Status: Relaxed Mode was triggered
+
+Recovery Verdict: The momentum breaker successfully filtered out the downside risks. The average loss was reduced from -11.05% to -5.50% after filtering. 
+
+
+
+
+
+
+
+
+
+2022-09-30
+heres verdict Institutional Alpha Portfolio Report
+
+Target Snapshot Date: 2022-09-30Execution Setup: BACKTEST MODE
+
+Table 1: Original Top 15 Selection (Backtest)
+
+TickerElite CountEntry Price6-mo ReturnJNJ202$160.30-7.64%XOM146$97.18-4.20%JPM128$122.549.89%XLE91$38.73-7.25%ABBV70$143.29-13.98%CVX67$154.27-12.66%BAC57$30.30-13.43%MRK51$99.682.22%LLY47$357.1926.95%WFC40$37.815.25%SCHW39$78.58-31.73%MCD35$245.0612.13%GS34$315.45-7.51%WMT34$45.5011.40%PGR32$119.131.07%
+
+Table 2: Critique Filter Analysis
+
+TickerVerdict (Cut/Hold)Technical ReasonJNJStructural Risk (CUT)Trading below the 200-day structural line.XOMEXECUTESMA200:UP and MOMO30D:POSITIVEJPMEXECUTESMA200:UP and MOMO30D:POSITIVEXLEEXECUTESMA200:UP and MOMO30D:POSITIVEABBVEXECUTESMA200:UP and MOMO30D:POSITIVECVXEXECUTESMA200:UP and MOMO30D:POSITIVEBACEXECUTESMA200:UP and MOMO30D:POSITIVEMRKEXECUTESMA200:UP and MOMO30D:POSITIVELLYEXECUTESMA200:UP and MOMO30D:POSITIVEWFCEXECUTESMA200:UP and MOMO30D:POSITIVESCHWEXECUTESMA200:UP and MOMO30D:POSITIVEMCDEXECUTESMA200:UP and MOMO30D:POSITIVEGSEXECUTESMA200:UP and MOMO30D:POSITIVEWMTEXECUTESMA200:UP and MOMO30D:POSITIVEPGREXECUTESMA200:UP and MOMO30D:POSITIVE
+
+Executive Summary:
+
+ROI / Win Rate (Original): -1.88% / 53.33%
+
+Refined ROI: -1.55%
+
+Refined List for Execution: XOM, JPM, XLE, ABBV, CVX, BAC, MRK, LLY, WFC, SCHW, MCD, GS, WMT, PGR
+
+Strategy Status: Relaxed Mode
+
+Recovery Verdict: The momentum breaker successfully filtered out JNJ with a 'SMA200:DOWN' trend. 
+
 
 
 
@@ -306,3 +366,6 @@ Execute the workflow strictly in order:
 5. Apply Phase 5 Critique Filters to categorize underperformers into Structural Losers (Below SMA200) vs Laggards (Above SMA200).
 
 Present the final output exactly in Table 1 (Original Selection), Table 2 (Critique Filter Analysis), and the complete Executive Summary with Refined ROI metrics.
+
+
+
