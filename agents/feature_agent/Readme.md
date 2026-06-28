@@ -292,6 +292,7 @@ Recovery Verdict: All Laggards are advised to HOLD as they maintained an uptrend
 
 
 ========== 20260628 ==============================
+(Results are in gemini context)
 
 2021-12-31
 here it is for 2021 12 31 Institutional Alpha Portfolio Report
