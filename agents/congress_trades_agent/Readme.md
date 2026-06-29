@@ -193,3 +193,15 @@ Why: This is the end of your dataset. It allows you to see if the strategy held 
     "reason": "Thesis: Unable to assess political context due to unknown sector/industry. Fundamentals: P/E 0, Beta 1.0, Debt/Equity: Unknown (critical data missing). Signal: Net Buy Score 15. Verdict: Pass."
   }
 ]
+
+
+==== FOR a Run on  25-6-26 we got
+[
+  {
+    "ticker": "FN",
+    "action": "BUY",
+    "confidence": 7,
+    "risk_rating": "Medium",
+    "reason": "Thesis: Macro regime is BULLISH (market uptrend). Congress shows strong net buying activity (net_buy_activity: 10). There is no 'Golden Confluence' from corporate lobbying or C-Suite insider buying, but also no negative signals. Fundamentals: P/E is 30.69 (reasonable for the Technology sector). Debt-to-Equity is 0.192 (very healthy). Verdict: Buy."
+  }
+]
