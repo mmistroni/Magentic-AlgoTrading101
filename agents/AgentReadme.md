@@ -130,4 +130,16 @@ curl -X POST "$APP_URL/run_sse" \
 - implement multi agent using langchain/langgraph
 - simple agent runnign on aws postponed
 - continue vix agent / price analysis agent this using outlier
+
+===================== AGENT LIST ======
+- tfl-agent (deployed on cloud run) : find best routes to bromley daily
+- feature_agent (deployed on cloud run): find stocks thru 13f filings
+- stock__agent(deployed on cloud run.): analyzes stock researched daily by dataflow jobs
+- congress_trades agent(deployed on cloud run) :analyzes congress trades
+- short_selling_agent(in progress): research stocks to be sold
+- vix agent (in progress) : check discrepancies in vix prices against commitment of traders
+- agent_cralwer(deployed on cloud run): monitor prices of items on the internet
+
+
+
 - 
