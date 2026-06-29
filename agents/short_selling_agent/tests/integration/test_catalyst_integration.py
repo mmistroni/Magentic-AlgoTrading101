@@ -1,6 +1,6 @@
 import asyncio
 import sys
-from catalyst_job.catalyst_job import load_ticker_map_from_bq, ClinicalTrialsClient
+from agents.short_selling_agent.catalyst_job.catalyst_download import load_ticker_map_from_bq, ClinicalTrialsClient
 
 async def inspect_live_catalysts(limit: int = 20):
     print("============================================================")

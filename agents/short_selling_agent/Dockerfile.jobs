@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements from the local directory context
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all the folder scripts (including catalyst_job scripts and sec_sync.py)
+COPY . .
+
+# Generic default fallback
+CMD ["python", "sync_catalyst_job.py"]

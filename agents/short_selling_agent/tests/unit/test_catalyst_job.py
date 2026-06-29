@@ -3,7 +3,7 @@ import pytest
 import httpx
 
 # Absolute import matching your structural update
-from agents.short_selling_agent.catalyst_job.catalyst_job import ClinicalCatalyst, ClinicalTrialsClient
+from agents.short_selling_agent.catalyst_job.catalyst_download import ClinicalCatalyst, ClinicalTrialsClient
 
 @pytest.fixture
 def mock_ticker_map():
