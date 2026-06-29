@@ -1,4 +1,4 @@
-google-adk
+google-adk==2.3.0
 db-dtypes
 pydantic
 pandas
