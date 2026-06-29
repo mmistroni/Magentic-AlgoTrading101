@@ -1,25 +1,20 @@
 import os
 import json
-import subprocess
 import asyncio
 from typing import Dict, Any
 from datetime import datetime
 import httpx 
-import sys # ⬅️ ADDED: sys module for version check
+import sys
 
-# --- Configuration (Dynamic) ---
-APP_URL = "https://stock-agent-service-682143946483.us-central1.run.app"
+# --- Configuration ---
+APP_URL = "https://congress-trades-agent-682143946483.us-central1.run.app"
 USER_ID = "user_123"
-# Generate a single session ID for the entire conversation loop
+# A persistent session ID ensures your multi-agent conversation history is maintained
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
-APP_NAME = "stock_agent"
-
-# --- Authentication Function (ASYNC) ---
+APP_NAME = "congress_trades_agent"
 
 async def get_auth_token() -> str:
-    """
-    Executes 'gcloud auth print-identity-token' asynchronously to get the token.
-    """
+    """Executes 'gcloud auth print-identity-token' asynchronously to fetch credentials."""
     try:
         proc = await asyncio.create_subprocess_exec(
             "gcloud", "auth", "print-identity-token",
@@ -33,9 +28,7 @@ async def get_auth_token() -> str:
             
         return stdout.decode().strip()
     except FileNotFoundError:
-        raise RuntimeError("gcloud command not found. Please ensure Google Cloud CLI is installed.")
-
-# --- API Interaction Functions (ASYNC) ---
+        raise RuntimeError("gcloud CLI not found. Please ensure Google Cloud CLI is installed and authenticated.")
 
 async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, data: Dict[str, Any] = None) -> httpx.Response:
     """Helper function for authenticated asynchronous requests using httpx."""
@@ -46,138 +39,107 @@ async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, da
     }
     url = f"{APP_URL}{endpoint}"
     
-    try:
-        if method.upper() == 'POST':
-            response = await client.post(url, headers=headers, json=data)
-        elif method.upper() == 'DELETE':
-             response = await client.delete(url, headers=headers)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
+    if method.upper() == 'POST':
+        response = await client.post(url, headers=headers, json=data)
+    else:
+        raise ValueError(f"Unsupported method: {method}")
 
-        response.raise_for_status() 
-        return response
-    except httpx.HTTPStatusError as errh:
-        print(f"\n❌ **HTTP ERROR:** Status {response.status_code} for {url}")
-        print(f"❌ **Server Response (Raw):**\n{response.text}")
-        raise
-    except httpx.RequestError as err:
-        print(f"\n❌ An unexpected request error occurred: {err}")
-        raise
+    response.raise_for_status() 
+    return response
 
 async def run_agent_request(client: httpx.AsyncClient, session_id: str, message: str):
-    """Executes a single POST request to the /run_sse endpoint."""
-    
-    print(f"\n[User] -> Sending message: '{message}'")
+    """Executes a single POST request to the /run_sse endpoint and processes the output blocks."""
+    print(f"\n[User] 🚀 Sending Prompt: '{message}'")
     
     run_data = {
         "app_name": APP_NAME,
         "user_id": USER_ID,
         "session_id": session_id,
         "new_message": {"role": "user", "parts": [{"text": message}]},
-        "streaming": False 
+        "streaming": False  # ADK still packages response inside SSE data wrappers
     }
     
     try:
+        # Technical analysis routines take time; using an extended timeout target
         response = await make_request(client, "POST", "/run_sse", data=run_data)
-        current_status = response.status_code
-        # print(f"**Request Status Code:** {current_status}") 
-
         raw_text = response.text.strip()
         
-        # Multi-line SSE parsing logic
+        # 1. Fallback: If ADK responds with immediate clear JSON arrays instead of an SSE block
+        if not raw_text.startswith("data:"):
+            agent_response = json.loads(raw_text)
+            final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', '')
+            print(f"\n[Agent Response]:\n{final_text}")
+            return
+
+        # 2. Extract and iterate over individual 'data:' chunks 
         data_lines = [
-            line.strip() 
+            line.strip()[5:].strip() # Strip the leading 'data:' prefix safely
             for line in raw_text.split('\n') 
             if line.strip().startswith("data:")
         ]
         
         if not data_lines:
-             raise json.JSONDecodeError("No 'data:' lines found in 200 response.", raw_text, 0)
-        
-        last_data_line = data_lines[-1]
-        json_payload = last_data_line[len("data:"):].strip()
-        agent_response = json.loads(json_payload)
-        
-        # Extract the final text 
-        final_text = agent_response.get('content', {}).get('parts', [{}])[0].get('text', 'Agent response structure not recognized.')
-        
-        print(f"[Agent] -> {final_text}")
-    
-    except json.JSONDecodeError as e:
-        print(f"\n🚨 **JSON PARSING FAILED**!")
-        print(f"   Error: {e}")
-        print("   --- RAW SERVER CONTENT ---")
-        print(raw_text)
-        print("   --------------------------")
-        
-    except Exception as e:
-        print(f"❌ Agent request failed: {e}")
-
-# --- Interactive Chat Loop ---
-
-async def chat(client: httpx.AsyncClient, session_id: str):
-    """Runs the main conversation loop, handling user input asynchronously."""
-    print("--- 💬 Start Chatting ---")
-    
-    try:
-        # Use asyncio.to_thread to run blocking input() without freezing the event loop
-        user_input = await asyncio.to_thread(input, f"[{USER_ID}]: ")
-        
-        # Send the message to the agent
-        await run_agent_request(client, session_id, user_input)
-
-    except Exception as e:
-        print(f"An unexpected error occurred in the loop: {e}")
-        raise e
-
-# --- Main Logic (ASYNC) ---
-
-# --- Updated Main Logic for Single Execution ---
-
-async def amain(message_to_send: str):
-    """Main function to run a single interaction and then cleanup."""
-    print(f"\n🤖 Starting Single-Run Client | Session: **{SESSION_ID}**")
-    
-    session_data = {"state": {"preferred_language": "English", "visit_count": 5}}
-    current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
-    
-    async with httpx.AsyncClient(timeout=60.0) as client: # Increased timeout for tool calls
-        
-        # 1. Create Session
-        try:
-            await make_request(client, "POST", current_session_endpoint, data=session_data)
-            print(f"✅ Session created.")
-        except Exception as e:
-            print(f"❌ Could not start session: {e}")
+            print("⚠️ Server returned an SSE structural format, but no valid data lines were parsed.")
             return
 
-        # 2. Run Single Request
-        print(f"--- 💬 Executing Single Task ---")
-        try:
-            await run_agent_request(client, SESSION_ID, message_to_send)
-        except Exception as e:
-            print(f"❌ Agent execution error: {e}")
+        print("\n🔍 Parsing Agent execution layers...")
+        final_text_content = ""
         
-        # 3. Cleanup: Delete Session
-        # Added a tiny sleep to ensure server-side async tasks finish before deletion
-        await asyncio.sleep(1) 
-        print(f"\n## 3. Deleting Session: {SESSION_ID}")
+        # Walk backward to find the final text delivery or concatenate message chunks
+        for line in reversed(data_lines):
+            try:
+                payload = json.loads(line)
+                
+                # Check for standardized ADK structure block
+                content_block = payload.get('content', {})
+                if content_block and 'parts' in content_block:
+                    parts = content_block.get('parts', [{}])
+                    text_chunk = parts[0].get('text', '')
+                    if text_chunk:
+                        final_text_content = text_chunk
+                        break
+            except json.JSONDecodeError:
+                continue
+
+        if final_text_content:
+            print(f"\n[Agent Final Recommendation]:\n{final_text_content}")
+        else:
+            # If standard structure mapping isn't found, dump the raw final data payload safely
+            print("\n[Agent Raw Structural Output]:")
+            print(data_lines[-1])
+
+    except httpx.HTTPStatusError as e:
+        print(f"\n❌ Execution failed on Cloud Run.")
+    except Exception as e:
+        print(f"\n❌ Client Runtime Error: {e}")
+
+async def amain(message_to_send: str):
+    """Main execution orchestrator."""
+    print(f"🤖 Initializing Client Pipeline | Session Context: {SESSION_ID}")
+    
+    # We use an explicit 5-minute timeout window since the agent computes technical indicators 
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        
+        # 1. Warm-up / Create Session
+        session_data = {"state": {"preferred_language": "English"}}
+        session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
+        
         try:
-            await make_request(client, "DELETE", current_session_endpoint)
-            print("✅ Session deleted successfully.")
+            await make_request(client, "POST", session_endpoint, data=session_data)
+            print("✅ Agent Session Verified.")
         except Exception as e:
-            print(f"⚠️ Warning: Failed to delete session. {e}")
+            print(f"❌ Failed to instantiate tracking session: {e}")
+            return
+
+        # 2. Trigger the Prompt
+        print("\n--- 📊 Initiating Analysis Workflow ---")
+        await run_agent_request(client, SESSION_ID, message_to_send)
+        print("\n--- ✨ Execution Finished ---")
 
 if __name__ == "__main__":
     if sys.version_info < (3, 9):
-        print("🚨 ERROR: Python 3.9+ required.")
+        print("🚨 Python 3.9+ required.")
         sys.exit(1)
         
-    # Define your single query here
     QUERY = "Run a technical analysis for yesterday's stock picks and give me your recommendations"
-    
-    try:
-        asyncio.run(amain(QUERY))
-    except Exception as e:
-        print(f"FATAL ERROR: {e}")
-
+    asyncio.run(amain(QUERY))
