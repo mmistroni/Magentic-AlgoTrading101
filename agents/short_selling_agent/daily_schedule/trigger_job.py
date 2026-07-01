@@ -34,8 +34,11 @@ def fetch_plus500_universe_set():
         return set()
 
 def send_summary_email(rows_inserted):
+    """Dispatches a summary table of successfully flagged short candidates."""
     sendgrid_key = os.environ.get("SENDGRID_API_KEY")
-    if not sendgrid_key: return
+    if not sendgrid_key: 
+        print("⚠️ [EMAIL] SendGrid API Key missing. Skipping notification.")
+        return
 
     table_rows = "".join([
         f"<tr style='background-color: {'#e6f7e9' if r.get('broker') == 'Plus500' else '#f9f9f9'};'>"
@@ -47,50 +50,113 @@ def send_summary_email(rows_inserted):
         for r in rows_inserted
     ])
     
-    html = f"<html><body><table style='border-collapse: collapse; width: 100%;'><thead><tr><th>Ticker</th><th>Broker</th><th>Action</th><th>Score</th><th>Reasoning</th></tr></thead><tbody>{table_rows}</tbody></table></body></html>"
-    sg = SendGridAPIClient(sendgrid_key)
-    sg.send(Mail(from_email="gcp_cloud_mm@outlook.com", to_emails="mmistroni@gmail.com", subject="StockAgent EndOfDay Shorts", html_content=html))
+    html = f"<html><body><h3>Short Selling Daily Report</h3><table style='border-collapse: collapse; width: 100%;'><thead><tr style='background-color: #f2f2f2;'><th style='padding: 10px; text-align: left;'>Ticker</th><th style='padding: 10px; text-align: left;'>Broker</th><th style='padding: 10px; text-align: left;'>Action</th><th style='padding: 10px; text-align: left;'>Score</th><th style='padding: 10px; text-align: left;'>Reasoning</th></tr></thead><tbody>{table_rows}</tbody></table></body></html>"
+    try:
+        sg = SendGridAPIClient(sendgrid_key)
+        sg.send(Mail(
+            from_email="gcp_cloud_mm@outlook.com", 
+            to_emails="mmistroni@gmail.com", 
+            subject="StockAgent EndOfDay Shorts", 
+            html_content=html
+        ))
+        print("✉️ [EMAIL] Summary report sent successfully.")
+    except Exception as e:
+        print(f"⚠️ [EMAIL] Failed to dispatch email via SendGrid: {e}")
 
 async def make_request(client, method, endpoint, data=None):
+    """Helper method for routing orchestration calls to the agent service layer."""
     url = f"{APP_URL}{endpoint}"
     headers = {"Content-Type": "application/json"}
-    return await (client.post(url, headers=headers, json=data) if method == 'POST' else client.delete(url, headers=headers))
+    if method == 'POST':
+        return await client.post(url, headers=headers, json=data)
+    elif method == 'DELETE':
+        return await client.delete(url, headers=headers)
 
 async def amain(message_to_send):
     plus500_set = fetch_plus500_universe_set()
+    
     async with httpx.AsyncClient(timeout=600.0) as client:
-        # Create Session & Run Agent (as per existing logic)
         session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
+        
+        # 1. Open the remote Agent Session
+        print(f"🚀 Establishing orchestration session: {SESSION_ID}")
         await make_request(client, "POST", session_endpoint, data={"state": {}})
         
-        run_data = {"app_name": APP_NAME, "user_id": USER_ID, "session_id": SESSION_ID, "new_message": {"role": "user", "parts": [{"text": message_to_send}]}, "streaming": False}
-        response = await make_request(client, "POST", "/run", data=run_data)
-        agent_text = response.json()[-1]['content']['parts'][0]['text']
+        try:
+            # 2. Fire the execution pipeline command
+            run_data = {
+                "app_name": APP_NAME, 
+                "user_id": USER_ID, 
+                "session_id": SESSION_ID, 
+                "new_message": {"role": "user", "parts": [{"text": message_to_send}]}, 
+                "streaming": False
+            }
+            print(f"📡 Executing pipeline request: '{message_to_send}'")
+            response = await make_request(client, "POST", "/run", data=run_data)
+            response.raise_for_status()
+            
+            agent_text = response.json()[-1]['content']['parts'][0]['text']
 
-        # Parse & Compile
-        raw_rows = json.loads(agent_text.strip("`json\n`"))
-        rows_to_insert = []
-        today = datetime.utcnow().strftime('%Y-%m-%d')
-        now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+            # 3. Parse output markdown blocks cleanly if wrapped
+            clean_json_text = agent_text.strip()
+            if clean_json_text.startswith("```json"):
+                clean_json_text = clean_json_text[7:]
+            if clean_json_text.endswith("```"):
+                clean_json_text = clean_json_text[:-3]
+            clean_json_text = clean_json_text.strip()
 
-        for row in (raw_rows["final_decisions"] if isinstance(raw_rows, dict) else raw_rows):
-            ticker = str(row.get("ticker", "")).upper()
-            rows_to_insert.append({
-                "evaluation_date": row.get("evaluation_date", today),
-                "ticker": ticker,
-                "conviction_score": int(row.get("conviction_score", 3)),
-                "action": str(row.get("action", "WATCH")).upper(),
-                "reasoning": row.get("reasoning", None),
-                "inserted_at": now,
-                "broker": "Plus500" if ticker in plus500_set else "Other"
-            })
+            raw_rows = json.loads(clean_json_text)
+            rows_to_insert = []
+            today = datetime.utcnow().strftime('%Y-%m-%d')
+            now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
 
-        # Insert BQ & Notify
-        bq_client = bigquery.Client(project=PROJECT_ID)
-        if not bq_client.insert_rows_json(TABLE_REF, rows_to_insert):
-            await asyncio.get_running_loop().run_in_executor(None, send_summary_email, rows_to_insert)
-        
-        await make_request(client, "DELETE", session_endpoint)
+            # Extract final decisions based on the returned layout structure
+            decisions = []
+            if isinstance(raw_rows, dict):
+                decisions = raw_rows.get("final_decisions", [])
+                status_msg = raw_rows.get("status", "Processed")
+                print(f"📊 Agent returned payload status: '{status_msg}' with {len(decisions)} candidates.")
+            elif isinstance(raw_rows, list):
+                decisions = raw_rows
+
+            for row in decisions:
+                ticker = str(row.get("ticker", "")).upper()
+                rows_to_insert.append({
+                    "evaluation_date": row.get("evaluation_date", today),
+                    "ticker": ticker,
+                    "conviction_score": int(row.get("conviction_score", 3)),
+                    "action": str(row.get("action", "WATCH")).upper(),
+                    "reasoning": row.get("reasoning", None),
+                    "inserted_at": now,
+                    "broker": "Plus500" if ticker in plus500_set else "Other"
+                })
+
+            # 4. Mitigation Guardrail: Only touch BigQuery if arrays contain values
+            if rows_to_insert:
+                print(f"💾 Committing {len(rows_to_insert)} items to BigQuery table: {TABLE_REF}")
+                bq_client = bigquery.Client(project=PROJECT_ID)
+                errors = bq_client.insert_rows_json(TABLE_REF, rows_to_insert)
+                
+                if not errors:
+                    print("✅ BigQuery sync completed safely.")
+                    await asyncio.get_running_loop().run_in_executor(None, send_summary_email, rows_to_insert)
+                else:
+                    print(f"❌ Error inserting rows into BigQuery: {errors}")
+            else:
+                print("ℹ️ No eligible candidate rows generated for insertion today. Skipping BigQuery connection block safely.")
+
+        except Exception as err:
+            print(f"🚨 Pipeline tracking failed unexpectedly: {err}")
+            
+        finally:
+            # 5. Guaranteed Cleanup Loop: Closes the remote context even if execution crashes midway
+            print(f"🛑 Cleaning up and closing session context: {SESSION_ID}")
+            try:
+                await make_request(client, "DELETE", session_endpoint)
+                print("🏁 Session cleanup verified successfully.")
+            except Exception as e:
+                print(f"⚠️ Warning: Session clean-up hook was unreachable: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(amain(f"Run short-selling pipeline for {datetime.utcnow().strftime('%Y-%m-%d')}."))
+    current_date_str = datetime.utcnow().strftime('%Y-%m-%d')
+    asyncio.run(amain(f"Run short-selling pipeline for {current_date_str}."))
