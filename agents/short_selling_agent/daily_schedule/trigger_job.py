@@ -49,7 +49,7 @@ def send_summary_email(rows_inserted):
     
     html = f"<html><body><table style='border-collapse: collapse; width: 100%;'><thead><tr><th>Ticker</th><th>Broker</th><th>Action</th><th>Score</th><th>Reasoning</th></tr></thead><tbody>{table_rows}</tbody></table></body></html>"
     sg = SendGridAPIClient(sendgrid_key)
-    sg.send(Mail(from_email="gcp_cloud_mm@outlook.com", to_emails="mmistroni@gmail.com", subject="Algo Summary Report", html_content=html))
+    sg.send(Mail(from_email="gcp_cloud_mm@outlook.com", to_emails="mmistroni@gmail.com", subject="StockAgent EndOfDay Shorts", html_content=html))
 
 async def make_request(client, method, endpoint, data=None):
     url = f"{APP_URL}{endpoint}"
