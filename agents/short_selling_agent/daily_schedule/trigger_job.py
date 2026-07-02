@@ -31,7 +31,7 @@ def check_plus500_availability(ticker_decisions: list) -> list:
         # Simple cross-reference query matching your availability catalog
         query = """
             SELECT ticker 
-            FROM `your_project.your_dataset.plus500_shortable_instruments`
+            FROM `datascience-projects.gcp_shareloader.plus500`
             WHERE ticker IN UNNEST(@tickers) AND is_available = TRUE
         """
         job_config = bigquery.QueryJobConfig(
