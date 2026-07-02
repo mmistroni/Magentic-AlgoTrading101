@@ -1,4 +1,4 @@
-google-adk
+google-adk[eval]
 google-cloud-bigquery
 db-dtypes
 pydantic
