@@ -29,7 +29,7 @@ TABLE_REF = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
 def send_summary_email(rows_inserted: List[Dict[str, Any]]):
     """
     Synchronous worker wrapping SendGrid HTTP API calls. 
-    Constructs an HTML summary matrix table from the compiled database records.
+    Constructs an HTML summary matrix table or an empty-state confirmation.
     """
     sendgrid_key = os.environ.get("SENDGRID_API_KEY")
     if not sendgrid_key:
@@ -40,43 +40,50 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
     receiver_email = "mmistroni@gmail.com"
     today_str = datetime.utcnow().strftime('%Y-%m-%d')
 
-    # Build the HTML output rows dynamically from processed items
-    table_rows = ""
-    for r in rows_inserted:
-        action = r.get("action", "AVOID")
-        # Set conditional visual styling based on strategy actions
-        if action == "SHORT" and r.get("conviction_score", 0) >= 7:
-            bg_color = "#ffe6eb"
-            text_color = "#cc0033"
-        elif action == "SHORT":
-            bg_color = "#fff2e6"
-            text_color = "#b35900"
-        elif "AUTOMATED_CRITIQUE_FAILED" in str(r.get("reasoning", "")):
-            bg_color = "#f2f2f2"
-            text_color = "#666666"
-        else:
-            bg_color = "#e6f7e9"
-            text_color = "#1e5a2c"
-
-        table_rows += f"""
-        <tr style="background-color: {bg_color}; color: {text_color}; font-size: 13px;">
-            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{r.get('ticker')}</td>
-            <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{action}</td>
-            <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{r.get('conviction_score')}/10</td>
-            <td style="padding: 10px; border: 1px solid #ddd; line-height: 1.4;">{r.get('reasoning')}</td>
-        </tr>
+    # 1. Determine Subject Line and Content Block Based on Data Presence
+    if not rows_inserted:
+        # Neutral, human-like log format to prevent spam filtering
+        subject_str = f"Daily strategy operations report - {today_str} - zero candidates found"
+        
+        display_content = """
+        <div style="padding: 15px; background-color: #fdfefe; border: 1px solid #e2e8f0; border-left: 4px solid #94a3b8; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #334155; font-weight: bold;">
+                No matching trade candidates met the strategy criteria for today's market scan.
+            </p>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">
+                The execution pipeline finalized checks successfully and stood down with an empty staging state.
+            </p>
+        </div>
         """
+    else:
+        subject_str = f"Daily strategy operations report - {today_str} - processed items"
+        
+        table_rows = ""
+        for r in rows_inserted:
+            action = r.get("action", "AVOID")
+            if action == "SHORT" and r.get("conviction_score", 0) >= 7:
+                bg_color = "#ffe6eb"
+                text_color = "#cc0033"
+            elif action == "SHORT":
+                bg_color = "#fff2e6"
+                text_color = "#b35900"
+            elif "AUTOMATED_CRITIQUE_FAILED" in str(r.get("reasoning", "")):
+                bg_color = "#f2f2f2"
+                text_color = "#666666"
+            else:
+                bg_color = "#e6f7e9"
+                text_color = "#1e5a2c"
 
-    # Assemble HTML document scaffolding
-    html_content = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333333; margin: 20px;">
-        <h2 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;">
-            🎯 Multi-Agent Pipeline Execution Summary
-        </h2>
-        <p><strong>Execution Date:</strong> {today_str}</p>
-        <p><strong>Session Context ID:</strong> <code>{SESSION_ID}</code></p>
-        <br>
+            table_rows += f"""
+            <tr style="background-color: {bg_color}; color: {text_color}; font-size: 13px;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{r.get('ticker')}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{action}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{r.get('conviction_score')}/10</td>
+                <td style="padding: 10px; border: 1px solid #ddd; line-height: 1.4;">{r.get('reasoning')}</td>
+            </tr>
+            """
+            
+        display_content = f"""
         <table style="width: 100%; border-collapse: collapse; min-width: 500px;">
             <thead>
                 <tr style="background-color: #2c3e50; color: white; text-align: left;">
@@ -87,9 +94,22 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
                 </tr>
             </thead>
             <tbody>
-                {table_rows if table_rows else "<tr><td colspan='4' style='padding:15px; text-align:center;'>No records evaluated.</td></tr>"}
+                {table_rows}
             </tbody>
         </table>
+        """
+
+    # 2. Assemble Clean, Non-Spammy HTML Document Blueprint
+    html_content = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333333; margin: 20px;">
+        <h2 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-weight: normal; font-size: 20px;">
+            Multi-Agent Pipeline Execution Summary
+        </h2>
+        <p style="font-size: 13px; margin: 4px 0;"><strong>Execution Date:</strong> {today_str}</p>
+        <p style="font-size: 13px; margin: 4px 0;"><strong>Session Context ID:</strong> <code>{SESSION_ID}</code></p>
+        <br>
+        {display_content}
         <br>
         <p style="font-size: 11px; color: #7f8c8d; border-top: 1px solid #eeeeee; padding-top: 10px;">
             Automated Operational Signal • Generated via Short Selling Agent Cluster Node
@@ -101,7 +121,7 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
     message = Mail(
         from_email=From(sender_email, "GCP Cloud Core System"),
         to_emails=To(receiver_email),
-        subject=Subject(f"🚀 Algo Summary Report: {today_str} ({len(rows_inserted)} Assets Staged)"),
+        subject=Subject(subject_str),
         html_content=HtmlContent(html_content)
     )
 
@@ -115,7 +135,6 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
             print(f"⚠️ [NOTIFIER] Unexpected SendGrid API response status received: {response.status_code}")
     except Exception as mail_err:
         print(f"❌ [NOTIFIER] Failed sending execution alert through SendGrid API service: {mail_err}")
-
 
 # --- Authentication Function (ASYNC) ---
 
@@ -295,7 +314,7 @@ async def amain(message_to_send: str):
                         # Cross reference tickers against your database shortable table
                         query = f"""
                             SELECT UPPER(ticker) as ticker 
-                            FROM `{PROJECT_ID}.{DATASET_ID}.plus500_shortable_instruments`
+                            FROM `datascience-projects.gcp_shareloader.plus500`
                             WHERE UPPER(ticker) IN UNNEST(@tickers) AND is_available = TRUE
                         """
                         job_config = bigquery.QueryJobConfig(
