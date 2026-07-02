@@ -39,7 +39,7 @@ async def test_programmatic_empty_dossier_score():
     
     # 3. Create an interactive in-memory session directly from the agent
     # This completely eliminates the need to import an "App" class
-    session = quant_agent.new_session()
+    session = quant_agent.create_session(session_id="test_short_sale_01")
     
     # 4. Asynchronously send the prompt into the session context
     response = await session.send_message(
