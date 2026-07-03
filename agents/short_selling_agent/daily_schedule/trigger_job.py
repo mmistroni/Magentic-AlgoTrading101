@@ -382,6 +382,9 @@ async def amain(message_to_send: str):
                         
                 else:
                     print("⚠️ [BIGQUERY] Aborting ingestion phase: No rows were successfully extracted or compiled.")
+                
+                # 📬 ALWAYS SEND EMAIL HERE (Safe from UnboundLocalError)
+                print("📧 [ORCHESTRATOR] Initializing mail summary delivery dispatch...")
                 await loop.run_in_executor(None, send_summary_email, rows_to_insert)
             
             except json.JSONDecodeError as decode_error:
