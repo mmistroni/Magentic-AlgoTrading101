@@ -379,11 +379,11 @@ async def amain(message_to_send: str):
                         # Run via standard loop executor since sendgrid's delivery client is synchronous
                         print("📧 [ORCHESTRATOR] Initializing mail summary delivery dispatch...")
                         loop = asyncio.get_running_loop()
-                        await loop.run_in_executor(None, send_summary_email, rows_to_insert)
-
+                        
                 else:
                     print("⚠️ [BIGQUERY] Aborting ingestion phase: No rows were successfully extracted or compiled.")
-                        
+                await loop.run_in_executor(None, send_summary_email, rows_to_insert)
+            
             except json.JSONDecodeError as decode_error:
                 print("\n🚨 ==================== 💥 JSON PARSE ERROR OCCURRED ====================")
                 print(f"Message: Agent did not output a cleanly parsable JSON data block schema structure.")
