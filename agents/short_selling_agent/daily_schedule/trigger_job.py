@@ -31,6 +31,7 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
     Synchronous worker wrapping SendGrid HTTP API calls. 
     Constructs an HTML summary matrix table or an empty-state confirmation.
     """
+    print('============= SENDING SUMMARY EMAIL NOTIFICATION LAYER =============')
     sendgrid_key = os.environ.get("SENDGRID_API_KEY")
     if not sendgrid_key:
         print("⚠️ [NOTIFICATION] SENDGRID_API_KEY env parameter missing. Aborting email dispatch.")
