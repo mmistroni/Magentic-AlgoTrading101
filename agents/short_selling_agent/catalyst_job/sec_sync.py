@@ -38,7 +38,7 @@ def fetch_and_clean_sec_tickers() -> list:
         })
     return cleaned_rows
 
-def run_sec_sync(dataset_id: str = "biotech_trading", table_id: str = "sec_ticker_registry"):
+def run_sec_sync(dataset_id: str = "gcp_shareloader", table_id: str = "sec_ticker_registry"):
     """Truncates and overwrites the BigQuery table with fresh master data weekly."""
     print("Fetching and cleaning master SEC data...")
     rows = fetch_and_clean_sec_tickers()
