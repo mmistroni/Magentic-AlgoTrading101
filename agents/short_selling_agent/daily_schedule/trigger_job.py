@@ -282,6 +282,7 @@ async def amain(message_to_send: str):
         
         # 3. Parse Text Responses and Stream directly to BigQuery
         if agent_text:
+            loop = asyncio.get_running_loop()
             clean_text = agent_text.strip()
             if clean_text.startswith("```"):
                 print("✂️ [PARSING] Detected Markdown block fences. Stripping wrappers out...")
@@ -378,8 +379,6 @@ async def amain(message_to_send: str):
                         # 📬 --- TRIGGER SENDGRID NOTIFICATION UPON SUCCESS ---
                         # Run via standard loop executor since sendgrid's delivery client is synchronous
                         print("📧 [ORCHESTRATOR] Initializing mail summary delivery dispatch...")
-                        loop = asyncio.get_running_loop()
-                        
                 else:
                     print("⚠️ [BIGQUERY] Aborting ingestion phase: No rows were successfully extracted or compiled.")
                 
