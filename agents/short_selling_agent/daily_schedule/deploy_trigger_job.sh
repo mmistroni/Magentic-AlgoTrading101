@@ -38,7 +38,7 @@ echo "🔨 Submitting source to Google Cloud Build and deploying job..."
 gcloud run jobs deploy "${JOB_NAME}" \
     --source . \
     --region="${REGION}" \
-    --set-env-vars="AGENT_SERVICE_URL=${AGENT_SERVICE_URL},SENDGRID_API_KEY=${SENDGRID_KEY}" \
+    --set-env-vars="AGENT_SERVICE_URL=${AGENT_SERVICE_URL},SENDGRID_API_KEY=${SENDGRID_KEY},EMAIL_PASSWORD=${EMAIL_PASSWORD}" \
     --max-retries=3 \
     --task-timeout=300s
 

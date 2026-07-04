@@ -7,7 +7,10 @@ from datetime import datetime
 import httpx 
 import sys
 from google.cloud import bigquery
-
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 # --- SendGrid Imports ---
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, HtmlContent, Subject, To, From
@@ -25,6 +28,39 @@ TABLE_ID = "daily_recommendations"
 TABLE_REF = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
 
 # --- EMAIL NOTIFICATION LAYER (SENDGRID) ---
+
+def send_strategy_report(subject: str, body_text: str):
+    # Configuration
+    SMTP_SERVER = "smtp.gmail.com"
+    SMTP_PORT = 587
+    SENDER_EMAIL = "mmistroni@gmail.com"
+    RECEIVER_EMAIL = "mmistroni@gmail.com"
+    
+    # Retrieve the 16-character app password securely from environment variables
+    APP_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    
+    if not APP_PASSWORD:
+        raise ValueError("EMAIL_PASSWORD environment variable is not set!")
+
+    # Build the email headers and body
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = RECEIVER_EMAIL
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body_text, 'plain'))
+
+    # Connect and send via Gmail's native servers
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()  # Secure the connection using TLS
+            server.login(SENDER_EMAIL, APP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+        print("Report sent successfully via Gmail SMTP!")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
+
+
 
 def send_summary_email(rows_inserted: List[Dict[str, Any]]):
     """
@@ -136,6 +172,11 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
             print(f"⚠️ [NOTIFIER] Unexpected SendGrid API response status received: {response.status_code}")
     except Exception as mail_err:
         print(f"❌ [NOTIFIER] Failed sending execution alert through SendGrid API service: {mail_err}")
+
+    print('============= SENDING SUMMARY EMAIL VIA PYTHON =============')
+    send_strategy_report(f'GCP Cloud Agent Report {today_str} | {len(rows_inserted)}', html_content)
+    
+
 
 # --- Authentication Function (ASYNC) ---
 
