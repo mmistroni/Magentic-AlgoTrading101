@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all the folder scripts (including catalyst_job scripts and sec_sync.py)
-COPY ./catalyst_job/ app
+COPY ./catalyst_job/ .
 
 # 
 #Wecho "Running the job script..."
