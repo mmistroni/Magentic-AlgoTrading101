@@ -44,7 +44,7 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
     # 1. Determine Subject Line and Content Block Based on Data Presence
     if not rows_inserted:
         # Neutral, human-like log format to prevent spam filtering
-        subject_str = f"Daily strategy operations report - {today_str} - zero candidates found"
+        subject_str = f"Overnight MarketStats {today_str} "
         
         display_content = """
         <div style="padding: 15px; background-color: #fdfefe; border: 1px solid #e2e8f0; border-left: 4px solid #94a3b8; border-radius: 4px;">
