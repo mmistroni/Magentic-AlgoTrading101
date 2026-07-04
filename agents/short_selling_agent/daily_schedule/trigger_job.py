@@ -33,7 +33,7 @@ def send_strategy_report(subject: str, body_text: str):
     # Configuration
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SENDER_EMAIL = "mmistroni@gmail.com"
+    SENDER_EMAIL = "mmistroni+strategyagent@gmail.com"
     RECEIVER_EMAIL = "mmistroni@gmail.com"
     
     # Retrieve the 16-character app password securely from environment variables
