@@ -220,6 +220,120 @@ def upsert_to_bigquery(rows):
         log(f"❌ BigQuery Error: {e}")
 
 
+def fetch_daily_lobbying_updates(days_back=2):
+    """
+    Scrapes the master filing feed based on the actual day the record was posted online.
+    Optimized for daily incremental production runs.
+    """
+    log(f"🔄 Scanning for live lobbying filings posted over the last {days_back} days...")
+    
+    try:
+        mapper = TickerMapper()
+    except Exception as e:
+        log(f"❌ Mapper Failure: {e}")
+        return
+
+    # Calculate real-world time boundaries
+    today = datetime.date.today()
+    start_boundary = (today - datetime.timedelta(days=days_back)).strftime("%Y-%m-%d")
+    
+    base_url = "https://lda.senate.gov/api/v1/filings/"
+    
+    # Query parameters optimized to pull the newest online filings first
+    params = {
+        "ordering": "-dt_posted",
+        "page_size": 250
+    }
+    
+    next_url = base_url
+    page_count = 0
+    clean_rows = []
+    reached_historical_cutoff = False
+    
+    while next_url and page_count < 20 and not reached_historical_cutoff:
+        try:
+            if page_count == 0:
+                resp = requests.get(next_url, params=params)
+            else:
+                resp = requests.get(next_url)
+                
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get('Retry-After', 30))
+                log(f"⏳ Rate limited. Waiting {retry_after} seconds...")
+                time.sleep(retry_after)
+                continue
+                
+            if resp.status_code != 200:
+                log(f"❌ API Error {resp.status_code}: {resp.text}")
+                break
+                
+            data = resp.json()
+            results = data.get('results', [])
+            if not results:
+                break
+                
+            next_url = data.get('next')
+            
+            for item in results:
+                # Extract the actual online posting date (YYYY-MM-DD)
+                dt_posted_str = item.get('dt_posted', '')[:10]
+                
+                # If we encounter records older than our lookback window, break the loop
+                if dt_posted_str < start_boundary:
+                    reached_historical_cutoff = True
+                    break
+                
+                client_name = item.get('client', {}).get('name', '').upper()
+                if not client_name: 
+                    continue
+                
+                ticker = mapper.find_ticker(client_name)
+                if not ticker: 
+                    continue
+                    
+                income = item.get('income')
+                expenses = item.get('expenses')
+                amt = max(float(income or 0), float(expenses or 0))
+                
+                # Only care about material spending
+                if amt < 10000: 
+                    continue
+                    
+                issues = [i.get('general_issue_code', '') for i in item.get('lobbying_activities', [])]
+                
+                clean_rows.append({
+                    "filing_year": int(item.get('filing_year')),
+                    "filing_period": item.get('filing_type'),  # Tracks Q1, Q2 structural bucket
+                    "client_name": client_name,
+                    "ticker": ticker,
+                    "amount": amt,
+                    "registrant_name": item.get('registrant', {}).get('name'),
+                    "general_issues": ",".join(filter(None, issues)),
+                    "filing_date": dt_posted_str,
+                    "description": (item.get('lobbying_activities', [{}])[0].get('description', '') if item.get('lobbying_activities') else '')[:1000]
+                })
+                
+            page_count += 1
+            time.sleep(1.5)
+            
+        except Exception as e:
+            log(f"⚠️ Error parsing live page {page_count}: {e}")
+            break
+
+    if clean_rows:
+        log(f"✅ Found {len(clean_rows)} live corporate filings posted since {start_boundary}")
+        try:
+            upsert_to_bigquery(clean_rows)
+        except Exception as e:
+            log(f"❌ Error during daily upsert execution: {e}")
+    else:
+        log("ℹ️ No new corporate tracking matches posted in this daily frame.")
+
+
+
+
+
+
 
 
 

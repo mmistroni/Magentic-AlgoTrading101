@@ -205,3 +205,7 @@ Why: This is the end of your dataset. It allows you to see if the strategy held 
     "reason": "Thesis: Macro regime is BULLISH (market uptrend). Congress shows strong net buying activity (net_buy_activity: 10). There is no 'Golden Confluence' from corporate lobbying or C-Suite insider buying, but also no negative signals. Fundamentals: P/E is 30.69 (reasonable for the Technology sector). Debt-to-Equity is 0.192 (very healthy). Verdict: Buy."
   }
 ]
+
+
+
+================= 20260706 - rev engineer congres strades
