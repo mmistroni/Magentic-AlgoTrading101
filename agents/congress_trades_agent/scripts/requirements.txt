@@ -1,0 +1,11 @@
+google-adk>=1.5.0,<2.0.0
+db-dtypes
+pydantic
+pandas
+pyarrow
+google-cloud-aiplatform
+google-cloud-bigquery
+yfinance
+requests
+db-dtypes
+rapidfuzz 

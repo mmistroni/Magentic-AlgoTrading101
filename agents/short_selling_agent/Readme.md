@@ -1,5 +1,15 @@
 ##  Agent on Cloud Run - 
 Short selling agent using outlier llm
+Sample prompt for results
+Run the short-selling pipeline [for YYYY-MM-DD].
+We got mail with flagged items for following dats
+11/6
+12/6
+18/6
+19/6
+22/6
+25/6
+
 
 here is how to run the backtest
 (.venv) vscode@codespaces-6656da:/workspaces/Magentic-AlgoTrading101/agents/short_selling_agent$ python -m tests.integration.backtest_one_day --date 2025-06-01
@@ -25,3 +35,5 @@ Updated agent definitions
  one_tickers.py tests the flow
  signals.py run multiple signals
  run_backtest clculates pnl
+
+
