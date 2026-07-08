@@ -40,16 +40,16 @@ https://medium.com/@princekrampah/multi-agent-architecture-in-multi-agent-system
 # mcp
 
 # TRading AGents
-1 - Congress Trades Agent using congress trades , form 4 and governmet contracts. PARTIALLY IMPLEMENTED Bu not deployed. Partially working using only Congress Trades
-      - todo: add Form4
-      -   add Governmet Contracts
-     -    add lobbying data
+1 - Congress Trades Agent using congress trades , form 4 and governmet contracts. Added
+    government contract and lobbyin gdata., Need to tets historical and daily
 2 - VIX Agent to detect vix Spikes in progress using outlier
-3 - 13F Agent to infer stocks to invest using 13F. IMPLEMENTED:This is Feature Agent, already developed but need to be re ran for bcktesting. this uses Bard
-4 - ShortSellibng Agent NOT IMPLEMENTED to detect opportunities for Short Selling ==outlier
-5 - Agent detect stocks in Upward momentum - IMPLEMENTED: this is Stock Agent
+3 - 13F Agent to infer stocks to invest using 13F. IMPLEMENTED:This is Feature Agent, already developed but need to be re ran for bcktesting. this has  been backtested and
+not yet deployd
+4 - ShortSellibng Agent.Implemented and deployed , but we will rewrite it using skills
+5 - Agent detect stocks in Upward momentum - IMPLEMENTED: this is Stock Agent. Deployed but need to be enhanced with beta
 6 - Commodities speculation Agent NOT IMPLEMENTED
-
+7 - CANSLIM agent and fundamental data agent - to be implemented
+8 - Horse Racing agent: to fetch data from horse racing apis to potentially bet on horses 
 
 
 ## run followibg command toenable gcloud
