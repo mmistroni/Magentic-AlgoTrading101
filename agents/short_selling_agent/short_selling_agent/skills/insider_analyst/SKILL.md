@@ -1,5 +1,5 @@
 ---
-name: insider_analyst_skill
+name: insider-analyst-skill
 description: Inspects news output, enforces short-circuit guardrails, and stages insider trading data for active tickers.
 ---
 

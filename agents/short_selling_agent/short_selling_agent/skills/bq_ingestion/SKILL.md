@@ -1,5 +1,5 @@
 ---
-name: bq_ingestion_skill
+name: bq-ingestion-skill
 description: Extracts the target date from user input and triggers the BigQuery data extraction tool.
 ---
 

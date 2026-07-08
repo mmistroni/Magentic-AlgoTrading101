@@ -1,5 +1,5 @@
 ---
-name: quant_coordinator_skill
+name: quant-coordinator-skill
 description: Synthesizes the aggregated trading dossier, filters out empty data states, applies rigid risk management metrics, and formats final short-selling execution choices.
 ---
 
