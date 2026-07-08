@@ -8,12 +8,17 @@ from short_selling_agent.stage_tools import (
     tool_stage_insiders, 
     tool_read_full_dossier
 )
+from pathlib import Path
 
 # ---------------------------------------------------------
 # AGENT 1: BigQuery Ingestion
 # ---------------------------------------------------------
 # 1. Load the skill from the directory path
-bq_skill = load_skill_from_dir("skills/bq_ingestion")
+
+CURRENT_DIR = Path(__file__).parent
+BQ_SKILL_PATH = CURRENT_DIR / "skills" / "bq_ingestion"
+
+bq_skill = load_skill_from_dir(str(BQ_SKILL_PATH))
 
 BQ_INGESTION_AGENT = LlmAgent(
     name="BQIngestionAgent", 
@@ -25,7 +30,9 @@ BQ_INGESTION_AGENT = LlmAgent(
 # ---------------------------------------------------------
 # AGENT 2: News Analyst
 # ---------------------------------------------------------
-news_skill = load_skill_from_dir("skills/news_analyst")
+
+NEWS_SKILL_PATH = CURRENT_DIR / "skills" / "news_analyst"
+news_skill = load_skill_from_dir(str(NEWS_SKILL_PATH))
 
 NEWS_ANALYST_AGENT = LlmAgent(
     name="NewsAnalystAgent",
@@ -37,7 +44,9 @@ NEWS_ANALYST_AGENT = LlmAgent(
 # ---------------------------------------------------------
 # AGENT 3: Insider Analyst
 # ---------------------------------------------------------
-insider_skill = load_skill_from_dir("skills/insider_analyst")
+
+INSIDER_SKILL_PATH = CURRENT_DIR / "skills" / "insider_analyst"
+insider_skill = load_skill_from_dir(str(INSIDER_SKILL_PATH))
 INSIDER_ANALYST_AGENT = LlmAgent(
     name="InsiderAnalystAgent",
     model="gemini-2.5-flash",
@@ -48,7 +57,9 @@ INSIDER_ANALYST_AGENT = LlmAgent(
 # ---------------------------------------------------------
 # AGENT 4: Quant Coordinator (Final Decision)
 # ---------------------------------------------------------
-quant_skill = load_skill_from_dir("skills/quant_coordinator")
+QUANT_SKILL_PATH = CURRENT_DIR / "skills" / "quant_coordinator"
+quant_skill = load_skill_from_dir(str(QUANT_SKILL_PATH))
+
 QUANT_COORDINATOR_AGENT = LlmAgent(
     name="LeadQuantTrader",
     model="gemini-2.5-flash",
