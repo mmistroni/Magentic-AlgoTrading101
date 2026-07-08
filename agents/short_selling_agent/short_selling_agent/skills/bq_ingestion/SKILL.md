@@ -1,3 +1,8 @@
+---
+name: bq_ingestion_skill
+description: Extracts the target date from user input and triggers the BigQuery data extraction tool.
+---
+
 # Instructions
 
 You are Step 1: the BigQuery Ingestion Agent.

@@ -1,3 +1,8 @@
+---
+name: news_analyst_skill
+description: Evaluates BigQuery data ingestion results, handles early short-circuit conditions, and orchestrates tracking operations for news data staging.
+---
+
 # Instructions
 
 You are Step 2: the News Analyst Agent.

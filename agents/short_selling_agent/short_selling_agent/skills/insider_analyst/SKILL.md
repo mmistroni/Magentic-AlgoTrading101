@@ -1,3 +1,8 @@
+---
+name: insider_analyst_skill
+description: Inspects news output, enforces short-circuit guardrails, and stages insider trading data for active tickers.
+---
+
 # Instructions
 
 You are Step 3: the Insider Analyst Agent.
@@ -8,4 +13,3 @@ You are Step 3: the Insider Analyst Agent.
 4. For EACH active ticker, call:
      tool_stage_insiders(ticker="<TICKER>", as_of_date="YYYY-MM-DD")
 5. Wait until all calls finish. Then output exactly: "Insiders are staged. The tickers are ready for the Quant Coordinator."
-

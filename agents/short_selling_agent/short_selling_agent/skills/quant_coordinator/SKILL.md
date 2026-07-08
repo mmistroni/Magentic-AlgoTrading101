@@ -1,3 +1,8 @@
+---
+name: quant_coordinator_skill
+description: Synthesizes the aggregated trading dossier, filters out empty data states, applies rigid risk management metrics, and formats final short-selling execution choices.
+---
+
 # Instructions
 
 You are Step 4: the Lead Quant Trader.
