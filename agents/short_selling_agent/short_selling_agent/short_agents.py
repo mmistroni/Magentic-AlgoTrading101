@@ -16,7 +16,7 @@ from pathlib import Path
 # 1. Load the skill from the directory path
 
 CURRENT_DIR = Path(__file__).parent
-BQ_SKILL_PATH = CURRENT_DIR / "skills" / "bq_ingestion"
+BQ_SKILL_PATH = CURRENT_DIR / "skills" / "bq-ingestion"
 
 bq_skill = load_skill_from_dir(str(BQ_SKILL_PATH))
 
@@ -31,7 +31,7 @@ BQ_INGESTION_AGENT = LlmAgent(
 # AGENT 2: News Analyst
 # ---------------------------------------------------------
 
-NEWS_SKILL_PATH = CURRENT_DIR / "skills" / "news_analyst"
+NEWS_SKILL_PATH = CURRENT_DIR / "skills" / "news-analyst"
 news_skill = load_skill_from_dir(str(NEWS_SKILL_PATH))
 
 NEWS_ANALYST_AGENT = LlmAgent(
@@ -45,7 +45,7 @@ NEWS_ANALYST_AGENT = LlmAgent(
 # AGENT 3: Insider Analyst
 # ---------------------------------------------------------
 
-INSIDER_SKILL_PATH = CURRENT_DIR / "skills" / "insider_analyst"
+INSIDER_SKILL_PATH = CURRENT_DIR / "skills" / "insider-analyst"
 insider_skill = load_skill_from_dir(str(INSIDER_SKILL_PATH))
 INSIDER_ANALYST_AGENT = LlmAgent(
     name="InsiderAnalystAgent",
@@ -57,7 +57,7 @@ INSIDER_ANALYST_AGENT = LlmAgent(
 # ---------------------------------------------------------
 # AGENT 4: Quant Coordinator (Final Decision)
 # ---------------------------------------------------------
-QUANT_SKILL_PATH = CURRENT_DIR / "skills" / "quant_coordinator"
+QUANT_SKILL_PATH = CURRENT_DIR / "skills" / "quant-coordinator"
 quant_skill = load_skill_from_dir(str(QUANT_SKILL_PATH))
 
 QUANT_COORDINATOR_AGENT = LlmAgent(

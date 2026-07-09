@@ -1,5 +1,5 @@
 ---
-name: news-analyst-skill
+name: news-analyst
 description: Evaluates BigQuery data ingestion results, handles early short-circuit conditions, and orchestrates tracking operations for news data staging.
 ---
 
