@@ -79,3 +79,54 @@ QUANT_COORDINATOR_AGENT =
 
 
 ==== Schemas ===
+# schemas/dossier.py — or wherever you keep models
+
+from typing import List, Optional
+from pydantic import BaseModel, Field
+from datetime import datetime
+
+
+# ------------------------------
+# 1. INPUT DATA MODELS (Keep existing ones)
+# ------------------------------
+# -----------------------------
+# 1. MODELS FOR BQ LOSERS
+# -----------------------------
+class MarketLoser(BaseModel):
+class BiggestLosersReport(BaseModel):
+
+
+
+----- MODELS For NEWS
+
+class NewsArticle(BaseModel):
+    date: str = Field(description="Publication date")
+    title: str = Field(description="Headline")
+    content: str = Field(default="", description="Snippet or body")
+
+class StockNewsReport(BaseModel):
+    ticker: str
+    articles: List[NewsArticle]
+    error_message: Optional[str] = None
+
+--- MODELS FOR INSIDER TRADES
+
+class InsiderTrade(BaseModel):
+class InsiderTradingReport(BaseModel):
+
+# ------------------------------
+# 2. QUANT SIGNAL MODEL (NEW)
+# ------------------------------
+class QuantitativeSignal(BaseModel):
+
+# ------------------------------
+# 3. AGENT DECISION MODEL
+# ------------------------------
+class QuantDecision(BaseModel):
+# ------------------------------
+# 4. UNIFIED PipelineDossier
+# ------------------------------
+class PipelineDossier(BaseModel):
+
+
+
