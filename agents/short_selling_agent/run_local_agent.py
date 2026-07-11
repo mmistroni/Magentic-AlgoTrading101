@@ -1,64 +1,48 @@
-import argparse
-import json
-import sys
-from datetime import datetime
+import os
+from pathlib import Path
+from google.adk.runners import InMemoryRunner
+from google.adk.cli.utils.agent_loader import AgentLoader
+from google.genai.types import Content, Part
 
-# Assuming you are using google-genai or your chosen framework async setup
-# from schemas import PipelineDossier, QuantDecision
+# Hardcode the source directory root for your agents block
+AGENTS_DIR = Path("/workspaces/Magentic-AlgoTrading101/agents")
 
-def validate_date(date_string: str) -> str:
-    """Validates that the input string matches YYYY-MM-DD format."""
-    try:
-        datetime.strptime(date_string, "%Y-%m-%d")
-        return date_string
-    except ValueError:
-        raise argparse.ArgumentTypeError(
-            f"Invalid date format: '{date_string}'. Must be in YYYY-MM-DD format."
-        )
+# 1. Initialize the 2.0 loader pointing exactly to the parent 'agents' directory
+loader = AgentLoader(agents_dir=str(AGENTS_DIR))
+agent_app = loader.load_agent("short_selling_agent")
 
-def execute_quant_coordinator(run_date: str):
-    """
-    Orchestrates the Lead Quant Trader execution and waits for the agent response.
-    """
-    print(f"🚀 Initializing Lead Quant Trader Pipeline for date: {run_date}")
-    
-    # 1. Initialize your State Dossier tracking object
-    # dossier = PipelineDossier(as_of_date=run_date)
-    
-    try:
-        # 2. Call your agent wrapper here. 
-        # Make sure this invocation explicitly blocks/waits for the complete LLM token return.
-        print("📡 Invoking quant-coordinator agent... Awaiting structured JSON output...")
-        
-        # Example execution matching your architecture:
-        # response = agent.run(
-        #     user_prompt=f"Process trading dossier execution rules for session: {run_date}",
-        #     result_type=QuantDecision
-        # )
-        
-        # --- Mocking active wait / processing output for demonstration ---
-        # print(f"📝 Raw response received: {response.text}")
-        
-        print("✅ Response successfully caught and validated against QuantDecision schema.")
-        
-    except Exception as e:
-        print(f"❌ Error during agent runtime execution: {e}", file=sys.stderr)
-        sys.exit(1)
+# 2. Build the local runner with the explicit app_name and auto-creation rules
+runner = InMemoryRunner(
+    agent=agent_app,
+    app_name="short_selling_agent",  # <--- Aligns the framework app name
+    auto_create_session=True         # <--- Tells the runner to instantiate the session if missing
+)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run Step 4 (Lead Quant Trader Coordinator) pipeline with a mandatory execution date."
-    )
-    
-    # Mandatory command line argument execution date
-    parser.add_argument(
-        "--run-date",
-        type=validate_date,
-        required=True,
-        help="The execution date for the data dossier in YYYY-MM-DD format (e.g., 2026-07-11)"
-    )
-    
-    args = parser.parse_args()
-    
-    # Run and block until full agent resolution
-    execute_quant_coordinator(run_date=args.run_date)
+print("--- Starting ADK 2.0 Pipeline Run ---")
+
+# 3. Instantiate explicit strongly-typed 2.0 objects
+structured_message = Content(
+    role="user",
+    parts=[Part(text="Run the short-selling pipeline for 2026-07-10.")]
+)
+
+# 4. Execute the interaction passing the structural typing frame
+response_stream = runner.run(
+    user_id="local_dev",
+    session_id="short_test_session",
+    new_message=structured_message
+)
+
+print("\nFinal Output: \n")
+
+# 5. Consume and print the stream event steps cleanly
+for event in response_stream:
+    if hasattr(event, "is_final_response") and event.is_final_response():
+        if event.content and event.content.parts:
+            print(event.content.parts[0].text, end="", flush=True)
+    elif hasattr(event, "content") and event.content:
+        if hasattr(event.content, "parts") and event.content.parts:
+            for part in event.content.parts:
+                if hasattr(part, "text") and part.text:
+                    print(part.text, end="", flush=True)
+print()

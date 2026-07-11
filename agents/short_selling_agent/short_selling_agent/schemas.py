@@ -1,7 +1,7 @@
 # schemas/dossier.py — or wherever you keep models
 
 from typing import List, Optional
-from pydantic import BaseModel, Field, Literal
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
