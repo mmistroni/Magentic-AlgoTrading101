@@ -61,7 +61,8 @@ gcloud run deploy "$SERVICE_NAME" \
   --project "$GOOGLE_CLOUD_PROJECT" \
   --allow-unauthenticated \
   --set-env-vars="$ENV_VARS_STRING" \
-  --platform managed
+  --platform managed \
+  --set-build-env-vars=GOOGLE_PYTHON_VERSION="3.13"
 
 # 6. Provide a Completion Message
 if [ $? -eq 0 ]; then
