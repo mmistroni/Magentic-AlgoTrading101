@@ -1,7 +1,7 @@
 # schemas/dossier.py — or wherever you keep models
 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Literal
 from datetime import datetime
 
 
@@ -86,14 +86,47 @@ class QuantitativeSignal(BaseModel):
     as_of_date: str
 
 
+class TechnicalAudit(BaseModel):
+    overnight_gap_detected: bool = Field(
+        ..., description="True if the stock gapped down >15% pre-market"
+    )
+    catalyst_severity: Literal["Terminal (Phase 3 Failure/FDA Reject)", "Standard (Earnings/Analyst)", "None"] = Field(
+        ..., description="The structural impact of the underlying news"
+    )
+    eod_candle_posture: Literal["Closed at Lows", "Dead Cat Bounce/Recovered", "Neutral"] = Field(
+        ..., description="Where the daily candle closed relative to its intraday range"
+    )
+    institutional_liquidation_expected: bool = Field(
+        ..., description="True if institutional rebalancing is likely to create a multi-day bleed"
+    )
+
+
+
 # ------------------------------
 # 3. AGENT DECISION MODEL
 # ------------------------------
+from pydantic import BaseModel, Field
+from typing import Literal
+
 class QuantDecision(BaseModel):
     ticker: str
-    conviction_score: int = Field(ge=0, le=10)  # Gemini-scale: 1–10
-    action: str  # SHORT, AVOID, COVER
+    conviction_score: int = Field(ge=0, le=10)  # Gemini-scale: 0–10
+    action: Literal["SHORT", "AVOID", "COVER"]
+    
+    # --- Flattened Audit Fields ---
+    overnight_gap_detected: bool = Field(
+        False, description="True if the stock gapped down >15% pre-market"
+    )
+    catalyst_severity: str = Field(
+        "None", description="e.g., 'Terminal (Phase 3 Failure)', 'Standard', or 'None'"
+    )
+    eod_candle_posture: str = Field(
+        "Neutral", description="e.g., 'Closed at Lows', 'Recovered', or 'Neutral'"
+    )
+    # ------------------------------
+    
     reasoning: str
+
 
 
 # ------------------------------
