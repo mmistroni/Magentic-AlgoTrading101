@@ -86,22 +86,6 @@ class QuantitativeSignal(BaseModel):
     as_of_date: str
 
 
-class TechnicalAudit(BaseModel):
-    overnight_gap_detected: bool = Field(
-        ..., description="True if the stock gapped down >15% pre-market"
-    )
-    catalyst_severity: Literal["Terminal (Phase 3 Failure/FDA Reject)", "Standard (Earnings/Analyst)", "None"] = Field(
-        ..., description="The structural impact of the underlying news"
-    )
-    eod_candle_posture: Literal["Closed at Lows", "Dead Cat Bounce/Recovered", "Neutral"] = Field(
-        ..., description="Where the daily candle closed relative to its intraday range"
-    )
-    institutional_liquidation_expected: bool = Field(
-        ..., description="True if institutional rebalancing is likely to create a multi-day bleed"
-    )
-
-
-
 # ------------------------------
 # 3. AGENT DECISION MODEL
 # ------------------------------
