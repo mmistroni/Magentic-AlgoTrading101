@@ -176,12 +176,26 @@ if __name__ == "__main__":
     # Define your single query here
 
     from datetime import datetime, timedelta
+    import argparse
+
+    # 1. Setup mandatory command-line arguments first
+    parser = argparse.ArgumentParser(
+        description="Run the ADK 2.0 short-selling pipeline with a mandatory target date."
+    )
+    parser.add_argument(
+        "--run-date",
+        required=True,
+        help="The target execution date in YYYY-MM-DD format (e.g., 2026-07-10)"
+    )
+    args = parser.parse_args()
+
+
 
     # 1. Get the current date and subtract 2 days
     target_date = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
 
     # 2. Inject it into your query string
-    QUERY = f"Run the short-selling pipeline for {target_date}."
+    QUERY = f"Run the short-selling pipeline for {args.run_date}."
     try:
         asyncio.run(amain(QUERY))
     except Exception as e:

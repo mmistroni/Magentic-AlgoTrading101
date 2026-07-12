@@ -1,43 +1,58 @@
-import os
+import argparse
 from pathlib import Path
 from google.adk.runners import InMemoryRunner
 from google.adk.cli.utils.agent_loader import AgentLoader
 from google.genai.types import Content, Part
-import argparse
-from datetime import datetime
 
-# Hardcode the source directory root for your agents block
-AGENTS_DIR = Path("/workspaces/Magentic-AlgoTrading101/agents")
+# 1. Setup mandatory command-line arguments first
+parser = argparse.ArgumentParser(
+    description="Run the ADK 2.0 short-selling pipeline with a mandatory target date."
+)
+parser.add_argument(
+    "--run-date",
+    required=True,
+    help="The target execution date in YYYY-MM-DD format (e.g., 2026-07-10)"
+)
+args = parser.parse_args()
 
-# 1. Initialize the 2.0 loader pointing exactly to the parent 'agents' directory
+# 2. Adjust path to look for the nested folder in the current directory context
+AGENTS_DIR = Path(".").resolve()
+
+# Initialize the loader pointing to the current directory context
 loader = AgentLoader(agents_dir=str(AGENTS_DIR))
 agent_app = loader.load_agent("short_selling_agent")
 
-# 2. Build the local runner with the explicit app_name and auto-creation rules
-runner = InMemoryRunner(
-    agent=agent_app,
-    app_name="short_selling_agent",  # <--- Aligns the framework app name
-    auto_create_session=True         # <--- Tells the runner to instantiate the session if missing
-)
-
 print("--- Starting ADK 2.0 Pipeline Run ---")
 
-# 3. Instantiate explicit strongly-typed 2.0 objects
-structured_message = Content(
-    role="user",
-    parts=[Part(text="Run the short-selling pipeline for 2026-07-10.")]
+# 3. Build the local runner
+runner = InMemoryRunner(
+    agent=agent_app,
+    app_name="short_selling_agent"
 )
 
-# 4. Execute the interaction passing the structural typing frame
+# 4. Target the correct internal memory storage layout to pre-register the session
+session_id = "short_test_session"
+user_id = "local_dev"
+
+print(f"📦 Seeding internal session store registry for: '{session_id}'...")
+runner.session_store.create_session(user_id=user_id, session_id=session_id)
+
+# 5. Instantiate explicit strongly-typed 2.0 objects using the CLI provided date
+structured_message = Content(
+    role="user",
+    parts=[Part(text=f"Run the short-selling pipeline for {args.run_date}.")]
+)
+
+# 6. Execute the interaction passing the structural typing frame
 response_stream = runner.run(
-    user_id="local_dev",
-    session_id="short_test_session",
+    user_id=user_id,
+    session_id=session_id,
     new_message=structured_message
 )
 
-print("\nFinal Output: \n")
+print(f"\nFinal Output for {args.run_date}: \n")
 
-# 5. Consume and print the stream event steps cleanly
+# 7. Consume and print the stream event steps cleanly
 for event in response_stream:
     if hasattr(event, "is_final_response") and event.is_final_response():
         if event.content and event.content.parts:
