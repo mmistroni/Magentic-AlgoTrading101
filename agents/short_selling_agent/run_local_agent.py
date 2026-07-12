@@ -3,6 +3,8 @@ from pathlib import Path
 from google.adk.runners import InMemoryRunner
 from google.adk.cli.utils.agent_loader import AgentLoader
 from google.genai.types import Content, Part
+import argparse
+from datetime import datetime
 
 # Hardcode the source directory root for your agents block
 AGENTS_DIR = Path("/workspaces/Magentic-AlgoTrading101/agents")
