@@ -1,5 +1,15 @@
 ##  Agent on Cloud Run - 
 Short selling agent using outlier llm
+This agent is supported by 3 differnet jobs
+- a bq_ingestion job which stores daily market losers from FMP. this is for research purposes
+- sec_sync a job which downloads from SEC Mappings from tickers to company names
+- sync_catalyst.job which downloads data from clinical trials , to spot biotech
+  catalysts.
+
+(12/07) - job is in process of being converted following Skills API  
+
+
+
 Sample prompt for results
 Run the short-selling pipeline [for YYYY-MM-DD].
 We got mail with flagged items for following dats
