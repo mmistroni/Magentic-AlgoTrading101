@@ -80,15 +80,45 @@ def download_historical_catalysts(start_date: str, end_date: str) -> List[Dict[s
             # --- FIX: Extract the actual historical post date from the API ---
             # Format returned by API v2 is usually "YYYY-MM-DD"
             # --- FIX: Extract and format date as a valid TIMESTAMP ---
+
             # --- FIX: Extract and format date as a valid TIMESTAMP ---
+            # --- FIX: Extract and format date as a valid TIMESTAMP ---
+            # --- BULLETPROOF FIX: Safely parse complete or partial API date strings ---
             api_update_date = status_info.get("lastUpdatePostDateStruct", {}).get("date")
+            record_timestamp = None
             
             if api_update_date:
-                # Append default time (midnight UTC) to make it a valid TIMESTAMP string
-                record_timestamp = f"{api_update_date}T00:00:00Z"
+                try:
+                    # Case 1: Standard full date (YYYY-MM-DD)
+                    if len(api_update_date) == 10:
+                        dt = datetime.datetime.strptime(api_update_date, "%Y-%m-%d")
+                    # Case 2: Partial month precision (YYYY-MM)
+                    elif len(api_update_date) == 7:
+                        dt = datetime.datetime.strptime(api_update_date, "%Y-%m")
+                    # Case 3: Partial year precision (YYYY)
+                    elif len(api_update_date) == 4:
+                        dt = datetime.datetime.strptime(api_update_date, "%Y")
+                    else:
+                        dt = datetime.datetime.utcnow()
+                    
+                    record_timestamp = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+                except Exception:
+                    # Safe fallback configuration if string format is unexpected
+                    record_timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
             else:
-                record_timestamp = datetime.datetime.utcnow().isoformat()
+                record_timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+            parsed_records.append({
+                "scraped_at": record_timestamp,  # Cleanly padded BigQuery timestamp
+                "nct_id": nct_id,
+                "sponsor": sponsor,
+                "title": brief_title,
+                "status": overall_status,
+                "negative_reason": why_stopped
+            })
 
+
+            
             # Fallback to current time only if the API field is missing
             record_timestamp = api_update_date if api_update_date else datetime.datetime.utcnow().isoformat()
             
