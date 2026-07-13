@@ -35,11 +35,11 @@ def download_historical_catalysts(start_date: str, end_date: str) -> List[Dict[s
     ## We use the exact RANGE syntax matching your daily framework configuration
     
     params = {
-        # 1. Target only Interventional studies in Phase 2 or Phase 3
-        "query.term": "AREA[StudyType]Interventional AND (AREA[Phase]Phase 2 OR AREA[Phase]Phase 3)",
+        # Combine the phase, study type, and industry sponsor type all into the main query term
+        "query.term": "AREA[StudyType]Interventional AND (AREA[Phase]Phase 2 OR AREA[Phase]Phase 3) AND AREA[LeadSponsorClass]INDUSTRY",
         
-        # 2. Target only commercial public/private companies (excluding universities/gov)
-        "filter.advanced": f"AREA[SponsorClass]INDUSTRY AND AREA[LastUpdatePostDate]RANGE[{start_date}, {end_date}]",
+        # Keep the advanced filter strictly for your historical date range
+        "filter.advanced": f"AREA[LastUpdatePostDate]RANGE[{start_date}, {end_date}]",
         
         "pageSize": 100
     }
@@ -51,8 +51,11 @@ def download_historical_catalysts(start_date: str, end_date: str) -> List[Dict[s
     while True:
         page_count += 1
         if next_page_token:
-            params["nextPageToken"] = next_page_token
-            
+            # CHANGE THIS LINE: Key must be "pageToken", value is next_page_token
+            params["pageToken"] = next_page_token
+        else:
+            params.pop("pageToken", None)    
+                
         log(f"   🔄 Fetching page {page_count}...")
         response = requests.get(url, params=params)
         if response.status_code != 200:
