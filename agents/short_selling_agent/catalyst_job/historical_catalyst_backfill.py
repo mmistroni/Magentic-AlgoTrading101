@@ -77,15 +77,22 @@ def download_historical_catalysts(start_date: str, end_date: str) -> List[Dict[s
             why_stopped = status_info.get("whyStopped", None)
             sponsor = sponsor_info.get("leadSponsor", {}).get("name")
             
+            # --- FIX: Extract the actual historical post date from the API ---
+            # Format returned by API v2 is usually "YYYY-MM-DD"
+            api_update_date = status_info.get("lastUpdatePostDateStruct", {}).get("date")
+            
+            # Fallback to current time only if the API field is missing
+            record_timestamp = api_update_date if api_update_date else datetime.datetime.utcnow().isoformat()
+            
             parsed_records.append({
-                "scraped_at": datetime.datetime.utcnow().isoformat(),
+                "scraped_at": record_timestamp,  # Now tracks the true historical timeline
                 "nct_id": nct_id,
                 "sponsor": sponsor,
                 "title": brief_title,
                 "status": overall_status,
                 "negative_reason": why_stopped
             })
-            
+                
         next_page_token = payload.get("nextPageToken")
         if not next_page_token or not studies:
             break
