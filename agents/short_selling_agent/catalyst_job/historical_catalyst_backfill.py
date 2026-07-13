@@ -79,8 +79,16 @@ def download_historical_catalysts(start_date: str, end_date: str) -> List[Dict[s
             
             # --- FIX: Extract the actual historical post date from the API ---
             # Format returned by API v2 is usually "YYYY-MM-DD"
+            # --- FIX: Extract and format date as a valid TIMESTAMP ---
+            # --- FIX: Extract and format date as a valid TIMESTAMP ---
             api_update_date = status_info.get("lastUpdatePostDateStruct", {}).get("date")
             
+            if api_update_date:
+                # Append default time (midnight UTC) to make it a valid TIMESTAMP string
+                record_timestamp = f"{api_update_date}T00:00:00Z"
+            else:
+                record_timestamp = datetime.datetime.utcnow().isoformat()
+
             # Fallback to current time only if the API field is missing
             record_timestamp = api_update_date if api_update_date else datetime.datetime.utcnow().isoformat()
             
@@ -92,7 +100,7 @@ def download_historical_catalysts(start_date: str, end_date: str) -> List[Dict[s
                 "status": overall_status,
                 "negative_reason": why_stopped
             })
-                
+
         next_page_token = payload.get("nextPageToken")
         if not next_page_token or not studies:
             break
