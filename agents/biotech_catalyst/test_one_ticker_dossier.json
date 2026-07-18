@@ -1,0 +1,29 @@
+{
+  "market_losers": [
+    {
+      "ticker": "GME",
+      "price": 18.75,
+      "change_pct": -14.2
+    }
+  ],
+  "news_reports": [
+    {
+      "ticker": "GME",
+      "articles": [],
+      "error_message": "Expecting value: line 1 column 1 (char 0)"
+    }
+  ],
+  "insider_reports": [
+    {
+      "ticker": "GME",
+      "total_dollars_dumped": 0.0,
+      "significant_sales": [],
+      "error_message": null
+    }
+  ],
+  "quant_reports": [],
+  "final_decisions": [],
+  "as_of_date": null,
+  "run_id": null,
+  "metadata": {}
+}

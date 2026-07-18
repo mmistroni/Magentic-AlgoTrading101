@@ -1,0 +1,602 @@
+[
+    {
+        "ticker": "UGRO",
+        "date": "2026-03-30",
+        "price": 17.61,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "VCX",
+        "date": "2026-03-30",
+        "price": 176.49,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "CDT",
+        "date": "2026-03-30",
+        "price": 7.85,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ROMA",
+        "date": "2026-03-30",
+        "price": 6.3,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ZETX",
+        "date": "2026-03-30",
+        "price": 11.9451,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "QGRD",
+        "date": "2026-03-31",
+        "price": 25.0551,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "VCX",
+        "date": "2026-03-31",
+        "price": 111.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "VRDN",
+        "date": "2026-03-31",
+        "price": 18.53,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "MPL",
+        "date": "2026-03-31",
+        "price": 12.76,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "NLOP",
+        "date": "2026-03-31",
+        "price": 11.3,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "CDT",
+        "date": "2026-04-01",
+        "price": 5.1,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "PHR",
+        "date": "2026-04-01",
+        "price": 8.38,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "RKLZ",
+        "date": "2026-04-01",
+        "price": 24.255,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "JILL",
+        "date": "2026-04-01",
+        "price": 11.46,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ADV",
+        "date": "2026-04-01",
+        "price": 21.14,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "POWL",
+        "date": "2026-04-06",
+        "price": 182.60315,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ELAB",
+        "date": "2026-04-06",
+        "price": 5.72,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "EEIQ",
+        "date": "2026-04-06",
+        "price": 7.25,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ANGO",
+        "date": "2026-04-06",
+        "price": 10.31,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "UGRO",
+        "date": "2026-04-06",
+        "price": 19.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HTCO",
+        "date": "2026-04-07",
+        "price": 7.1,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AREB",
+        "date": "2026-04-07",
+        "price": 6.46,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "VRDN",
+        "date": "2026-04-07",
+        "price": 13.9,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "NPT",
+        "date": "2026-04-07",
+        "price": 9.44,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SWMR",
+        "date": "2026-04-07",
+        "price": 50.12,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SMX",
+        "date": "2026-04-08",
+        "price": 8.15,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "GEOS",
+        "date": "2026-04-08",
+        "price": 9.825,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "DRIO",
+        "date": "2026-04-08",
+        "price": 6.37,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "BODI",
+        "date": "2026-04-08",
+        "price": 9.72,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "RCAX",
+        "date": "2026-04-08",
+        "price": 11.4426,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "YDDL",
+        "date": "2026-04-13",
+        "price": 5.16,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "LUD",
+        "date": "2026-04-13",
+        "price": 5.72,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "NETG",
+        "date": "2026-04-13",
+        "price": 7.65,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "FSLY",
+        "date": "2026-04-13",
+        "price": 23.07,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AFJK",
+        "date": "2026-04-13",
+        "price": 56.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AFJK",
+        "date": "2026-04-14",
+        "price": 40.4,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "NPT",
+        "date": "2026-04-14",
+        "price": 7.925,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HSPTU",
+        "date": "2026-04-14",
+        "price": 8.47,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "GLND",
+        "date": "2026-04-14",
+        "price": 6.34,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ZNTL",
+        "date": "2026-04-14",
+        "price": 5.56,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "IONZ",
+        "date": "2026-04-15",
+        "price": 13.34,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "QBTZ",
+        "date": "2026-04-15",
+        "price": 30.76,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "RGTZ",
+        "date": "2026-04-15",
+        "price": 17.09,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SKYQ",
+        "date": "2026-04-15",
+        "price": 9.2,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HCAI",
+        "date": "2026-04-15",
+        "price": 6.39,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "LNZA",
+        "date": "2026-04-20",
+        "price": 22.57,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "JLHL",
+        "date": "2026-04-20",
+        "price": 6.35,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "BMI",
+        "date": "2026-04-20",
+        "price": 115.54,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SMST",
+        "date": "2026-04-20",
+        "price": 33.5,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "MSDD",
+        "date": "2026-04-20",
+        "price": 34.995,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "PASG",
+        "date": "2026-04-21",
+        "price": 6.25,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HUBC",
+        "date": "2026-04-21",
+        "price": 5.55,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AGIO",
+        "date": "2026-04-21",
+        "price": 27.07,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "VACH",
+        "date": "2026-04-21",
+        "price": 10.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "WSHP",
+        "date": "2026-04-21",
+        "price": 12.94,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SKLZ",
+        "date": "2026-04-27",
+        "price": 7.91,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "LBRDA",
+        "date": "2026-04-27",
+        "price": 41.89,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "CHTR",
+        "date": "2026-04-27",
+        "price": 180.13,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SMCZ",
+        "date": "2026-04-27",
+        "price": 24.53,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "LABT",
+        "date": "2026-04-27",
+        "price": 7.26,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "POET",
+        "date": "2026-04-28",
+        "price": 7.95,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "FGI",
+        "date": "2026-04-28",
+        "price": 6.84,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "UP",
+        "date": "2026-04-28",
+        "price": 6.27,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AGCC",
+        "date": "2026-04-28",
+        "price": 16.62,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HCAI",
+        "date": "2026-04-28",
+        "price": 6.62,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HTCO",
+        "date": "2026-04-29",
+        "price": 8.09,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "VISN",
+        "date": "2026-04-29",
+        "price": 9.9,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ERAS",
+        "date": "2026-04-29",
+        "price": 9.9,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "CRMU",
+        "date": "2026-04-29",
+        "price": 9.41,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "CUE",
+        "date": "2026-04-29",
+        "price": 12.455,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SMMT",
+        "date": "2026-05-04",
+        "price": 16.115,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "BAFN",
+        "date": "2026-05-04",
+        "price": 6.37,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SENS",
+        "date": "2026-05-04",
+        "price": 5.1,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "TREE",
+        "date": "2026-05-04",
+        "price": 38.81,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "COHN",
+        "date": "2026-05-04",
+        "price": 18.42,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "XNDU",
+        "date": "2026-05-05",
+        "price": 13.99,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AIOS",
+        "date": "2026-05-05",
+        "price": 15.52,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "CCOI",
+        "date": "2026-05-05",
+        "price": 16.37,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AKAN",
+        "date": "2026-05-05",
+        "price": 41.08,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ULH",
+        "date": "2026-05-05",
+        "price": 16.13,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SKK",
+        "date": "2026-05-06",
+        "price": 5.56,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "WGS",
+        "date": "2026-05-06",
+        "price": 34.51,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "BRBR",
+        "date": "2026-05-06",
+        "price": 10.63,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AKAN",
+        "date": "2026-05-06",
+        "price": 30.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "IPGP",
+        "date": "2026-05-06",
+        "price": 90.84,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "NETG",
+        "date": "2026-05-11",
+        "price": 9.25,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "FWRD",
+        "date": "2026-05-11",
+        "price": 9.87,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AORT",
+        "date": "2026-05-11",
+        "price": 25.41,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "AKAN",
+        "date": "2026-05-11",
+        "price": 27.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "PN",
+        "date": "2026-05-11",
+        "price": 5.81,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SMX",
+        "date": "2026-05-12",
+        "price": 14.49,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "ENHA",
+        "date": "2026-05-12",
+        "price": 7.31,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "IRE",
+        "date": "2026-05-12",
+        "price": 29.57,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "IREG",
+        "date": "2026-05-12",
+        "price": 22.2,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "BH",
+        "date": "2026-05-12",
+        "price": 247.83,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "PSIX",
+        "date": "2026-05-13",
+        "price": 38.0,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "SMX",
+        "date": "2026-05-13",
+        "price": 9.15,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "BOT",
+        "date": "2026-05-13",
+        "price": 25.4,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "HIMZ",
+        "date": "2026-05-13",
+        "price": 28.9,
+        "conviction_score": 8
+    },
+    {
+        "ticker": "DXYZ",
+        "date": "2026-05-13",
+        "price": 53.4,
+        "conviction_score": 8
+    }
+]
