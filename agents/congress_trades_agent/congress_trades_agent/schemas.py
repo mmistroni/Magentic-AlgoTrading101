@@ -63,12 +63,30 @@ class LobbyingSignalResponse(BaseModel):
     lobbying_status: str = "Active"
     error: Optional[str] = None
 
+# congress_trades_agent/schemas.py
+class CongressSignalItem(BaseModel):
+    ticker: str
+    signal_date: str
+    purchase_count: int = 0
+    sale_count: int = 0
+    net_buy_activity: int = 0
+    buying_days_count: int = 0
+    last_trade_date: str
+    market_uptrend: bool = True
+
+class CongressSignalsResponse(BaseModel):
+    analysis_date: str
+    signals: List[CongressSignalItem] = Field(default_factory=list)
+    count: int = 0
+    error: Optional[str] = None
 
 class FundamentalsResponse(BaseModel):
     ticker: str
-    market_cap: Optional[float] = None
-    forward_pe: Optional[float] = None
+    sector: Optional[str] = "Unknown"
+    industry: Optional[str] = "Unknown"
+    market_cap_B: float = 0.0
+    beta: float = 1.0
+    forward_pe: float = 0.0
     debt_to_equity: Optional[float] = None
-    sector: Optional[str] = None
-    valid: bool
+    dividend_yield: float = 0.0
     error: Optional[str] = None
