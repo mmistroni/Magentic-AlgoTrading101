@@ -434,3 +434,5 @@ def _get_spy_data(end_date_str: str) -> pd.DataFrame:
     except Exception as e:
         print(f"❌ SPY Data Fetch Error: {e}")
         return pd.DataFrame()
+
+    
