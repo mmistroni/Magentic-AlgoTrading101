@@ -1,11 +1,13 @@
 import json
 
-def fetch_form4_signals_tool(ticker: str, analysis_date: str):
+import json
+from google.cloud import bigquery
+
+def fetch_form4_signals_tool(ticker: str, analysis_date: str) -> str:
     """
     Insider Alignment Validator: Retrieves recent Form 4 insider trading data (CEOs, Directors) for a specific ticker.
     
     Use this tool to check for 'The Triple Crown' (Congress + Corporate Lobbying + C-Suite Insiders all aligning).
-    It uses mocked data for backtesting purposes.
 
     Args:
         ticker (str): The stock symbol (e.g., 'BE', 'MOH', 'NDAQ').
@@ -13,50 +15,84 @@ def fetch_form4_signals_tool(ticker: str, analysis_date: str):
 
     Returns:
         str: A JSON string containing insider transaction details:
-             - 'insider_title': Role of the insider (e.g., 'CEO', 'CFO').
+             - 'insider_title': Role of the insider (e.g., 'CEO', 'CFO', 'Director').
              - 'transaction_type': 'Buy' or 'Sell'.
              - 'shares': Number of shares transacted.
-             - 'transaction_date': When the trade occurred.
-             - 'signal_strength': 'Strong', 'Neutral', or 'Warning'.
+             - 'transaction_date': When the filing/trade occurred.
+             - 'signal_strength': 'Strong Buy Confluence', 'Warning - Insider Dumping', or 'Neutral'.
     """
-    print(f"🕵️ Checking Form 4 Insider trades for: {ticker} around {analysis_date}")
+    print(f"🕵️ Fetching live Form 4 Insider trades for: {ticker} around {analysis_date}")
     
-    # Mocked database for our test cases
-    mock_form4_db = {
-        "BE": {
-            "ticker": "BE",
-            "insider_title": "CEO", 
-            "transaction_type": "Buy", 
-            "shares": 25000, 
-            "transaction_date": "2024-10-25",
-            "signal_strength": "Strong Buy Confluence"
-        },
-        "MOH": {
-            "ticker": "MOH",
-            "insider_title": "CFO", 
-            "transaction_type": "Sell", 
-            "shares": 15000, 
-            "transaction_date": "2024-06-05",
-            "signal_strength": "Warning - Insider Dumping"
-        },
-        "NDAQ": {
-            "ticker": "NDAQ",
-            "insider_title": "Director", 
-            "transaction_type": "Hold", 
-            "shares": 0, 
-            "transaction_date": "N/A",
+    client = bigquery.Client()
+    
+    # Query BigQuery schema matching your dataset structure
+    query = """
+    SELECT 
+        ticker,
+        COALESCE(
+            officer_title, 
+            IF(is_director, 'Director', NULL),
+            IF(is_officer, 'Officer', NULL),
+            'Insider'
+        ) AS insider_title,
+        UPPER(TRIM(transaction_side)) AS transaction_type,
+        CAST(shares AS INT64) AS shares,
+        CAST(filing_date AS STRING) AS transaction_date
+    FROM 
+        `datascience-projects.gcp_shareloader.form4_disclosures`
+    WHERE 
+        UPPER(TRIM(ticker)) = UPPER(@ticker)
+        AND filing_date <= PARSE_DATE('%Y-%m-%d', @analysis_date)
+        AND filing_date >= DATE_SUB(PARSE_DATE('%Y-%m-%d', @analysis_date), INTERVAL 90 DAY)
+        AND UPPER(TRIM(transaction_side)) IN ('BUY', 'SELL')
+    ORDER BY 
+        filing_date DESC, shares DESC
+    LIMIT 1;
+    """
+    
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("ticker", "STRING", ticker.strip().upper()),
+            bigquery.ScalarQueryParameter("analysis_date", "STRING", analysis_date),
+        ]
+    )
+    
+    try:
+        query_job = client.query(query, job_config=job_config)
+        results = list(query_job.result())
+        
+        if not results:
+            return json.dumps({
+                "ticker": ticker.upper(),
+                "error": "No recent insider transactions found.",
+                "signal_strength": "Neutral"
+            })
+            
+        row = dict(results[0].items())
+        
+        # Determine signal strength dynamically
+        tx_type = str(row.get("transaction_type", "")).capitalize()
+        title = str(row.get("insider_title", "")).upper()
+        
+        if tx_type == "Buy" and any(role in title for role in ["CEO", "CFO", "DIRECTOR", "OFFICER"]):
+            signal = "Strong Buy Confluence"
+        elif tx_type == "Sell" and any(role in title for role in ["CEO", "CFO"]):
+            signal = "Warning - Insider Dumping"
+        else:
+            signal = "Neutral"
+            
+        row["signal_strength"] = signal
+        row["transaction_type"] = tx_type
+        
+        return json.dumps(row)
+
+    except Exception as e:
+        print(f"❌ Error querying Form 4 data: {e}")
+        return json.dumps({
+            "ticker": ticker.upper(),
+            "error": f"Failed to execute query: {str(e)}",
             "signal_strength": "Neutral"
-        }
-    }
-    
-    # Fetch data or return a default empty state if ticker not in mock DB
-    insider_data = mock_form4_db.get(ticker.upper(), {
-        "ticker": ticker,
-        "error": "No recent insider transactions found.",
-        "signal_strength": "Neutral"
-    })
-    
-    return json.dumps(insider_data)
+        })
 
 
 import json
