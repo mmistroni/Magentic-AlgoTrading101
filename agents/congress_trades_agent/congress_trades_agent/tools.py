@@ -7,7 +7,7 @@ import yfinance as yf
 from google.cloud import bigquery
 from functools import lru_cache
 from datetime import date, datetime
-yf.set_tz_cache_false()
+#yf.set_tz_cache_false()
 # ==============================================================================
 # 1. EXPOSED TOOLS (With LLM-Optimized Docstrings)
 # ==============================================================================
