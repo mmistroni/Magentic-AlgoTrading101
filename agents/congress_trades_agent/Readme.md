@@ -209,3 +209,110 @@ Why: This is the end of your dataset. It allows you to see if the strategy held 
 
 
 ================= 20260706 - rev engineer congres strades
+Agents:
+
+congress_researcher = LlmAgent(
+    name="CongressResearcher",
+    model='gemini-2.5-flash',
+    instruction=RESEARCHER_INSTRUCTION,
+    tools=[
+        FunctionTool(fetch_congress_signals_tool)  this comes directly from big query
+executing this 
+WITH clean_data AS (
+        SELECT
+        AS_OF_DATE AS trade_date,
+        CASE
+            WHEN DISCLOSURE LIKE '%Purchase%' THEN 'Buy'
+            WHEN DISCLOSURE LIKE '%Sale%' THEN 'Sell'
+            ELSE 'Other'
+        END AS action,
+        TRIM(REPLACE(TICKER, 'Ticker:', '')) AS ticker
+        FROM `datascience-projects.gcp_shareloader.senate_disclosures`
+        WHERE
+        TICKER IS NOT NULL
+        AND AS_OF_DATE IS NOT NULL
+        AND AS_OF_DATE >= DATE_SUB(run_date, INTERVAL 90 DAY)
+        AND AS_OF_DATE <= run_date
+    )
+
+    SELECT
+        run_date AS signal_date,
+        ticker,
+        COUNTIF(action = 'Buy') AS purchase_count,
+        COUNTIF(action = 'Sell') AS sale_count,
+        (COUNTIF(action = 'Buy') - COUNTIF(action = 'Sell')) AS net_buy_activity,
+        
+        -- NEW METRIC: Count Distinct Days (The Spam Filter)
+        COUNT(DISTINCT CASE WHEN action='Buy' THEN trade_date END) as buying_days_count,
+        
+        MAX(trade_date) AS last_trade_date
+    FROM clean_data
+    WHERE
+        LOWER(ticker) NOT IN (
+        'vti', 'spy', 'voo', 'qqq', 'ivv', 'spxl', 'spxs',
+        'tqqq', 'sqqq', 'dia', 'iwm', 'dow', 'shv', 'bnd'
+        )
+        AND TRIM(ticker) != ''
+        AND ticker IS NOT NULL
+        
+        -- NEW FILTERS: Remove Mutual Funds (5 chars) and weird symbols
+        AND LENGTH(ticker) <= 4 
+        AND NOT REGEXP_CONTAINS(ticker, r'[^a-zA-Z]') 
+
+    GROUP BY ticker, run_date
+
+    HAVING
+        -- 1. Must be bought on at least 2 SEPARATE days (Kills 1-day spam)
+        buying_days_count >= 2
+        
+        -- 2. Net activity must still be positive
+        AND net_buy_activity >= 5
+        AND last_trade_date >= DATE_SUB(run_date, INTERVAL 90 DAY)
+        AND (
+        COUNTIF(action = 'Sell') = 0
+        OR
+        (COUNTIF(action = 'Buy') * 1.0 / GREATEST(COUNTIF(action = 'Sell'), 1)) >= 2.0
+        )
+
+    ORDER BY buying_days_count DESC, net_buy_activity DESC
+    LIMIT 10;
+    
+
+
+
+    ],
+    output_key="political_context" 
+)
+
+# ==========================================
+# AGENT 2: The Insider Analyst
+# ==========================================
+insider_analyst = LlmAgent(
+    name="CorporateInsiderAnalyst",
+    model='gemini-2.5-flash',
+    instruction=INSIDER_ANALYST_INSTRUCTION,
+    tools=[
+        FunctionTool(fetch_lobbying_signals_tool),  ---> this too comes form big query
+        
+        
+        
+        
+         # <-- Checks Lobbying on the tickers
+        FunctionTool(fetch_form4_signals_tool)    --> this will come from big query  but at the moment is mocked
+                      we need to replacce with real
+    ],
+    output_key="political_and_insider_context"
+)
+
+# ==========================================
+# AGENT 3: The Trader
+# ==========================================
+congress_trader = LlmAgent(
+    name="CongressTrader",
+    model='gemini-2.5-flash',
+    instruction=TRADER_INSTRUCTION,
+    tools=[
+        FunctionTool(check_fundamentals_tool),     # <-- Checks P/E, Debt, and makes final decision
+    ],
+    output_key="final_trade_plan"
+)
