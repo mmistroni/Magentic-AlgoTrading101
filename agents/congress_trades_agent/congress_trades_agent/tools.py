@@ -7,7 +7,10 @@ import yfinance as yf
 from google.cloud import bigquery
 from functools import lru_cache
 from datetime import date, datetime
-#yf.set_tz_cache_false()
+import yfinance as yf
+
+# Writable directory across both local containers and AWS/Cloud deployments
+yf.set_tz_cache_location("/tmp/py-yfinance")
 # ==============================================================================
 # 1. EXPOSED TOOLS (With LLM-Optimized Docstrings)
 # ==============================================================================
