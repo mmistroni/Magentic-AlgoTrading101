@@ -2,30 +2,18 @@ import json
 
 import json
 from google.cloud import bigquery
+from .schemas import Form4SignalResponse, FundamentalsResponse
 
-def fetch_form4_signals_tool(ticker: str, analysis_date: str) -> str:
+# 2. Refactor tool signature and return type
+def fetch_form4_signals_tool(ticker: str, analysis_date: str) -> Form4SignalResponse:
     """
-    Insider Alignment Validator: Retrieves recent Form 4 insider trading data (CEOs, Directors) for a specific ticker.
-    
-    Use this tool to check for 'The Triple Crown' (Congress + Corporate Lobbying + C-Suite Insiders all aligning).
-
-    Args:
-        ticker (str): The stock symbol (e.g., 'BE', 'MOH', 'NDAQ').
-        analysis_date (str): The reference date in 'YYYY-MM-DD' format.
-
-    Returns:
-        str: A JSON string containing insider transaction details:
-             - 'insider_title': Role of the insider (e.g., 'CEO', 'CFO', 'Director').
-             - 'transaction_type': 'Buy' or 'Sell'.
-             - 'shares': Number of shares transacted.
-             - 'transaction_date': When the filing/trade occurred.
-             - 'signal_strength': 'Strong Buy Confluence', 'Warning - Insider Dumping', or 'Neutral'.
+    Insider Alignment Validator: Retrieves recent Form 4 insider trading data for a specific ticker.
+    Checks `form4_master` table schema using boolean flags (is_officer, is_director) and officer_title.
     """
     print(f"🕵️ Fetching live Form 4 Insider trades for: {ticker} around {analysis_date}")
     
     client = bigquery.Client()
     
-    # Query BigQuery schema matching your dataset structure
     query = """
     SELECT 
         ticker,
@@ -35,16 +23,18 @@ def fetch_form4_signals_tool(ticker: str, analysis_date: str) -> str:
             IF(is_officer, 'Officer', NULL),
             'Insider'
         ) AS insider_title,
+        COALESCE(is_officer, FALSE) AS is_officer,
+        COALESCE(is_director, FALSE) AS is_director,
         UPPER(TRIM(transaction_side)) AS transaction_type,
         CAST(shares AS INT64) AS shares,
         CAST(filing_date AS STRING) AS transaction_date
     FROM 
-        `datascience-projects.gcp_shareloader.form4_disclosures`
+        `datascience-projects.gcp_shareloader.form4_master`
     WHERE 
         UPPER(TRIM(ticker)) = UPPER(@ticker)
         AND filing_date <= PARSE_DATE('%Y-%m-%d', @analysis_date)
         AND filing_date >= DATE_SUB(PARSE_DATE('%Y-%m-%d', @analysis_date), INTERVAL 90 DAY)
-        AND UPPER(TRIM(transaction_side)) IN ('BUY', 'SELL')
+        AND UPPER(TRIM(transaction_side)) IN ('BUY', 'SELL', 'P', 'S')
     ORDER BY 
         filing_date DESC, shares DESC
     LIMIT 1;
@@ -62,37 +52,56 @@ def fetch_form4_signals_tool(ticker: str, analysis_date: str) -> str:
         results = list(query_job.result())
         
         if not results:
-            return json.dumps({
-                "ticker": ticker.upper(),
-                "error": "No recent insider transactions found.",
-                "signal_strength": "Neutral"
-            })
+            return Form4SignalResponse(
+                ticker=ticker.upper(),
+                error="No recent insider transactions found.",
+                signal_strength="Neutral"
+            )
             
         row = dict(results[0].items())
         
-        # Determine signal strength dynamically
-        tx_type = str(row.get("transaction_type", "")).capitalize()
+        # Normalize transaction side ('P' or 'BUY' -> Buy, 'S' or 'SELL' -> Sell)
+        side_raw = str(row.get("transaction_type", "")).upper()
+        if side_raw in ["BUY", "P"]:
+            tx_type = "Buy"
+        elif side_raw in ["SELL", "S"]:
+            tx_type = "Sell"
+        else:
+            tx_type = side_raw.capitalize()
+
         title = str(row.get("insider_title", "")).upper()
+        is_officer = bool(row.get("is_officer", False))
+        is_director = bool(row.get("is_director", False))
         
-        if tx_type == "Buy" and any(role in title for role in ["CEO", "CFO", "DIRECTOR", "OFFICER"]):
+        # Robust executive role evaluation
+        EXEC_KEYWORDS = ["CEO", "CFO", "CHIEF", "EXECUTIVE", "PRESIDENT", "VP", "OFFICER", "DIRECTOR"]
+        is_key_executive = is_officer or is_director or any(kw in title for kw in EXEC_KEYWORDS)
+        
+        if tx_type == "Buy" and is_key_executive:
             signal = "Strong Buy Confluence"
-        elif tx_type == "Sell" and any(role in title for role in ["CEO", "CFO"]):
+        elif tx_type == "Sell" and is_key_executive:
             signal = "Warning - Insider Dumping"
         else:
             signal = "Neutral"
             
-        row["signal_strength"] = signal
-        row["transaction_type"] = tx_type
-        
-        return json.dumps(row)
+        return Form4SignalResponse(
+            ticker=ticker.upper(),
+            insider_title=row.get("insider_title", "Insider"),
+            transaction_type=tx_type,
+            shares=row.get("shares", 0),
+            transaction_date=str(row.get("transaction_date", "N/A")),
+            is_officer=is_officer,
+            is_director=is_director,
+            signal_strength=signal
+        )
 
     except Exception as e:
-        print(f"❌ Error querying Form 4 data: {e}")
-        return json.dumps({
-            "ticker": ticker.upper(),
-            "error": f"Failed to execute query: {str(e)}",
-            "signal_strength": "Neutral"
-        })
+        print(f"❌ Error querying form4_master: {e}")
+        return Form4SignalResponse(
+            ticker=ticker.upper(),
+            error=f"Failed to execute query: {str(e)}",
+            signal_strength="Neutral"
+        )
 
 
 import json

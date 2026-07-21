@@ -47,8 +47,11 @@ class Form4SignalResponse(BaseModel):
     transaction_type: Optional[str] = "None"
     shares: Optional[int] = 0
     transaction_date: Optional[str] = "N/A"
+    is_officer: bool = False
+    is_director: bool = False
     signal_strength: str = "Neutral"
     error: Optional[str] = None
+
 
 class FundamentalsResponse(BaseModel):
     ticker: str
