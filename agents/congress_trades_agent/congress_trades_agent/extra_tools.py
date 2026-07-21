@@ -1,5 +1,8 @@
 import json
-
+import os
+from typing import Optional
+from google.cloud import bigquery
+from congress_trades_agent.schemas import LobbyingSignalResponse
 import json
 from google.cloud import bigquery
 from .schemas import Form4SignalResponse, FundamentalsResponse
@@ -104,77 +107,77 @@ def fetch_form4_signals_tool(ticker: str, analysis_date: str) -> Form4SignalResp
         )
 
 
-import json
-from google.cloud import bigquery
-import os
+# congress_trades_agent/extra_tools.py
 
-def fetch_lobbying_signals_tool(ticker: str):
+def fetch_lobbying_signals_tool(ticker: str, analysis_date: Optional[str] = None) -> LobbyingSignalResponse:
     """
     Political Context Validator: Retrieves recent corporate lobbying activity for a specific ticker.
-    
-    Use this tool to find out if a company is actively spending money in Washington D.C., 
-    how much they are spending, and what specific issues they are lobbying for.
+    Returns a validated LobbyingSignalResponse Pydantic object.
 
     Args:
         ticker (str): The stock symbol (e.g., 'NVDA', 'LMT').
-
-    Returns:
-        str: A JSON string containing:
-             - 'total_recent_spend': Sum of lobbying amounts.
-             - 'recent_filing_dates': Dates of the lobbying reports.
-             - 'lobbied_issues': A list of text describing what they lobbied for.
+        analysis_date (Optional[str]): Reference date in 'YYYY-MM-DD' format. Defaults to current date if None.
     """
-    print(f"🏛️ Fetching corporate lobbying data for: {ticker}")
+    clean_ticker = ticker.strip().upper()
+    print(f"🏛️ Fetching corporate lobbying data for: {clean_ticker}")
     
     try:
-        # Initialize BigQuery Client
         project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "datascience-projects")
         client = bigquery.Client(project=project_id)
         
-        # Query to get the last 12 months of lobbying for this ticker
-        query = f"""
+        # SQL with parameterized analysis date logic
+        query = """
             SELECT 
                 ticker,
                 client_name,
                 SUM(amount) as total_spend,
                 MAX(filing_date) as latest_filing,
-                STRING_AGG(DISTINCT general_issues LIMIT 5) as top_issues,
+                STRING_AGG(DISTINCT general_issues, ' | ') as raw_issues,
                 COUNT(*) as number_of_filings
             FROM `datascience-projects.gcp_shareloader.lobbying_signals`
-            WHERE ticker = @ticker
-              -- Look at the last 365 days of available data
-              AND filing_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
+            WHERE UPPER(TRIM(ticker)) = UPPER(@ticker)
+              AND filing_date <= IFNULL(PARSE_DATE('%Y-%m-%d', @analysis_date), CURRENT_DATE())
+              AND filing_date >= DATE_SUB(IFNULL(PARSE_DATE('%Y-%m-%d', @analysis_date), CURRENT_DATE()), INTERVAL 365 DAY)
             GROUP BY ticker, client_name
+            LIMIT 1;
         """
         
-        # Use query parameters for safety
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("ticker", "STRING", ticker.upper())
+                bigquery.ScalarQueryParameter("ticker", "STRING", clean_ticker),
+                bigquery.ScalarQueryParameter("analysis_date", "STRING", analysis_date),
             ]
         )
         
-        results = client.query(query, job_config=job_config).result()
+        query_job = client.query(query, job_config=job_config)
+        records = list(query_job.result())
         
-        # Parse the result
-        records = list(results)
         if not records:
-            return json.dumps({
-                "ticker": ticker, 
-                "lobbying_status": "No recent lobbying activity found."
-            })
+            return LobbyingSignalResponse(
+                ticker=clean_ticker,
+                lobbying_status="No recent lobbying activity found."
+            )
             
-        row = records[0]
-        lobbying_data = {
-            "ticker": row.ticker,
-            "company_name": row.client_name,
-            "total_spend_last_12m": float(row.total_spend) if row.total_spend else 0,
-            "latest_filing_date": str(row.latest_filing),
-            "number_of_filings": row.number_of_filings,
-            "top_lobbied_issues": row.top_issues
-        }
+        row = dict(records[0].items())
         
-        return json.dumps(lobbying_data)
+        # Parse aggregated issues into a clean Python list
+        raw_issues = row.get("raw_issues") or ""
+        issues_list = [issue.strip() for issue in raw_issues.split(" | ") if issue.strip()]
+        
+        return LobbyingSignalResponse(
+            ticker=clean_ticker,
+            company_name=row.get("client_name", "N/A"),
+            total_spend_last_12m=float(row.get("total_spend") or 0.0),
+            latest_filing_date=str(row.get("latest_filing", "N/A")),
+            number_of_filings=int(row.get("number_of_filings") or 0),
+            top_lobbied_issues=issues_list,
+            lobbying_status="Active Lobbying Detected"
+        )
 
     except Exception as e:
-        return json.dumps({"ticker": ticker, "error": f"Database error: {str(e)}"})
+        print(f"❌ Error fetching lobbying signals: {e}")
+        return LobbyingSignalResponse(
+            ticker=clean_ticker,
+            lobbying_status="Error",
+            error=f"Database error: {str(e)}"
+        )

@@ -52,6 +52,17 @@ class Form4SignalResponse(BaseModel):
     signal_strength: str = "Neutral"
     error: Optional[str] = None
 
+# congress_trades_agent/schemas.py
+class LobbyingSignalResponse(BaseModel):
+    ticker: str
+    company_name: Optional[str] = "N/A"
+    total_spend_last_12m: float = 0.0
+    latest_filing_date: Optional[str] = "N/A"
+    number_of_filings: int = 0
+    top_lobbied_issues: List[str] = Field(default_factory=list)
+    lobbying_status: str = "Active"
+    error: Optional[str] = None
+
 
 class FundamentalsResponse(BaseModel):
     ticker: str
