@@ -1,6 +1,7 @@
 # state_schema.py
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+from typing import Literal
 
 class CandidateTicker(BaseModel):
     ticker: str
@@ -90,3 +91,14 @@ class FundamentalsResponse(BaseModel):
     debt_to_equity: Optional[float] = None
     dividend_yield: float = 0.0
     error: Optional[str] = None
+
+class TradeRecommendation(BaseModel):
+    ticker: str = Field(description="Stock ticker symbol")
+    action: Literal["STRONG BUY", "BUY", "HOLD", "PASS"] = Field(
+        description="Recommended action based on macro regime and confluence filters."
+    )
+    confidence: int = Field(ge=1, le=10, description="Confidence rating from 1 to 10")
+    risk_rating: Literal["Low", "Medium", "High"] = Field(description="Risk assessment level")
+    reason: str = Field(
+        description="Reasoning in format: 'Thesis: [Macro/Lobbying]. Fundamentals: [Cite P/E & Debt]. Verdict: [Buy/Hold/Pass].'"
+    )
