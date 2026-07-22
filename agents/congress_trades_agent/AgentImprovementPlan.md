@@ -46,3 +46,19 @@ congress_trades_agent/
     ├── pipeline_runner.py          # Programmatic ADK InMemoryRunner wrapper
     ├── bigquery_client.py          # BigQuery persistence helper
     └── market_data.py
+
+
+
+[STEP 1: Refactor to Skills Framework Layout]
+                        │
+                        ▼
+  [STEP 2: Build Pipeline Runner (pipeline_runner.py)]
+                        │
+                        ▼
+  [STEP 3: Setup BigQuery Schema & Persistence Client]
+                        │
+                        ▼
+  [STEP 4: Implement Pytest Suite & Programmatic Evals]
+                        │
+                        ▼
+  [STEP 5: Deploy to Cloud Run + Cloud Scheduler]
