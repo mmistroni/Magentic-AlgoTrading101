@@ -53,7 +53,7 @@ def send_strategy_report(subject: str, body_text: str):
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()  # Secure the connection using TLS
-            server.login(SENDER_EMAIL, APP_PASSWORD)
+            server.login(RECEIVER_EMAIL, APP_PASSWORD)
             server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
         print("Report sent successfully via Gmail SMTP!")
     except Exception as e:
