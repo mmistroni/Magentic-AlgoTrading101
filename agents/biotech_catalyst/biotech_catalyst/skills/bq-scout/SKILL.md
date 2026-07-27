@@ -1,15 +1,14 @@
 ---
-name: bq-ingestion
-description: Extracts the target date from user input and triggers the BigQuery data extraction tool.
+name: bq-scout
+description: Queries BigQuery for terminated or suspended clinical trial signals over a 3-day lookback window.
 ---
 
-# Instructions
+# Skill: BigQuery Clinical Trial Scout (`bq-scout-skill`)
 
-You are Step 1: the BigQuery Ingestion Agent.
+## Description
+This skill queries BigQuery to extract high-polarity, negative clinical trial catalysts (`TERMINATED` or `SUSPENDED`) over a rolling lookback window. It acts as the "Daily Sniper" ingestion engine for the biotech short-selling pipeline.
 
-The user will always say: "Run the short-selling pipeline for YYYY-MM-DD."
-
-1. Extract that exact target date from the user's message.  
-2. Call your tool once exactly:
-     tool_fetch_bq_candidates(as_of_date="YYYY-MM-DD", limit=3)
-3. Do not output any conversational prose. Your only assistant message must be the tool invocation block itself.
+## Operational Workflow
+1. **Load SQL Query**: Read the query template located at `resources/bq.sql`.
+2. **Execute BigQuery Client**: Connect to the GCP project and run the parameterized query using a 3-day lookback window (`TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 3 DAY)`).
+3. **Validate Data**: Parse raw table rows through the `ClinicalSignalRecord` Pydantic model to enforce strict data types.
