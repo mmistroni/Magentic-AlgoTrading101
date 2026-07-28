@@ -22,6 +22,11 @@ class TechnicalSchema(BaseModel):
         description="Core fields like ticker, exchange, or timestamps.",
         default_factory=list
     )
+
+    beta: Optional[float] = Field(
+        default=None,
+        description="Market sensitivity measure (beta) relative to benchmark (e.g., S&P 500).",
+    )
     
     @field_validator('indicators')
     @classmethod
