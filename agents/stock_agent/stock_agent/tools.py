@@ -34,37 +34,42 @@ def discover_technical_schema_tool():
     return _get_table_schema()
     
 
-def fetch_technical_snapshot_tool(target_date: str = "today"):
+from datetime import date, timedelta
+from google.cloud import bigquery
+
+def fetch_technical_snapshot_tool(target_date: str = "today") -> str:
     """
     Queries BigQuery for technical data for a specific day.
     Args:
         target_date: The date to query. Can be 'today', 'yesterday', or a date string 'YYYY-MM-DD'.
     """
     client = bigquery.Client()
+    project = 'datascience-projects'
     dataset_id = 'gcp_shareloader'
     table_id = 'finviz-premarket'
-    table_ref = f"{client.project}.{dataset_id}.{table_id}"
+    table_ref = f"{project}.{dataset_id}.{table_id}"
     
     print(f'Query tool: querying for {target_date}')
 
+    # 1. Resolve target_date to a datetime.date object or formatted string
+    if target_date.lower() == "today":
+        resolved_date = date.today().strftime("%Y-%m-%d")
+    elif target_date.lower() == "yesterday":
+        resolved_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        resolved_date = target_date.strip()
 
-    # Handle relative date logic
-    query_date = date.today()
-    if target_date.lower() == "yesterday":
-        query_date = date.today() - timedelta(days=1)
-    elif target_date.lower() != "today":
-        # Attempt to parse specific date if provided
-        query_date = target_date 
-
+    # 2. Query BigQuery safely with DATE casting
+    # NOTE: Removed 'price is not null' because price is NULL in premarket datasets!
     query = f"""
         SELECT * FROM `{table_ref}`
-        WHERE cob = @query_date and price is not null
+        WHERE (DATE(cob) = DATE(@query_date) OR CAST(cob AS STRING) = @query_date)
+          AND (open IS NOT NULL OR previousClose IS NOT NULL OR price IS NOT NULL)
     """
     
-    # Using query parameters for security and cleaner syntax
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("query_date", "DATE", query_date)
+            bigquery.ScalarQueryParameter("query_date", "STRING", resolved_date)
         ]
     )
     
@@ -72,6 +77,6 @@ def fetch_technical_snapshot_tool(target_date: str = "today"):
     df = query_job.to_dataframe()
     
     if df.empty:
-        return f"No data found for {query_date}."
+        return f"No data found for {resolved_date}."
     
     return df.to_json(orient="records")

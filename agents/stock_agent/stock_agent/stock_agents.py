@@ -24,17 +24,21 @@ SCHEMA_DISCOVERY_AGENT = LlmAgent(
 )
 
 # Format the discovered indicators into a structured TechnicalSchema
+# Format the discovered indicators into a structured TechnicalSchema
 SCHEMA_FORMATTER_AGENT = LlmAgent(
     name="SchemaFormatter",
     model="gemini-2.5-flash",
     instruction="""
-    Convert the raw columns into a TechnicalSchema JSON matching these exact fields:
-    - `metadata`: Core fields like ticker, symbol, exchange, cob, or date.
-    - `indicators`: Technical indicators like RSI, ADX, SMA, slope, choppiness.
-    - `volume_metrics`: Fields related to volume like current_obv, prev_obv, CMF.
-    - `beta`: Extract the numeric value or column name for beta if present, otherwise set to null.
+    SYSTEM ROLE: Technical Schema Classifier.
+    TASK: You are given a raw list of column names and data types from BigQuery.
+    
+    Categorize EVERY column into one of these fields:
+    - `metadata`: Identification and date columns (e.g., ticker, symbol, exchange, cob, asodate, country, selection, highlight, marketCap, price, open, previousClose, change).
+    - `indicators`: Oscillators, moving averages, and technical indicators (e.g., ADX, RSI, SMA20, SMA50, SMA200, slope, choppiness, spx_choppyness, ewo, demarker, fib_161, trend_velocity_gap).
+    - `volume_metrics`: Volume-related columns (e.g., current_obv, previous_obv, last_cmf, previous_cmf, obv_last_20_days, cmf_last_20_days).
+    - `beta`: If the column name 'beta' is present in the raw column list, set beta equal to the string "beta". Otherwise set to null.
 
-    OUTPUT ONLY VALID JSON. NO PREAMBLE. NO EXPLANATION.
+    CRITICAL: DO NOT omit any technical indicator columns. Return valid JSON only.
     """,
     output_schema=TechnicalSchema,
     output_key="available_schema",
@@ -96,12 +100,32 @@ For every symbol evaluated, provide:
 * **Technical Justification**: Explicitly cite which indicators from the schema drove the decision. Mention if any data was missing (N/A) and how you compensated.
 """
 
+# Agent 2A: Collects data via tools and performs quantitative reasoning (Tools only)
 QUANT_ANALYZER = LlmAgent(
     name="QuantAnalyzer",
     model="gemini-2.5-flash",
     instruction=AUTONOMOUS_QUANT_INSTRUCTION,
     tools=[FunctionTool(fetch_technical_snapshot_tool)],
-    output_schema=TrendSignal,  # Enforces Pydantic contract from models.py
+    output_key="quant_analysis_raw",
+)
+
+# Agent 2B: Formats raw quant output into strict TrendSignal JSON contract (Schema only)
+SIGNAL_FORMATTER_AGENT = LlmAgent(
+    name="SignalFormatter",
+    model="gemini-2.5-flash",
+    instruction="""
+    Convert the technical quantitative analysis provided in `quant_analysis_raw` into a valid TrendSignal JSON.
+    Ensure all required fields are present:
+    - ticker
+    - signal (BUY, SELL, or HOLD)
+    - confidence_score (float between 0.0 and 1.0)
+    - technical_indicators (list of indicators used)
+    - fundamental_metrics (list of metrics used, or empty list if none)
+    - reasoning (clear explanation of the trade signal)
+
+    OUTPUT ONLY VALID JSON. NO PREAMBLE. NO EXPLANATION.
+    """,
+    output_schema=TrendSignal,  # Valid: tools=[]
     output_key="final_trade_signal",
 )
 
@@ -113,7 +137,8 @@ QUANT_ANALYZER = LlmAgent(
 TREND_PIPELINE = SequentialAgent(
     name="TrendStrategist",
     sub_agents=[
-        SCHEMA_UNIT,  # Step 1: Discover BigQuery columns & format into TechnicalSchema
-        QUANT_ANALYZER,  # Step 2: Fetch snapshot data & execute trade signal evaluation
+        SCHEMA_UNIT,             # Step 1: Discover BigQuery columns & format into TechnicalSchema
+        QUANT_ANALYZER,          # Step 2: Fetch snapshot data & generate quantitative analysis
+        SIGNAL_FORMATTER_AGENT,  # Step 3: Format final response into TrendSignal JSON
     ],
 )
