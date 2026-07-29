@@ -1,59 +1,56 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+# Exit immediately if a command exits with a non-zero status
 set -e
 
-# --- Configuration Variables ---
-PROJECT_ID="datascience-projects"
-REGION="us-central1"
-REPOSITORY="cloud-run-source-deploy"
-IMAGE_NAME="stock-agent-job"
+# --- Configuration ---
 JOB_NAME="stock-agent-daily-job"
-SERVICE_ACCOUNT="stock-agent-job-sa@${PROJECT_ID}.iam.gserviceaccount.com" # Adjust if using default
+REGION="us-central1"
+AGENT_SERVICE_URL="https://stock-agent-service-682143946483.us-central1.run.app"
 
-FULL_IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:latest"
+# Get current directory name
+CURRENT_DIR=$(basename "$PWD")
 
-echo "=========================================================="
-echo "🚀 Building & Deploying Cloud Run Job: ${JOB_NAME}"
-echo "=========================================================="
+# 1. Verification Check: Ensure the user is executing this inside the client_job directory
+if [ "$CURRENT_DIR" != "client_job" ]; then
+    echo "❌ ERROR: Please run this script from inside the 'client_job' directory."
+    echo "👉 Run: cd client_job && ./deploy.sh"
+    exit 1
+fi
 
-# 1. Ensure Artifact Registry repository exists
-gcloud artifacts repositories describe ${REPOSITORY} \
-    --location=${REGION} \
-    --project=${PROJECT_ID} &>/dev/null || \
-gcloud artifacts repositories create ${REPOSITORY} \
-    --repository-format=docker \
-    --location=${REGION} \
-    --project=${PROJECT_ID} \
-    --description="Docker repository for Cloud Run Jobs and Services"
+# 2. Pre-flight Check: Ensure EMAIL_PASSWORD is set locally
+if [ -z "${EMAIL_PASSWORD}" ]; then
+  echo "🚨 ERROR: EMAIL_PASSWORD environment variable is not set in your local shell!"
+  echo "👉 Run: export EMAIL_PASSWORD='your_app_password' before executing this script."
+  exit 1
+fi
 
-# 2. Build and push container image using Cloud Build
-echo "📦 Building container image via GCP Cloud Build..."
-gcloud builds submit . \
-    --tag="${FULL_IMAGE_URI}" \
-    --project="${PROJECT_ID}"
+echo "🚀 Starting automated source deployment for Cloud Run Job: ${JOB_NAME}..."
 
-# 3. Create or Update the Cloud Run Job
-echo "⚡ Deploying Cloud Run Job..."
-gcloud run jobs deploy ${JOB_NAME} \
-    --image="${FULL_IMAGE_URI}" \
+# 3. Extract active GCP Project ID from the local gcloud CLI config
+GCP_PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+
+if [ -z "$GCP_PROJECT_ID" ]; then
+    echo "❌ ERROR: No active Google Cloud Project detected in gcloud CLI."
+    echo "👉 Please run: gcloud config set project YOUR_PROJECT_ID"
+    exit 1
+fi
+
+echo "📡 Target Project ID: ${GCP_PROJECT_ID}"
+echo "📡 Target Region:     ${REGION}"
+echo "📡 Agent Target URL:  ${AGENT_SERVICE_URL}"
+echo "🔨 Submitting source to Google Cloud Build and deploying job..."
+
+# 4. Execute single source-deploy command
+gcloud run jobs deploy "${JOB_NAME}" \
+    --source . \
     --region="${REGION}" \
-    --project="${PROJECT_ID}" \
-    --set-env-vars="AGENT_SERVICE_URL=https://stock-agent-service-682143946483.us-central1.run.app,GCP_PROJECT=${PROJECT_ID}" \
+    --set-env-vars="AGENT_SERVICE_URL=${AGENT_SERVICE_URL},GCP_PROJECT=${GCP_PROJECT_ID},EMAIL_PASSWORD=${EMAIL_PASSWORD}" \
     --max-retries=1 \
-    --task-timeout=10m \
-    --memory=512Mi \
-    --cpu=1
+    --task-timeout=600s
 
-echo "✅ Cloud Run Job '${JOB_NAME}' deployed successfully!"
-
-# 4. Optional Execution Command
-echo ""
-echo "To execute the job manually, run:"
-echo "  gcloud run jobs execute ${JOB_NAME} --region=${REGION} --project=${PROJECT_ID}"
-echo ""
-echo "To attach a daily Cloud Scheduler cron trigger (e.g., 08:30 AM UTC mon-fri):"
-echo "  gcloud scheduler jobs create http ${JOB_NAME}-trigger \\"
-echo "    --location=${REGION} \\"
-echo "    --schedule='30 8 * * 1-5' \\"
-echo "    --uri='https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/${JOB_NAME}:run' \\"
-echo "    --http-method=POST \\"
-echo "    --oauth-service-account-email='YOUR_SERVICE_ACCOUNT_EMAIL'"
+echo "====================================================================="
+echo "🎉 SUCCESS: Job '${JOB_NAME}' has been compiled, built, and deployed!"
+echo "👉 You can run a manual test in the cloud using:"
+echo "   gcloud run jobs execute ${JOB_NAME} --region=${REGION}"
+echo "====================================================================="
