@@ -90,6 +90,7 @@ async def main():
     # ==========================================
     print(f"🚀 Executing TREND_PIPELINE for target date: '{args.target_date}'...\n")
 
+
     # Use run_async within the event loop
     response_stream = runner.run_async(
         user_id=user_id,
