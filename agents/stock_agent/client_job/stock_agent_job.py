@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta
 import httpx 
 import sys
 import smtplib
@@ -10,24 +10,24 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from google.cloud import bigquery
 
-# --- Configuration (Stock Agent) ---
+# --- Configuration (Stock Agent & BigQuery Target) ---
 APP_URL = os.environ.get("AGENT_SERVICE_URL", "https://stock-agent-service-682143946483.us-central1.run.app")
 USER_ID = "automated_cron_job"
 SESSION_ID = f"session_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}" 
 APP_NAME = "stock_agent"
 
-# BigQuery Destination Schema Configuration
+# Reusing the existing Short-Selling Agent destination table
 PROJECT_ID = os.environ.get("GCP_PROJECT", "datascience-projects")
-DATASET_ID = "gcp_shareloader"
-TABLE_ID = "stock_agent_recommendations"
+DATASET_ID = "finviz_blacklist"
+TABLE_ID = "daily_recommendations"
 TABLE_REF = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
 
 
-# --- EMAIL NOTIFICATION LAYER (GMAIL SMTP ONLY) ---
+# --- EMAIL NOTIFICATION LAYER (GMAIL SMTP) ---
 
 def send_strategy_report(subject: str, html_body: str):
     """
-    Synchronous worker that dispatches an HTML report directly via Gmail SMTP using APP_PASSWORD.
+    Synchronous worker that dispatches an HTML report directly via Gmail SMTP using EMAIL_PASSWORD.
     """
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
@@ -44,7 +44,6 @@ def send_strategy_report(subject: str, html_body: str):
     msg['To'] = RECEIVER_EMAIL
     msg['Subject'] = subject
 
-    # Attach HTML payload
     msg.attach(MIMEText(html_body, 'html'))
 
     try:
@@ -58,17 +57,16 @@ def send_strategy_report(subject: str, html_body: str):
         print(f"❌ [EMAIL] Failed to send email via SMTP: {e}")
 
 
-def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]]):
+def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]], target_date_str: str):
     """Constructs a responsive HTML summary dashboard and triggers Gmail SMTP dispatch."""
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
     print('============= GENERATING OPERATIONAL SUMMARY EMAIL =============')
 
     if not rows_inserted:
-        subject_str = f"Stock Agent Operations Report - {today_str} [EMPTY]"
+        subject_str = f"Stock Agent Operations Report - {target_date_str} [EMPTY]"
         display_content = """
         <div style="padding: 15px; background-color: #fdfefe; border: 1px solid #e2e8f0; border-left: 4px solid #94a3b8; border-radius: 4px;">
             <p style="margin: 0; font-size: 14px; color: #334155; font-weight: bold;">
-                No trade candidates or signals were generated for today's market snapshot.
+                No trade candidates or signals were generated for this market snapshot date.
             </p>
             <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">
                 The execution pipeline finalized checks successfully with zero output records.
@@ -76,27 +74,27 @@ def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]]):
         </div>
         """
     else:
-        subject_str = f"Stock Agent Operations Report - {today_str} | {len(rows_inserted)} Signals"
+        subject_str = f"Stock Agent Operations Report - {target_date_str} | {len(rows_inserted)} Signals"
         table_rows = ""
         for r in rows_inserted:
-            signal = str(r.get("signal", r.get("action", "HOLD"))).upper()
+            action = str(r.get("action", "HOLD")).upper()
             
-            if signal == "BUY":
+            if action in ["BUY", "LONG"]:
                 bg_color = "#e6f7e9"
                 text_color = "#1e5a2c"
-            elif signal == "SELL":
+            elif action in ["SELL", "SHORT"]:
                 bg_color = "#ffe6eb"
                 text_color = "#cc0033"
             else:  # HOLD / AVOID
                 bg_color = "#f8f9fa"
                 text_color = "#495057"
 
-            score = r.get("confidence_score", r.get("conviction_score", 0.0))
+            score = r.get("conviction_score", 0)
 
             table_rows += f"""
             <tr style="background-color: {bg_color}; color: {text_color}; font-size: 13px;">
                 <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{r.get('ticker', 'N/A')}</td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{signal}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{action}</td>
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{score}</td>
                 <td style="padding: 10px; border: 1px solid #ddd; line-height: 1.4;">{r.get('reasoning', 'N/A')}</td>
             </tr>
@@ -107,8 +105,8 @@ def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]]):
             <thead>
                 <tr style="background-color: #1a365d; color: white; text-align: left;">
                     <th style="padding: 12px; border: 1px solid #ddd;">Ticker</th>
-                    <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Signal</th>
-                    <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Confidence Score</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Action</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Conviction Score</th>
                     <th style="padding: 12px; border: 1px solid #ddd;">Analytical Reasoning</th>
                 </tr>
             </thead>
@@ -124,7 +122,7 @@ def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]]):
         <h2 style="color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 10px; font-size: 20px;">
             Stock Agent Pipeline Execution Summary
         </h2>
-        <p style="font-size: 13px; margin: 4px 0;"><strong>Execution Date:</strong> {today_str}</p>
+        <p style="font-size: 13px; margin: 4px 0;"><strong>Snapshot Target Date:</strong> {target_date_str}</p>
         <p style="font-size: 13px; margin: 4px 0;"><strong>Session ID:</strong> <code>{SESSION_ID}</code></p>
         <br>
         {display_content}
@@ -139,7 +137,7 @@ def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]]):
     send_strategy_report(subject_str, html_content)
 
 
-# --- Authentication Function (ASYNC) ---
+# --- AUTHENTICATION LAYER (ASYNC) ---
 
 async def get_auth_token() -> str:
     """Retrieves an OIDC Identity Token for authenticating against Cloud Run."""
@@ -175,7 +173,7 @@ async def get_auth_token() -> str:
         raise RuntimeError("gcloud command not found. Please ensure Google Cloud CLI is installed.")
 
 
-# --- API Interaction Functions (ASYNC) ---
+# --- API INTERACTION LAYER (ASYNC) ---
 
 async def make_request(client: httpx.AsyncClient, method: str, endpoint: str, data: Dict[str, Any] = None) -> httpx.Response:
     """Helper function for authenticated asynchronous requests using httpx."""
@@ -247,18 +245,18 @@ async def run_agent_request(client: httpx.AsyncClient, session_id: str, message:
     return final_text
 
 
-# --- Main Logic (ASYNC) ---
+# --- MAIN PIPELINE EXECUTION ---
 
-async def amain(message_to_send: str):
+async def amain(message_to_send: str, target_date_str: str):
     """Main execution orchestrator."""
-    print(f"\n🤖 Starting Single-Run Stock Job | Session: **{SESSION_ID}**")
+    print(f"\n🤖 Starting Single-Run Stock Job | Session: **{SESSION_ID}** | Snapshot Date: **{target_date_str}**")
     
     session_data = {"state": {}}
     current_session_endpoint = f"/apps/{APP_NAME}/users/{USER_ID}/sessions/{SESSION_ID}"
     
     async with httpx.AsyncClient(timeout=600.0) as client:
         
-        # 1. Create Session Context
+        # 1. Initialize Session Context
         try:
             await make_request(client, "POST", current_session_endpoint, data=session_data)
             print(f"✅ Session state re-initialized successfully.")
@@ -279,7 +277,7 @@ async def amain(message_to_send: str):
             loop = asyncio.get_running_loop()
             clean_text = agent_text.strip()
             
-            # Clean markdown formatting if present
+            # Remove Markdown code blocks if present
             if clean_text.startswith("```"):
                 lines = clean_text.splitlines()
                 if lines[0].startswith("```"):
@@ -298,16 +296,20 @@ async def amain(message_to_send: str):
                 else:
                     raw_rows = parsed_json if isinstance(parsed_json, list) else [parsed_json]
                 
-                today_str = datetime.utcnow().strftime('%Y-%m-%d')
                 timestamp_now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
 
                 for index, row in enumerate(raw_rows):
                     ticker_upper = str(row.get("ticker", "UNKNOWN")).upper()
+                    
+                    # Map signals to match finviz_blacklist.daily_recommendations schema
+                    action_val = str(row.get("signal", row.get("action", "HOLD"))).upper()
+                    raw_score = row.get("confidence_score", row.get("conviction_score", 3))
+                    
                     compiled_row = {
-                        "evaluation_date": today_str,
+                        "evaluation_date": target_date_str,
                         "ticker": ticker_upper,
-                        "signal": str(row.get("signal", row.get("action", "HOLD"))).upper(),
-                        "confidence_score": float(row.get("confidence_score", row.get("conviction_score", 0.0))),
+                        "conviction_score": int(float(raw_score)),
+                        "action": action_val,
                         "reasoning": row.get("reasoning", "No detailed reasoning provided."),
                         "inserted_at": timestamp_now
                     }
@@ -332,9 +334,9 @@ async def amain(message_to_send: str):
 
             # 4. Dispatch Email Report via Gmail SMTP
             print("📧 [ORCHESTRATOR] Dispatching email report...")
-            await loop.run_in_executor(None, build_summary_email_and_send, rows_to_insert)
+            await loop.run_in_executor(None, build_summary_email_and_send, rows_to_insert, target_date_str)
 
-        # 5. Cleanup Session
+        # 5. Cleanup Session Context
         await asyncio.sleep(1) 
         print(f"\n🗑️ Deleting active session context: {SESSION_ID}")
         try:
@@ -349,10 +351,13 @@ if __name__ == "__main__":
         print("🚨 ERROR: Python 3.9+ required.")
         sys.exit(1)
         
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
-    QUERY = f"Execute full schema discovery and quantitative trend analysis for market snapshot date: {today_str}."
+    # --- Calculate PREVIOUS DAY (Yesterday) ---
+    yesterday = datetime.utcnow() - timedelta(days=1)
+    target_date_str = yesterday.strftime('%Y-%m-%d')
+    
+    QUERY = f"Execute full schema discovery and quantitative trend analysis for market snapshot date: {target_date_str}."
     
     try:
-        asyncio.run(amain(QUERY))
+        asyncio.run(amain(QUERY, target_date_str))
     except Exception as e:
         print(f"FATAL SYSTEM FAILURE: {e}")
