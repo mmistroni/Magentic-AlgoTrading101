@@ -50,11 +50,11 @@ def send_strategy_report(subject: str, html_body: str):
         print(f"📤 [EMAIL] Transmitting report to {RECEIVER_EMAIL} via Gmail SMTP...")
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
-            server.login(SENDER_EMAIL, APP_PASSWORD)
+            server.login(RECEIVER_EMAIL, APP_PASSWORD)
             server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
         print("📨 [EMAIL] Report sent successfully via Gmail SMTP!")
     except Exception as e:
-        print(f"❌ [EMAIL] Failed to send email via SMTP: {e}")
+        print(f"❌ [EMAIL] Fail. FAiled again.Failed to send email via SMTP: {e} for {RECEIVER_EMAIL}/{APP_PASSWORD}")
 
 
 def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]], target_date_str: str):

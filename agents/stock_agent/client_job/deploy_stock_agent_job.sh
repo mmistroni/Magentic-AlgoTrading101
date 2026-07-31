@@ -41,13 +41,17 @@ echo "📡 Target Region:     ${REGION}"
 echo "📡 Agent Target URL:  ${AGENT_SERVICE_URL}"
 echo "🔨 Submitting source to Google Cloud Build and deploying job..."
 
-# 4. Execute single source-deploy command
+# 4. Execute single source-deploy command with cache-busting build arg
+BUILD_TIMESTAMP=$(date +%s)
+
 gcloud run jobs deploy "${JOB_NAME}" \
     --source . \
     --region="${REGION}" \
+    --set-build-env-vars="BUILD_DATE=${BUILD_TIMESTAMP}" \
     --set-env-vars="AGENT_SERVICE_URL=${AGENT_SERVICE_URL},GCP_PROJECT=${GCP_PROJECT_ID},EMAIL_PASSWORD=${EMAIL_PASSWORD}" \
     --max-retries=1 \
     --task-timeout=600s
+
 
 echo "====================================================================="
 echo "🎉 SUCCESS: Job '${JOB_NAME}' has been compiled, built, and deployed!"
