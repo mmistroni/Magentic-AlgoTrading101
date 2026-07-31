@@ -11,10 +11,10 @@ AGENT_SERVICE_URL="https://stock-agent-service-682143946483.us-central1.run.app"
 # Get current directory name
 CURRENT_DIR=$(basename "$PWD")
 
-# 1. Verification Check: Ensure the user is executing this inside the client_job directory
+# 1. Verification Check: Ensure execution occurs inside client_job directory
 if [ "$CURRENT_DIR" != "client_job" ]; then
     echo "❌ ERROR: Please run this script from inside the 'client_job' directory."
-    echo "👉 Run: cd client_job && ./deploy.sh"
+    echo "👉 Run: cd client_job && ./deploy_stock_agent_job.sh"
     exit 1
 fi
 
@@ -27,7 +27,7 @@ fi
 
 echo "🚀 Starting automated source deployment for Cloud Run Job: ${JOB_NAME}..."
 
-# 3. Extract active GCP Project ID from the local gcloud CLI config
+# 3. Extract active GCP Project ID from local gcloud CLI config
 GCP_PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
 
 if [ -z "$GCP_PROJECT_ID" ]; then
@@ -41,17 +41,13 @@ echo "📡 Target Region:     ${REGION}"
 echo "📡 Agent Target URL:  ${AGENT_SERVICE_URL}"
 echo "🔨 Submitting source to Google Cloud Build and deploying job..."
 
-# 4. Execute single source-deploy command with cache-busting build arg
-BUILD_TIMESTAMP=$(date +%s)
-
+# 4. Execute single source-deploy command
 gcloud run jobs deploy "${JOB_NAME}" \
     --source . \
     --region="${REGION}" \
-    --set-build-env-vars="BUILD_DATE=${BUILD_TIMESTAMP}" \
     --set-env-vars="AGENT_SERVICE_URL=${AGENT_SERVICE_URL},GCP_PROJECT=${GCP_PROJECT_ID},EMAIL_PASSWORD=${EMAIL_PASSWORD}" \
     --max-retries=1 \
     --task-timeout=600s
-
 
 echo "====================================================================="
 echo "🎉 SUCCESS: Job '${JOB_NAME}' has been compiled, built, and deployed!"

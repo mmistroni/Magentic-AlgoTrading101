@@ -12,11 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- CACHE BUSTER ---
-ARG BUILD_DATE=unknown
-ENV BUILD_DATE=${BUILD_DATE}
+# --- FORCE CACHE INVALIDATION ---
+# Updating this string guarantees Docker rebuilds from here down
+ENV CODE_VERSION="v1.0.1"
 
-# Copy job script
 COPY stock_agent_job.py .
 
 RUN useradd -m appuser && chown -R appuser:appuser /app

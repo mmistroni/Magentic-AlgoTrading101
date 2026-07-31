@@ -31,30 +31,29 @@ def send_strategy_report(subject: str, html_body: str):
     """
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SENDER_EMAIL = "mmistroni+strategyagent@gmail.com"
-    RECEIVER_EMAIL = "mmistroni@gmail.com"
-    
-    APP_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    PRIMARY_EMAIL = "mmistroni@gmail.com"
+    APP_PASSWORD = os.getenv("EMAIL_PASSWORD").replace(" ", "")
+
     if not APP_PASSWORD:
         print("⚠️ [EMAIL] EMAIL_PASSWORD environment variable is not set! Skipping email dispatch.")
         return
 
     msg = MIMEMultipart("alternative")
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECEIVER_EMAIL
+    msg['From'] = PRIMARY_EMAIL
+    msg['To'] = PRIMARY_EMAIL
     msg['Subject'] = subject
 
     msg.attach(MIMEText(html_body, 'html'))
 
     try:
-        print(f"📤 [EMAIL] Transmitting report to {RECEIVER_EMAIL} via Gmail SMTP...")
+        print(f"📤 [EMAIL] Transmitting report to {PRIMARY_EMAIL} via Gmail SMTP...")
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
-            server.login(RECEIVER_EMAIL, APP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+            server.login(PRIMARY_EMAIL, APP_PASSWORD)
+            server.sendmail(PRIMARY_EMAIL, PRIMARY_EMAIL, msg.as_string())
         print("📨 [EMAIL] Report sent successfully via Gmail SMTP!")
     except Exception as e:
-        print(f"❌ [EMAIL] Fail. FAiled again.Failed to send email via SMTP: {e} for {RECEIVER_EMAIL}/{APP_PASSWORD}")
+        print(f"❌ [EMAIL] Fail. FAiled again.Failed to send email via SMTP: {e} for {PRIMARY_EMAIL}/{APP_PASSWORD}")
 
 
 def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]], target_date_str: str):
