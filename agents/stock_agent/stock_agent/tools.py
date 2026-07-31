@@ -65,6 +65,7 @@ def fetch_technical_snapshot_tool(target_date: str = "today") -> str:
         SELECT * FROM `{table_ref}`
         WHERE (DATE(cob) = DATE(@query_date) OR CAST(cob AS STRING) = @query_date)
           AND (open IS NOT NULL OR previousClose IS NOT NULL OR price IS NOT NULL)
+        LIMIT 10 
     """
     
     job_config = bigquery.QueryJobConfig(
