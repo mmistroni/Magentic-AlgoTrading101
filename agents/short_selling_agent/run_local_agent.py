@@ -35,7 +35,10 @@ session_id = "short_test_session"
 user_id = "local_dev"
 
 print(f"📦 Seeding internal session store registry for: '{session_id}'...")
-runner.session_store.create_session(user_id=user_id, session_id=session_id)
+runner.session_service.create_session(
+    app_name=runner.app_name,
+            user_id=user_id,
+            session_id=session_id)
 
 # 5. Instantiate explicit strongly-typed 2.0 objects using the CLI provided date
 structured_message = Content(
