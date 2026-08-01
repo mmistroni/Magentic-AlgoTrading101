@@ -174,7 +174,7 @@ def send_summary_email(rows_inserted: List[Dict[str, Any]]):
         print(f"❌ [NOTIFIER] Failed sending execution alert through SendGrid API service: {mail_err}")
 
     print('============= SENDING SUMMARY EMAIL VIA PYTHON =============')
-    send_strategy_report(f'GCP Cloud Agent Report {today_str} | {len(rows_inserted)}', html_content)
+    send_strategy_report(subject_str, html_content)
     
 
 
