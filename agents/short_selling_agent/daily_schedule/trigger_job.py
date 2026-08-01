@@ -37,24 +37,24 @@ def send_strategy_report(subject: str, body_text: str):
     RECEIVER_EMAIL = "mmistroni@gmail.com"
     
     # Retrieve the 16-character app password securely from environment variables
-    APP_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    APP_PASSWORD = os.getenv("EMAIL_PASSWORD").replace( " ", "")
     
     if not APP_PASSWORD:
         raise ValueError("EMAIL_PASSWORD environment variable is not set!")
 
     # Build the email headers and body
     msg = MIMEMultipart()
-    msg['From'] = SENDER_EMAIL
+    msg['From'] = RECEIVER_EMAIL
     msg['To'] = RECEIVER_EMAIL
     msg['Subject'] = subject
-    msg.attach(MIMEText(body_text, 'plain'))
+    msg.attach(MIMEText(body_text, 'html'))
 
     # Connect and send via Gmail's native servers
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()  # Secure the connection using TLS
             server.login(RECEIVER_EMAIL, APP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+            server.sendmail(RECEIVER_EMAIL, RECEIVER_EMAIL, msg.as_string())
         print("Report sent successfully via Gmail SMTP!")
     except Exception as e:
         print(f"Failed to send email: {e}")
