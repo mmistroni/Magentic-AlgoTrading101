@@ -1,13 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Union, Any
-import random
-import time
-from datetime import date
-from pydantic import BaseModel, Field
-from typing import Literal, List
-
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 class TechnicalSchema(BaseModel):
     indicators: List[str] = Field(
@@ -42,20 +34,19 @@ class TechnicalSchema(BaseModel):
             raise ValueError("Identity field (ticker/symbol) missing from schema.")
         return v
     
-
     @model_validator(mode='before')
     @classmethod
     def debug_input_data(cls, data):
-        # This will print the raw data the agent is trying to validate
         print(f"DEBUG: ======Pydantic receiving data: {data}")
         return data
     
     @model_validator(mode='after')
     def check_for_empty_discovery(self):
         if not self.indicators and not self.metadata:
-            # This will show up in your test logs immediately
             raise ValueError("The Agent failed to map any columns from the discovery tool.")
         return self
+
+
 class TrendSignal(BaseModel):
     ticker: str
     signal: Literal["BUY", "SELL", "HOLD"]
@@ -63,3 +54,13 @@ class TrendSignal(BaseModel):
     technical_indicators: List[str] = Field(description="List of indicators used (e.g., RSI, MACD)")
     fundamental_metrics: List[str] = Field(description="List of metrics used (e.g., P/E ratio, Revenue Growth)")
     reasoning: str
+
+
+# ==========================================
+# NEW: Batch Container Model for Multi-Ticker Runs
+# ==========================================
+class BatchMarketReport(BaseModel):
+    signals: List[TrendSignal] = Field(
+        description="List of individual stock trend signals evaluated during the pipeline run.",
+        default_factory=list
+    )
