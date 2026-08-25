@@ -48,3 +48,5 @@ def test_congress_researcher_tool_plumbing(mock_get_bq_data):
     assert result.signals[0].net_buy_activity == 6
     assert result.signals[0].market_uptrend is True
     mock_get_bq_data.assert_called_once_with("2026-07-01")
+
+# Need to write integration test
