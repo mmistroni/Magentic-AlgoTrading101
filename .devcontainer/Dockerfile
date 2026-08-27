@@ -15,15 +15,11 @@ ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
-# 1. Install System Dependencies + Playwright Libraries
+# 1. Install System Dependencies & Setup User
 RUN apt-get update -o Acquire::Retries=3 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         sudo git curl gnupg apt-transport-https ca-certificates \
-        lsb-release build-essential libffi-dev \
-        libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-        libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
-        libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 \
-        libcairo2 libasound2 libxshmfence1 && \
+        lsb-release build-essential libffi-dev && \
     groupadd --gid ${USER_GID} ${USERNAME} && \
     useradd -s /bin/bash -u ${USER_UID} -g ${USER_GID} -m ${USERNAME} && \
     echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} && \
@@ -31,7 +27,7 @@ RUN apt-get update -o Acquire::Retries=3 && \
     mkdir -p /ms-playwright && chown -R ${USERNAME}:${USERNAME} /ms-playwright && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Google Cloud SDK (Fixed Keyring Setup)
+# 2. Install Google Cloud SDK
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/cloud.google.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list \
@@ -43,11 +39,11 @@ RUN mkdir -p /etc/apt/keyrings \
 COPY --from=uv_installer /uv /usr/local/bin/uv
 COPY --from=uv_installer /uvx /usr/local/bin/uvx
 
-# 4. Install Playwright browser as the vscode user
+# 4. Install Playwright & Chromium with Browser Dependencies
 USER $USERNAME
 WORKDIR /workspaces
 
 RUN uv pip install --system playwright \
-    && playwright install chromium
+    && playwright install --with-deps chromium
 
 CMD ["bash"]
