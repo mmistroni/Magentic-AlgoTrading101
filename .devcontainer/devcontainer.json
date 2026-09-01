@@ -1,9 +1,6 @@
 {
     "name": "Magentic Algo Trading Environment",
-    "build": {
-        "dockerfile": "Dockerfile",
-        "context": "." 
-    },
+    "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
     "containerEnv": {
         "GOOGLE_APPLICATION_CREDENTIALS": "/workspaces/${localWorkspaceFolderBasename}/gcp_key.json",
         "GOOGLE_CLOUD_PROJECT": "datascience-projects"
@@ -21,6 +18,6 @@
             }
         }
     },
-    "postCreateCommand": "bash -c 'python3 -m venv .venv && source .venv/bin/activate && pip install --no-cache-dir -r requirements.txt && python3 -m ipykernel install --user --name=magentic_algo_venv --display-name \"Magentic Algo VEnv\"'",
+    "postCreateCommand": "python3 -m venv .venv && .venv/bin/pip install --no-cache-dir -r requirements.txt && .venv/bin/python -m ipykernel install --user --name=magentic_algo_venv --display-name \"Magentic Algo VEnv\"",
     "remoteUser": "vscode"
 }
