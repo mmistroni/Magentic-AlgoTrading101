@@ -316,3 +316,8 @@ congress_trader = LlmAgent(
     ],
     output_key="final_trade_plan"
 )
+
+
+===== running eval tests
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+(.venv) @mmistroni ➜ /workspaces/Magentic-AlgoTrading101/agents/congress_trades_agent (main) $ python -m pytest tests/unit/test_congress_researcher_evals.py -v
