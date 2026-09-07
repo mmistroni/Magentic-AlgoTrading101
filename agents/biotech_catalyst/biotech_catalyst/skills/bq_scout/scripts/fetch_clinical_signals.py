@@ -10,7 +10,7 @@ def load_sql_query() -> str:
     with open(sql_path, "r") as f:
         return f.read()
 
-def fetch_negative_clinical_signals(project_id: str, dataset_id: str, table_id: str) -> List[ClinicalSignalRecord]:
+def fetch_clinical_signals(project_id: str , dataset_id: str, table_id: str) -> List[ClinicalSignalRecord]:
     """
     Queries BigQuery using the SQL template stored in resources/bq.sql 
     and returns a list of validated ClinicalSignalRecord objects.
