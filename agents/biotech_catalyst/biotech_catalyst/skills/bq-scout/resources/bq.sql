@@ -1,3 +1,8 @@
+DECLARE query_anchor TIMESTAMP;
+
+-- If a reference parameter is passed, use it; otherwise default to current time
+SET query_anchor = COALESCE(@reference_date, CURRENT_TIMESTAMP());
+
 WITH public_clinical_failures AS (
   SELECT 
     c.scraped_at AS failure_post_date,
@@ -15,8 +20,9 @@ WITH public_clinical_failures AS (
     ON REGEXP_REPLACE(LOWER(c.sponsor), r'[^a-z0-9]', '') LIKE CONCAT('%', REGEXP_REPLACE(LOWER(m.description), r'[^a-z0-9]', ''), '%')
     OR REGEXP_REPLACE(LOWER(m.description), r'[^a-z0-9]', '') LIKE CONCAT('%', REGEXP_REPLACE(LOWER(c.sponsor), r'[^a-z0-9]', ''), '%')
   WHERE c.status IN ('TERMINATED', 'SUSPENDED', 'WITHDRAWN')
-    -- BOUNDARY CONDITION: Only pull recent updates to prevent querying the whole archive
-    AND c.scraped_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 DAY)
+    -- BOUNDARY CONDITION: Use the dynamic anchor instead of CURRENT_TIMESTAMP()
+    AND c.scraped_at >= TIMESTAMP_SUB(query_anchor, INTERVAL 5 DAY)
+    AND c.scraped_at <= query_anchor
 )
 SELECT 
   ticker,
