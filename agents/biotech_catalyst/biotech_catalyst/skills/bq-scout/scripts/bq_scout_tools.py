@@ -1,7 +1,24 @@
 import os
 from google.cloud import bigquery
 from typing import List
+import os
+import sys
+
+import os
+import sys
+
+# Dynamically resolve and add the correct directory containing schemas.py to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Navigate up from scripts/ -> bq-scout/ -> skills/ -> biotech_catalyst/
+project_root = os.path.abspath(os.path.join(current_dir, "../../../"))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from schemas import ClinicalSignalRecord
+
+
+from schemas import ClinicalSignalRecord
+
 
 def load_sql_query() -> str:
     """Reads the SQL query from the resources/bq.sql directory relative to this script."""

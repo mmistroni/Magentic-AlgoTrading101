@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class ClinicalSignalRecord(BaseModel):
     ticker: Optional[str] = Field(None, description="Stock ticker symbol for the sponsoring organization")
@@ -12,7 +12,7 @@ class ClinicalSignalRecord(BaseModel):
     trial_title: Optional[str] = Field(None, description="Official title of the clinical trial study")
     failure_reason: Optional[str] = Field(None, description="Detailed explanation for termination or suspension")
 
-    class Config:
+    class ConfigDict:
         frozen = True
 
 

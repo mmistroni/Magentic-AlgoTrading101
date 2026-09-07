@@ -3,8 +3,7 @@ name: bq-scout
 description: Queries BigQuery for terminated or suspended clinical trial signals over a 3-day lookback window.
 ---
 
-# Skill: BigQuery Clinical Trial Scout (`bq-scout-skill`)
-
+# Skill: BigQuery Clinical Trial Scout (`bq_scout_tools`)
 ## Description
 This skill queries BigQuery to extract high-polarity, negative clinical trial catalysts (`TERMINATED` or `SUSPENDED`) over a rolling lookback window. It acts as the "Daily Sniper" ingestion engine for the biotech short-selling pipeline.
 
