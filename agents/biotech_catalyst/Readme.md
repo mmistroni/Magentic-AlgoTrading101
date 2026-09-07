@@ -8,4 +8,4 @@ short squeeze or dead cat bounce
 
 
 ==== TRACKEr
-18/7 - inception
+7/9 - integ tests for bq_scout. We now need to test a real agent call
