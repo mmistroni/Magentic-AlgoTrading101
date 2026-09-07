@@ -8,7 +8,7 @@ from pathlib import Path
 # 1. Load the skill from the directory path
 
 CURRENT_DIR = Path(__file__).parent
-BQ_SKILL_PATH = CURRENT_DIR / "skills" / "bq-scout"
+BQ_SKILL_PATH = CURRENT_DIR / "skills" / "bq_scout"
 
 bq_skill = load_skill_from_dir(str(BQ_SKILL_PATH))
 
