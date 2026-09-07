@@ -15,19 +15,22 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from schemas import ClinicalSignalRecord
-
-
-from schemas import ClinicalSignalRecord
-
-
-def load_sql_query() -> str:
+from typing import List, Optional
+from google.cloud import bigquery
+#def load_sql_query() -> str:
     """Reads the SQL query from the resources/bq.sql directory relative to this script."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     sql_path = os.path.join(current_dir, "resources", "bq.sql")
     with open(sql_path, "r") as f:
         return f.read()
 
-def fetch_clinical_signals(project_id: str , dataset_id: str, table_id: str) -> List[ClinicalSignalRecord]:
+
+def fetch_clinical_signals(
+    project_id: str, 
+    dataset_id: str, 
+    table_id: str, 
+    reference_date: Optional[str] = None
+) -> List[ClinicalSignalRecord]:
     """
     Queries BigQuery using the SQL template stored in resources/bq.sql 
     and returns a list of validated ClinicalSignalRecord objects.
@@ -43,7 +46,16 @@ def fetch_clinical_signals(project_id: str , dataset_id: str, table_id: str) -> 
         table_id=table_id
     )
     
-    query_job = client.query(query)
+    # Configure optional query parameters if a historical reference date is provided for testing
+    job_config = None
+    if reference_date:
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("reference_date", "TIMESTAMP", reference_date)
+            ]
+        )
+    
+    query_job = client.query(query, job_config=job_config)
     results = query_job.result()
     
     records = []
