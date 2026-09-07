@@ -85,3 +85,10 @@ def test_fetch_clinical_signals_mock():
         assert record.ticker == "INCY"
         assert record.failure_status == "TERMINATED"
         assert record.nct_id == "NCT06873789"
+
+def test_bq_scout_agent_tool_binding():
+    """Verifies that the bq_scout_agent and its skill directory are correctly configured."""
+    assert bq_scout_agent.name == "BQScoutAgent"
+    assert bq_scout_agent.output_key == "clinical_signals"
+    assert BQ_SKILL_PATH.exists()
+    assert (BQ_SKILL_PATH / "SKILL.md").exists()
