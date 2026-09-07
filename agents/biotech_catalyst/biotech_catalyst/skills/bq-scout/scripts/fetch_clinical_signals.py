@@ -44,6 +44,18 @@ def fetch_negative_clinical_signals(project_id: str, dataset_id: str, table_id: 
             status=row.status,
             negative_reason=row.negative_reason
         )
+        '''
+        ticker,
+        cusip,
+        sponsor,
+        failure_status,
+        failure_post_date,
+        nct_id,
+        trial_title,
+        failure_reason
+
+
+
         records.append(record)
         
     return records
