@@ -92,3 +92,29 @@ def test_bq_scout_agent_tool_binding():
     assert bq_scout_agent.output_key == "clinical_signals"
     assert BQ_SKILL_PATH.exists()
     assert (BQ_SKILL_PATH / "SKILL.md").exists()
+
+def test_fetch_clinical_signals_passes_reference_date():
+    """Confirms that the reference_date parameter correctly populates the BigQuery job configuration."""
+    with patch("biotech_catalyst.skills.bq_scout.scripts.bq_scout_tools:bigquery.Client") as mock_client_class, \
+         patch("biotech_catalyst.skills.bq_scout.scripts.bq_scout_tools:load_sql_query") as mock_load_sql:
+        
+        mock_load_sql.return_value = "SELECT * FROM mock_table"
+        mock_client_instance = mock_client_class.return_value
+        mock_query_job = MagicMock()
+        mock_query_job.result.return_value = []
+        mock_client_instance.query.return_value = mock_query_job
+
+        test_anchor = "2025-12-03 23:59:59 UTC"
+        fetch_clinical_signals(reference_date=test_anchor)
+
+        # Assert client.query was called with job_config containing our scalar parameter
+        mock_client_instance.query.assert_called_once()
+        _, kwargs = mock_client_instance.query.call_args
+        
+        job_config = kwargs.get("job_config")
+        assert job_config is not None, "JobConfig must be passed when reference_date is provided."
+        
+        params = job_config.query_parameters
+        assert len(params) == 1
+        assert params[0].name == "reference_date"
+        assert params[0].value == test_anchor
