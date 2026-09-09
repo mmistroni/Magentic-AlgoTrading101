@@ -35,9 +35,11 @@ def fetch_clinical_signals(reference_date: Optional[str] = None) -> List[Clinica
     """
     client = bigquery.Client()
     raw_query = load_sql_query()
+    print(f" Using ref date {reference_date}")
     
     job_config = None
     if reference_date:
+        
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("reference_date", "TIMESTAMP", reference_date)
