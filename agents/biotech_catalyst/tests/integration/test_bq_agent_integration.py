@@ -29,14 +29,14 @@ def test_bq_scout_agent_tool_invocation():
     with patch.object(bq_scout_tools, "bigquery") as mock_bq, \
          patch.object(bq_scout_tools, "load_sql_query") as mock_load_sql:
         
-        mock_load_sql.return_value = "SELECT * FROM `{project_id}.{dataset_id}.{table_id}`"
+        mock_load_sql.return_value = "SELECT * FROM mock_table"
         mock_client_instance = mock_bq.Client.return_value
         mock_query_job = MagicMock()
         mock_query_job.result.return_value = []
         mock_client_instance.query.return_value = mock_query_job
 
-        # Execute tool invocation
-        result = fetch_clinical_signals("test-project", "biotech_catalysts", "signals")
+        # Execute tool invocation without positional arguments (matching the updated signature)
+        result = fetch_clinical_signals()
 
         # Assertions
         mock_client_instance.query.assert_called_once()
