@@ -62,3 +62,27 @@ congress_trades_agent/
                         │
                         ▼
   [STEP 5: Deploy to Cloud Run + Cloud Scheduler]
+
+
+
+========================== CURRENT SETUP
+congress_agents
+  |
+  |__ congress_researcher  (political context)
+         |__ fetch_congress_signals_tool  
+  |__  insider_analyst   (political_and_insider_context)
+         |__ fetch_lobbying_signals_tool 
+         |__ fetch_form4_signals_tool
+  |__  congress_trader  # <-- Checks P/E, Debt, and makes final decision
+         |__ check_fundamentals_tool
+
+tools available:
+
+tools.py
+  |__  fetch_congress_signals_tool(analysis_date: str) -> CongressSignalsResponse:
+  |__  check_fundamentals_tool
+  |__  fetch_form4_signals_tool
+  |__  fetch_lobbying_signals_tool
+
+asymmetric_tools
+  |__  check_gov_contracts_tool  
