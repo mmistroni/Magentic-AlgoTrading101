@@ -1,7 +1,7 @@
 # skills/CongressResearcher/tools.py
 
 from google.adk.tools import FunctionTool
-from .scripts.fetch_congress_data import get_bq_data
+from .scripts.congress_signals import get_bq_data
 from ...schemas import CongressSignalsResponse, CongressSignalItem
 
 def fetch_congress_signals(analysis_date: str) -> CongressSignalsResponse:
