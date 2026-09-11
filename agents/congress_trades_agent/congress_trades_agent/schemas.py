@@ -11,11 +11,17 @@ class CandidateTicker(BaseModel):
     sale_count: int
     last_trade_date: str
 
+# state_schema.py
+
 class ConfluenceReport(BaseModel):
     form4_signal: Optional[str] = "Neutral"
     form4_details: Optional[Dict[str, Any]] = None
     lobbying_spend_usd: Optional[float] = 0.0
     lobbying_details: Optional[Dict[str, Any]] = None
+    # NEW: Government Contract Signals Confluence Fields
+    gov_contracts_spend_usd: Optional[float] = 0.0
+    gov_contracts_signal: Optional[str] = "Neutral"  # e.g., "High Acceleration", "Moderate", "None"
+    gov_contracts_details: Optional[Dict[str, Any]] = None  # Holds raw/formatted contract items
 
 class TradeReasoning(BaseModel):
     macro_context: str
