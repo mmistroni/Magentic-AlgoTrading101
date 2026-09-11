@@ -102,3 +102,23 @@ class TradeRecommendation(BaseModel):
     reason: str = Field(
         description="Reasoning in format: 'Thesis: [Macro/Lobbying]. Fundamentals: [Cite P/E & Debt]. Verdict: [Buy/Hold/Pass].'"
     )
+# Contract Signals
+# tool_schemas.py
+
+class ContractSignalItem(BaseModel):
+    action_date: str = Field(description="Date contract award was issued (YYYY-MM-DD)")
+    recipient_name: str = Field(description="Name of recipient company")
+    ticker: str = Field(description="Stock ticker symbol")
+    amount: float = Field(default=0.0, description="Dollar amount of the contract award")
+    agency: str = Field(description="Awarding government agency (e.g., NASA, DoD, DHS)")
+    description: Optional[str] = Field(default="No contract description provided.", description="Award details")
+    formatted_amount: Optional[str] = Field(default=None, description="Human readable amount (e.g. $75M)")
+
+class ContractSignalsResponse(BaseModel):
+    ticker: str
+    analysis_date: str
+    total_contract_spend_usd: float = 0.0
+    signals: List[ContractSignalItem] = Field(default_factory=list)
+    count: int = 0
+    error: Optional[str] = None
+
