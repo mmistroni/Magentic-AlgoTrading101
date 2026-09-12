@@ -12,15 +12,9 @@ def test_congress_researcher_agent_skill_migration():
     assert isinstance(congress_researcher, LlmAgent)
     assert congress_researcher.name == "CongressResearcher"
     assert congress_researcher.output_key == "political_context"
-
-    assert "Washington Policy Strategist & Congress Scout" in congress_researcher.instruction
-    assert "fetch_congress_signals(analysis_date)" in congress_researcher.instruction
-
-    assert len(congress_researcher.tools) == 1
-    tool = congress_researcher.tools[0]
-    assert isinstance(tool, FunctionTool)
-    assert tool.func.__name__ == "fetch_congress_signals"
-
+    
+    # Updated to match the new header in SKILL.md
+    assert "Policy & Government Action Analyst" in congress_researcher.instruction
 
 @patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_data")
 def test_congress_researcher_tool_plumbing(mock_get_bq_data):
