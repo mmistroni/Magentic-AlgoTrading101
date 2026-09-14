@@ -87,6 +87,7 @@ SIGNAL_FORMATTER_AGENT = LlmAgent(
     CONSTRAINTS:
     - Ensure every ticker has a clear `signal` (BUY, SELL, or HOLD).
     - Provide a robust numerical `confidence_score` between 0.0 and 1.0.
+    - Explicitly detail in `score_breakdown` how macro factors, volatility, and technicals mathematically combined to yield the exact `confidence_score`.
     - Populate `reasoning` explicitly based on the analysis text.
     - OUTPUT ONLY VALID JSON MATCHING THE SCHEMA. NO PREAMBLE.
     """,

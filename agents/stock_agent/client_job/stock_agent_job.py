@@ -88,16 +88,32 @@ def build_summary_email_and_send(rows_inserted: List[Dict[str, Any]], target_dat
                 bg_color = "#f8f9fa"
                 text_color = "#495057"
 
-            score = r.get("conviction_score", 0)
+            # UPDATED (Reads the actual schema key with a fallback)
+            score = r.get("confidence_score", r.get("conviction_score", 0))
+
+            # FIX 2: Extract structured parameter breakdown
+            breakdown = r.get("score_breakdown", {})
+            tech_impact = breakdown.get("technical_weights", "N/A")
+            macro_impact = breakdown.get("macro_regime_impact", "N/A")
+
+            reasoning_html = f"""
+            <strong>Analysis:</strong> {r.get('reasoning', 'N/A')}<br><br>
+            <small>
+                <b>Score Audit:</b><br>
+                • <i>Technicals:</i> {tech_impact}<br>
+                • <i>Macro/Regime:</i> {macro_impact}
+            </small>
+            """
 
             table_rows += f"""
             <tr style="background-color: {bg_color}; color: {text_color}; font-size: 13px;">
                 <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{r.get('ticker', 'N/A')}</td>
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{action}</td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{score}</td>
-                <td style="padding: 10px; border: 1px solid #ddd; line-height: 1.4;">{r.get('reasoning', 'N/A')}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">{score}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; line-height: 1.4;">{reasoning_html}</td>
             </tr>
             """
+                    
 
         display_content = f"""
         <table style="width: 100%; border-collapse: collapse; min-width: 500px;">
@@ -299,20 +315,30 @@ async def amain(message_to_send: str, target_date_str: str):
 
                 for index, row in enumerate(raw_rows):
                     ticker_upper = str(row.get("ticker", "UNKNOWN")).upper()
-                    
-                    # Map signals to match finviz_blacklist.daily_recommendations schema
                     action_val = str(row.get("signal", row.get("action", "HOLD"))).upper()
-                    raw_score = row.get("confidence_score", row.get("conviction_score", 3))
                     
+                    # Safely parse float score without casting to int (preserves 0.85)
+                    raw_score = row.get("confidence_score", row.get("conviction_score", 0.0))
+                    try:
+                        numeric_score = float(raw_score)
+                    except (ValueError, TypeError):
+                        numeric_score = 0.0
+                    
+                    # Extract score breakdown emitted by SignalFormatter
+                    score_breakdown = row.get("score_breakdown", {})
+
                     compiled_row = {
                         "evaluation_date": target_date_str,
                         "ticker": ticker_upper,
-                        "conviction_score": int(float(raw_score)),
+                        "confidence_score": numeric_score,
+                        "conviction_score": numeric_score,
                         "action": action_val,
                         "reasoning": row.get("reasoning", "No detailed reasoning provided."),
+                        "score_breakdown": score_breakdown,  # REQUIRED: Passed to build_summary_email_and_send
                         "inserted_at": timestamp_now
                     }
                     rows_to_insert.append(compiled_row)
+
 
                 if rows_to_insert:
                     print(f"📤 [BIGQUERY] Streaming {len(rows_to_insert)} items to {TABLE_REF}...")

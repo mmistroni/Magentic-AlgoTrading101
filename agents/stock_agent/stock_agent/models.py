@@ -46,15 +46,32 @@ class TechnicalSchema(BaseModel):
             raise ValueError("The Agent failed to map any columns from the discovery tool.")
         return self
 
+class ParameterBreakdown(BaseModel):
+    technical_weights: str = Field(
+        description="Explanation of technical indicator score (e.g., OBV + CMF = +0.8)"
+    )
+    macro_regime_impact: str = Field(
+        description="Impact of broader market regime (e.g., Range-bound penalty applied)"
+    )
 
 class TrendSignal(BaseModel):
     ticker: str
     signal: Literal["BUY", "SELL", "HOLD"]
-    confidence_score: float = Field(ge=0, le=1)
-    technical_indicators: List[str] = Field(description="List of indicators used (e.g., RSI, MACD)")
-    fundamental_metrics: List[str] = Field(description="List of metrics used (e.g., P/E ratio, Revenue Growth)")
+    confidence_score: float = Field(
+        ge=0,
+        le=1,
+        description="Calculated conviction score based on technicals and macro factors.",
+    )
+    technical_indicators: List[str] = Field(
+        description="List of indicators used (e.g., RSI, MACD)"
+    )
+    fundamental_metrics: List[str] = Field(
+        description="List of metrics used (e.g., P/E ratio, Revenue Growth)"
+    )
+    score_breakdown: ParameterBreakdown = Field(
+        description="Detailed audit explaining how the numerical confidence_score was derived."
+    )
     reasoning: str
-
 
 # ==========================================
 # NEW: Batch Container Model for Multi-Ticker Runs
