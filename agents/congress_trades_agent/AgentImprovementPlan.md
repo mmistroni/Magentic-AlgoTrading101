@@ -87,5 +87,14 @@ tools.py
 asymmetric_tools
   |__  check_gov_contracts_tool  
 
+=== Tests
+test_congress_researcher_new
+- test_fetch_congress_signals_end_to_end_wiring
+test_congress_researcher_executio
+- test_congress_researcher_skill_tool_sequence mock an execution
+test_congress_researcher_agents.py
+ - test skills migration
+- test_congress_resaearcher_eval evaluate response
+
   ====12/9.
   MOck tests for congress resercher. We need integ tests next.

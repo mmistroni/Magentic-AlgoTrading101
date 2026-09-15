@@ -7,13 +7,34 @@ from functools import lru_cache
 from google.cloud import bigquery
 
 
-def check_market_regime(row_date, context_date_str) -> bool:
+import os
+import requests
+import pandas as pd
+import yfinance as yf
+from datetime import date, datetime
+from typing import Optional, Union
+from functools import lru_cache
+from google.cloud import bigquery
+
+
+def check_market_regime(
+    row_date: Union[str, date, pd.Timestamp], 
+    context_date_str: str
+) -> bool:
+    """Checks if SPX/SPY was in an uptrend on a specific signal date relative to SMA200.
+
+    Args:
+        row_date: The specific trade/signal date (date object, Timestamp, or ISO string).
+        context_date_str: Analysis end date string (e.g. '2026-06-30').
+    """
     try:
-        spy_data = _get_spy_data(context_date_str)
+        spy_data = _get_spy_data(str(context_date_str))
         if spy_data.empty:
             return True
 
+        # Guarantee row_date is a timezone-naive Timestamp
         target_date = pd.to_datetime(row_date).tz_localize(None)
+        
         idx_loc = spy_data.index.get_indexer([target_date], method='pad')[0]
 
         if idx_loc == -1: 
@@ -30,6 +51,7 @@ def check_market_regime(row_date, context_date_str) -> bool:
     except Exception as e:
         print(f"⚠️ Regime Check Warning: {e}")
         return True
+
 
 @lru_cache(maxsize=32)
 def _get_spy_data(end_date_str: str) -> pd.DataFrame:
