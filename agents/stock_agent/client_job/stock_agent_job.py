@@ -104,6 +104,20 @@ def build_summary_email_and_send(
       score = r.get("confidence_score", r.get("conviction_score", 0.0))
 
       breakdown = r.get("score_breakdown", {})
+      # Parse string back into a dictionary if needed
+      if isinstance(breakdown, str):
+        try:
+          breakdown = json.loads(breakdown)
+        except Exception:
+          breakdown = {}
+      elif not isinstance(breakdown, dict):
+        breakdown = {}
+
+      tech_impact = breakdown.get("technical_weights", "N/A")
+      macro_impact = breakdown.get("macro_regime_impact", "N/A")
+
+
+
       tech_impact = breakdown.get("technical_weights", "N/A")
       macro_impact = breakdown.get("macro_regime_impact", "N/A")
 
@@ -378,6 +392,10 @@ async def amain(message_to_send: str, target_date_str: str):
             numeric_score = 0.0
 
           score_breakdown = row.get("score_breakdown", {})
+          if isinstance(score_breakdown, (dict, list)):
+            score_breakdown_str = json.dumps(score_breakdown)
+          else:
+            score_breakdown_str = str(score_breakdown)
 
           compiled_row = {
               "evaluation_date": target_date_str,
@@ -388,7 +406,7 @@ async def amain(message_to_send: str, target_date_str: str):
               "reasoning": str(
                   row.get("reasoning", "No detailed reasoning provided.")
               ),
-              "score_breakdown": score_breakdown,
+              "score_breakdown": score_breakdown_str,
               "inserted_at": timestamp_now,
           }
           rows_to_insert.append(compiled_row)
