@@ -96,5 +96,5 @@ test_congress_researcher_agents.py
  - test skills migration
 - test_congress_resaearcher_eval evaluate response
 
-  ====12/9.
-  MOck tests for congress resercher. We need integ tests next.
+  ====16/9.
+  Eval test for congress researcher
