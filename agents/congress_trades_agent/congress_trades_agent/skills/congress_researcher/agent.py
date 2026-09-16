@@ -1,6 +1,6 @@
 from pathlib import Path
 from google.adk.agents import LlmAgent
-from .tools import fetch_congress_signals_tool
+from .tools import fetch_congress_signals_tool, fetch_contract_signals_tool
 
 SKILL_DIR = Path(__file__).parent
 
@@ -18,6 +18,6 @@ congress_researcher = LlmAgent(
     name="CongressResearcher",
     model='gemini-2.5-flash',
     instruction=parse_skill_instructions(SKILL_DIR),
-    tools=[fetch_congress_signals_tool],
+    tools=[fetch_congress_signals_tool, fetch_contract_signals_tool],
     output_key="political_context"
 )

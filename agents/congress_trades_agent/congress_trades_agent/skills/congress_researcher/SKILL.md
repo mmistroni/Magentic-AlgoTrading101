@@ -8,13 +8,13 @@ description: Analyzes Capitol Hill stock trades alongside US Government contract
 When asked to evaluate congressional trades for a given `analysis_date` (YYYY-MM-DD):
 
 ## 1. Retrieve Congressional Signals
-Call `fetch_congress_signals_tool(analysis_date=analysis_date)` to extract candidate stock tickers. 
+Call `fetch_congress_signals(analysis_date=analysis_date)` to extract candidate stock tickers. 
 * Review the returned list of signals, purchase counts, net buy activity, and the macro market regime status (`market_uptrend`).
 * If no candidates are returned, summarize that no high-conviction Congressional buy signals met the threshold for that date.
 
 ## 2. Cross-Reference Government Contracts
 For each flagged ticker identified in Step 1:
-* Call `fetch_contract_signals_tool(ticker=ticker, analysis_date=analysis_date)` to inspect federal procurement activity over the 90-day window leading up to `analysis_date`.
+* Call `fetch_contract_signals(ticker=ticker, analysis_date=analysis_date)` to inspect federal procurement activity over the 90-day window leading up to `analysis_date`.
 * Note key agencies (e.g., NASA, DoD, DHS), combined award values (`total_contract_spend_usd`), and individual award descriptions.
 
 ## 3. Synthesize Political Intelligence Report
