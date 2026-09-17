@@ -55,3 +55,10 @@ not yet deployd
 ## run followibg command toenable gcloud
 xport GOOGLE_APPLICATION_CREDENTIALS="/workspaces/GCP_Experiments/gcp_key.json"
 export GOOGLE_CLOUD_PROJECT="datascience-projects"
+
+
+==============
+JOb Emails
+- StockAgent End of Day WrapUp --> comes from dataflow job
+- Stock Agent Operations Report --> Magentic Algo Trading / Cloud Run
+- Daily strategy operations report --> Magentic Algo Trading / Cloud Run
