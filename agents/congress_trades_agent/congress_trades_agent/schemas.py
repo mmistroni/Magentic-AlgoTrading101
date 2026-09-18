@@ -3,6 +3,9 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from typing import Literal
 
+
+#=== Congress Researcher
+
 class CandidateTicker(BaseModel):
     ticker: str
     buying_days_count: int
@@ -126,5 +129,41 @@ class ContractSignalsResponse(BaseModel):
     total_contract_spend_usd: float = 0.0
     signals: List[ContractSignalItem] = Field(default_factory=list)
     count: int = 0
+    error: Optional[str] = None
+
+
+## ---   Insider Analyst
+
+# --- Form 4 Models ---
+class Form4SignalItem(BaseModel):
+    ticker: str
+    issuer: Optional[str] = None
+    net_buy_value: float
+    unique_buyers: int
+    is_c_suite_buy: bool
+    is_cluster_buy: bool
+    buy_count: int
+    sell_count: int
+    insider_activity_score: float
+
+class Form4SignalsResponse(BaseModel):
+    analysis_date: str
+    count: int = 0
+    signals: List[Form4SignalItem] = Field(default_factory=list)
+    error: Optional[str] = None
+
+# --- Lobbying Models ---
+class LobbyingSignalItem(BaseModel):
+    ticker: str
+    client_name: Optional[str] = None
+    key_issues: Optional[str] = None
+    current_spend: float
+    prior_spend: float
+    spend_growth_pct: float
+
+class LobbyingSignalsResponse(BaseModel):
+    analysis_date: str
+    count: int = 0
+    signals: List[LobbyingSignalItem] = Field(default_factory=list)
     error: Optional[str] = None
 
