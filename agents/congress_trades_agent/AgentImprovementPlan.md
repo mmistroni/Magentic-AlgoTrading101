@@ -96,5 +96,6 @@ test_congress_researcher_agents.py
  - test skills migration
 - test_congress_resaearcher_eval evaluate response
 
-  ====16/9.
-  Eval test for congress researcher
+  ====17/9.
+  Prepared sql and scripts. Next step: test the script with sql, both
+  mock and integrated
