@@ -1,10 +1,9 @@
-# state_schema.py
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field
-from typing import Literal
 
-
-#=== Congress Researcher
+# ==========================================
+# 1. PIPELINE STATE MODELS
+# ==========================================
 
 class CandidateTicker(BaseModel):
     ticker: str
@@ -14,17 +13,14 @@ class CandidateTicker(BaseModel):
     sale_count: int
     last_trade_date: str
 
-# state_schema.py
-
 class ConfluenceReport(BaseModel):
     form4_signal: Optional[str] = "Neutral"
     form4_details: Optional[Dict[str, Any]] = None
     lobbying_spend_usd: Optional[float] = 0.0
     lobbying_details: Optional[Dict[str, Any]] = None
-    # NEW: Government Contract Signals Confluence Fields
     gov_contracts_spend_usd: Optional[float] = 0.0
     gov_contracts_signal: Optional[str] = "Neutral"  # e.g., "High Acceleration", "Moderate", "None"
-    gov_contracts_details: Optional[Dict[str, Any]] = None  # Holds raw/formatted contract items
+    gov_contracts_details: Optional[Dict[str, Any]] = None
 
 class TradeReasoning(BaseModel):
     macro_context: str
@@ -47,33 +43,11 @@ class PipelineState(BaseModel):
     confluence_reports: Dict[str, ConfluenceReport] = Field(default_factory=dict)
     final_dossier: List[FinalDecision] = Field(default_factory=list)
 
-# tool_schemas.py
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
 
-class Form4SignalResponse(BaseModel):
-    ticker: str
-    insider_title: Optional[str] = "Insider"
-    transaction_type: Optional[str] = "None"
-    shares: Optional[int] = 0
-    transaction_date: Optional[str] = "N/A"
-    is_officer: bool = False
-    is_director: bool = False
-    signal_strength: str = "Neutral"
-    error: Optional[str] = None
+# ==========================================
+# 2. CONGRESS RESEARCHER MODELS
+# ==========================================
 
-# congress_trades_agent/schemas.py
-class LobbyingSignalResponse(BaseModel):
-    ticker: str
-    company_name: Optional[str] = "N/A"
-    total_spend_last_12m: float = 0.0
-    latest_filing_date: Optional[str] = "N/A"
-    number_of_filings: int = 0
-    top_lobbied_issues: List[str] = Field(default_factory=list)
-    lobbying_status: str = "Active"
-    error: Optional[str] = None
-
-# congress_trades_agent/schemas.py
 class CongressSignalItem(BaseModel):
     ticker: str
     signal_date: str
@@ -89,30 +63,6 @@ class CongressSignalsResponse(BaseModel):
     signals: List[CongressSignalItem] = Field(default_factory=list)
     count: int = 0
     error: Optional[str] = None
-
-class FundamentalsResponse(BaseModel):
-    ticker: str
-    sector: Optional[str] = "Unknown"
-    industry: Optional[str] = "Unknown"
-    market_cap_B: float = 0.0
-    beta: float = 1.0
-    forward_pe: float = 0.0
-    debt_to_equity: Optional[float] = None
-    dividend_yield: float = 0.0
-    error: Optional[str] = None
-
-class TradeRecommendation(BaseModel):
-    ticker: str = Field(description="Stock ticker symbol")
-    action: Literal["STRONG BUY", "BUY", "HOLD", "PASS"] = Field(
-        description="Recommended action based on macro regime and confluence filters."
-    )
-    confidence: int = Field(ge=1, le=10, description="Confidence rating from 1 to 10")
-    risk_rating: Literal["Low", "Medium", "High"] = Field(description="Risk assessment level")
-    reason: str = Field(
-        description="Reasoning in format: 'Thesis: [Macro/Lobbying]. Fundamentals: [Cite P/E & Debt]. Verdict: [Buy/Hold/Pass].'"
-    )
-# Contract Signals
-# tool_schemas.py
 
 class ContractSignalItem(BaseModel):
     action_date: str = Field(description="Date contract award was issued (YYYY-MM-DD)")
@@ -132,19 +82,20 @@ class ContractSignalsResponse(BaseModel):
     error: Optional[str] = None
 
 
-## ---   Insider Analyst
+# ==========================================
+# 3. INSIDER ANALYST MODELS
+# ==========================================
 
-# --- Form 4 Models ---
 class Form4SignalItem(BaseModel):
     ticker: str
     issuer: Optional[str] = None
-    net_buy_value: float
-    unique_buyers: int
-    is_c_suite_buy: bool
-    is_cluster_buy: bool
-    buy_count: int
-    sell_count: int
-    insider_activity_score: float
+    net_buy_value: float = 0.0
+    unique_buyers: int = 0
+    is_c_suite_buy: bool = False
+    is_cluster_buy: bool = False
+    buy_count: int = 0
+    sell_count: int = 0
+    insider_activity_score: float = 0.0
 
 class Form4SignalsResponse(BaseModel):
     analysis_date: str
@@ -152,14 +103,13 @@ class Form4SignalsResponse(BaseModel):
     signals: List[Form4SignalItem] = Field(default_factory=list)
     error: Optional[str] = None
 
-# --- Lobbying Models ---
 class LobbyingSignalItem(BaseModel):
     ticker: str
     client_name: Optional[str] = None
     key_issues: Optional[str] = None
-    current_spend: float
-    prior_spend: float
-    spend_growth_pct: float
+    current_spend: float = 0.0
+    prior_spend: float = 0.0
+    spend_growth_pct: float = 0.0
 
 class LobbyingSignalsResponse(BaseModel):
     analysis_date: str
@@ -167,3 +117,18 @@ class LobbyingSignalsResponse(BaseModel):
     signals: List[LobbyingSignalItem] = Field(default_factory=list)
     error: Optional[str] = None
 
+
+# ==========================================
+# 4. SHARED MARKET MODELS
+# ==========================================
+
+class FundamentalsResponse(BaseModel):
+    ticker: str
+    sector: Optional[str] = "Unknown"
+    industry: Optional[str] = "Unknown"
+    market_cap_B: float = 0.0
+    beta: float = 1.0
+    forward_pe: float = 0.0
+    debt_to_equity: Optional[float] = None
+    dividend_yield: float = 0.0
+    error: Optional[str] = None
