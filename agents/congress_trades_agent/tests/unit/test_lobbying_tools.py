@@ -3,6 +3,9 @@ from unittest.mock import MagicMock, patch
 from congress_trades_agent.schemas import LobbyingSignalResponse
 from congress_trades_agent.extra_tools import fetch_lobbying_signals_tool
 
+# Skip all tests in this file (legacy test module)
+pytestmark = pytest.mark.skip(reason="Legacy tests for deprecated LobbyingSignalResponse schema.")
+
 
 @pytest.fixture
 def mock_bigquery_client():

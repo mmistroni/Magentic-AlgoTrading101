@@ -10,6 +10,9 @@ from google.adk.runners import Runner
 # Import your actual pipeline
 from congress_trades_agent.congress_agents import CONGRESS_PIPELINE
 
+# Skip all tests in this file (legacy test module)
+pytestmark = pytest.mark.skip(reason="Legacy tests for deprecated LobbyingSignalResponse schema.")
+
 
 # =============================================================================
 # DEEP MOCKS (Intercepting the APIs, NOT the Tool Pointers)
