@@ -5,7 +5,7 @@ from google.cloud import bigquery
 PROJECT_ID = "datascience-projects"
 
 # Path to the SQL file in references/ directory
-REFERENCES_DIR = Path(__file__).resolve().parents[2] / "references"
+REFERENCES_DIR = Path(__file__).resolve().parents[1] / "references"
 SQL_FILE_PATH = REFERENCES_DIR / "get_lobbying_signals.sql"
 
 
