@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 import pytest
 from google.adk.tools import ToolContext
 
@@ -22,11 +23,12 @@ TEST_DATE = "2026-09-14"
 @pytest.fixture
 def real_tool_context():
     """Initializes a live ToolContext instance for integration testing."""
-    context = ToolContext()
-    context.state = {
+    mock_invocation = MagicMock()
+    mock_invocation.session.state = {
         "candidates": [],
         "confluence_reports": {},
     }
+    context = ToolContext(invocation_context=mock_invocation)
     return context
 
 
@@ -55,7 +57,6 @@ def test_fetch_congress_signals(real_tool_context):
     candidates = real_tool_context.state.get("candidates", [])
     assert len(candidates) > 0, "ToolContext state 'candidates' was not updated."
     
-    # Handle list of dicts or list of Pydantic models in state
     candidate_tickers = [
         c.ticker if hasattr(c, "ticker") else c.get("ticker")
         for c in candidates
