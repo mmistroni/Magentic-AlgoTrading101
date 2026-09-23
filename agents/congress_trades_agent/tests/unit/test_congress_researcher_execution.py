@@ -83,3 +83,4 @@ def test_fetch_contract_signals_updates_context(mock_contract_records, mock_tool
         assert res.ticker == "LMT"
         assert res.total_contract_spend_usd == 75000000.0
         assert "LMT" in mock_tool_context.state["confluence_reports"]
+
