@@ -111,20 +111,25 @@ async def test_eval_congress_researcher_scenarios(
     )
 
     final_text = ""
+    tool_outputs = [json.dumps(mock_bq_data)]  # Include the input signal data
+
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session.id,
         new_message=user_message,
     ):
+        # Dynamically record tool execution responses as retrieval context
+        if hasattr(event, "content") and event.content and event.content.parts:
+            for part in event.content.parts:
+                if hasattr(part, "function_response") and part.function_response:
+                    tool_outputs.append(str(part.function_response.response))
+
         if hasattr(event, "is_final_response") and event.is_final_response():
             if event.content and event.content.parts:
                 final_text = "".join(part.text for part in event.content.parts if part.text)
 
-    retrieval_context_payload = (
-        [json.dumps(mock_bq_data)]
-        if mock_bq_data
-        else ["No congressional trade signals found for target date."]
-    )
+    # Now retrieval_context contains BOTH signals and real/mocked contract query outputs
+    retrieval_context_payload = tool_outputs if tool_outputs else ["No context found."]
 
     test_case = LLMTestCase(
         input=prompt_text,
