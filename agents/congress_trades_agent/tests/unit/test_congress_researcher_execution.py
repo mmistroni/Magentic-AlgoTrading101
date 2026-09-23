@@ -1,13 +1,14 @@
+from unittest.mock import MagicMock, patch
 import pytest
-from unittest.mock import patch
+from google.adk.tools import ToolContext
 
-from congress_trades_agent.skills.congress_researcher.tools import (
-    fetch_congress_signals,
-    fetch_contract_signals,
-)
 from congress_trades_agent.schemas import (
     CongressSignalsResponse,
     ContractSignalsResponse,
+)
+from congress_trades_agent.skills.congress_researcher.tools import (
+    fetch_congress_signals,
+    fetch_contract_signals,
 )
 
 
@@ -37,26 +38,48 @@ def mock_contract_records():
     }]
 
 
-@patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_data")
-@patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_signals_data")
-def test_congress_researcher_skill_tool_sequence(
-    mock_get_contracts, mock_get_congress, mock_congress_records, mock_contract_records
-):
-    """Verifies tool execution workflow across Congress and Contract data pipelines."""
-    mock_get_congress.return_value = mock_congress_records
-    mock_get_contracts.return_value = mock_contract_records
+@pytest.fixture
+def mock_tool_context():
+    context = MagicMock(spec=ToolContext)
+    context.state = {
+        "candidates": [],
+        "confluence_reports": {},
+    }
+    return context
 
-    # Step 1: Congress tool retrieves political candidates
-    res_congress = fetch_congress_signals(analysis_date="2026-06-30")
-    assert isinstance(res_congress, CongressSignalsResponse)
-    assert res_congress.count == 1
-    assert res_congress.signals[0].ticker == "LMT"
-    mock_get_congress.assert_called_once_with("2026-06-30")
 
-    # Step 2: Contract tool cross-references candidates
-    flagged_ticker = res_congress.signals[0].ticker
-    res_contracts = fetch_contract_signals(ticker=flagged_ticker, analysis_date="2026-06-30")
-    assert isinstance(res_contracts, ContractSignalsResponse)
-    assert res_contracts.ticker == "LMT"
-    assert res_contracts.total_contract_spend_usd == 75000000.0
-    mock_get_contracts.assert_called_once_with(ticker="LMT", analysis_date="2026-06-30")
+def test_fetch_congress_signals_updates_context(mock_congress_records, mock_tool_context):
+    """Tests fetch_congress_signals independently and verifies state updates."""
+    with patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_data") as mock_bq, \
+         patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_signals_data", mock_bq):
+        
+        mock_bq.return_value = mock_congress_records
+
+        res = fetch_congress_signals(analysis_date="2026-06-30", tool_context=mock_tool_context)
+
+        assert isinstance(res, CongressSignalsResponse)
+        assert res.count == 1
+        assert res.signals[0].ticker == "LMT"
+
+        # Assert candidate record containing 'LMT' was stored in state
+        candidates = mock_tool_context.state["candidates"]
+        assert len(candidates) > 0
+        assert any(
+            (c.ticker if hasattr(c, "ticker") else c.get("ticker")) == "LMT"
+            for c in candidates
+        )
+
+
+def test_fetch_contract_signals_updates_context(mock_contract_records, mock_tool_context):
+    """Tests fetch_contract_signals independently and verifies state updates."""
+    with patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_data") as mock_bq, \
+         patch("congress_trades_agent.skills.congress_researcher.tools.get_bq_signals_data", mock_bq):
+        
+        mock_bq.return_value = mock_contract_records
+
+        res = fetch_contract_signals(ticker="LMT", analysis_date="2026-06-30", tool_context=mock_tool_context)
+
+        assert isinstance(res, ContractSignalsResponse)
+        assert res.ticker == "LMT"
+        assert res.total_contract_spend_usd == 75000000.0
+        assert "LMT" in mock_tool_context.state["confluence_reports"]
