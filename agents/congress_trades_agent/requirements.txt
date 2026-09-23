@@ -1,12 +1,10 @@
-google-adk>=1.25.0,<2.0.0
+google-adk>=1.6.1,<2.0.0
 db-dtypes
-pydantic
 pandas
 pyarrow
 google-cloud-aiplatform
 google-cloud-bigquery
 yfinance
 requests
-db-dtypes
 rapidfuzz 
 deepeval
