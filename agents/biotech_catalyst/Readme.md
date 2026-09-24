@@ -8,4 +8,4 @@ short squeeze or dead cat bounce
 
 
 ==== TRACKEr
-7/9 - integ tests for bq_scout. We now need to test a real agent call
+24/9 - wrote tools.py  and writing tests. todo need agent integration test and agent eval test
