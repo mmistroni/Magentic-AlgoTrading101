@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
 class ClinicalSignalRecord(BaseModel):
@@ -12,7 +12,14 @@ class ClinicalSignalRecord(BaseModel):
     trial_title: Optional[str] = Field(None, description="Official title of the clinical trial study")
     failure_reason: Optional[str] = Field(None, description="Detailed explanation for termination or suspension")
 
-    class ConfigDict:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
+
+class ClinicalSignalResponse(BaseModel):
+    reference_date: str = Field(description="Reference timestamp used for the query cutoff")
+    signals: List[ClinicalSignalItem] = Field(default_factory=list, description="List of extracted clinical trial signals")
+    count: int = Field(default=0, description="Total number of signals retrieved")
+    error: Optional[str] = Field(None, description="Error message if the query or processing failed")
+
+    model_config = ConfigDict(frozen=True)
