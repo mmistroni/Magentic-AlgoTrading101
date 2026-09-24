@@ -1,10 +1,22 @@
+import importlib.util
 import os
+from pathlib import Path
 import pytest
 from datetime import datetime
 
-# Import your real fetch function (using the same loader logic or relative import)
-from biotech_catalyst.skills.bq_scout.scripts.bq_scout_tools import fetch_clinical_signals
+# Dynamically load the tool script via file path (bypasses hyphenated folder import limitation)
+current_dir = Path(__file__).resolve().parent
+tool_path = current_dir.parent.parent / "biotech_catalyst" / "skills" / "bq-scout" / "scripts" / "bq_scout_tools.py"
+
+spec = importlib.util.spec_from_file_location("bq_scout_tools", tool_path)
+bq_scout_tools = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bq_scout_tools)
+
+fetch_clinical_signals = bq_scout_tools.fetch_clinical_signals
+
+# Import schemas normally
 from schemas import ClinicalSignalRecord
+
 
 @pytest.mark.integration
 def test_real_bigquery_clinical_signals_integration():
@@ -15,20 +27,23 @@ def test_real_bigquery_clinical_signals_integration():
     """
     # Ensure GCP authentication environment variable is available
     if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS") and not os.getenv("GCP_PROJECT_ID"):
-        pytest.skip("Skipping BigQuery integration test: GCP credentials not found in environment.")
+        pytest.skip(
+            "Skipping BigQuery integration test: GOOGLE_APPLICATION_CREDENTIALS or GCP_PROJECT_ID not set. "
+            "Run 'gcloud auth application-default login' or export your service account key path."
+        )
 
-    # Define a historical anchor date where data is guaranteed to exist in your table
+    # Define historical anchor date where data is guaranteed to exist
     historical_anchor = "2025-12-03 23:59:59 UTC"
 
     # Execute the live query
     records = fetch_clinical_signals(reference_date=historical_anchor)
 
-    # Validate the results structure and types returned from BigQuery
+    # Validate results structure and types returned from BigQuery
     assert isinstance(records, list), "Expected a list of clinical signal records."
     
     print(f"Successfully fetched {len(records)} records from BigQuery using historical anchor {historical_anchor}")
 
-    # If records exist in that window, validate schema conformity
+    # Validate schema conformity on returned live items
     for record in records:
         assert isinstance(record, ClinicalSignalRecord)
         assert record.ticker is not None

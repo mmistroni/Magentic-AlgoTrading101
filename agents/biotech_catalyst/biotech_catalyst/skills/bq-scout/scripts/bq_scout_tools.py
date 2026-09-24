@@ -20,12 +20,12 @@ from typing import List, Optional
 from google.cloud import bigquery
 
 def load_sql_query() -> str:
-    """Reads the SQL query from the resources/bq.sql directory relative to this script."""
+    """Reads the SQL query from the resources/bq.sql directory relative to the skill root."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    sql_path = os.path.join(current_dir, "resources", "bq.sql")
+    # Go up one level from 'scripts' to 'bq-scout', then into 'resources'
+    sql_path = os.path.join(current_dir, "..", "resources", "bq.sql")
     with open(sql_path, "r") as f:
         return f.read()
-
 
 
 def fetch_clinical_signals(reference_date: Optional[str] = None) -> List[ClinicalSignalRecord]:
