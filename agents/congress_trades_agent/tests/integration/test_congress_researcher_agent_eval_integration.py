@@ -5,11 +5,10 @@ from unittest.mock import patch
 from google.genai import types
 from deepeval.metrics import GEval
 from deepeval.test_case import LLMTestCase, SingleTurnParams
-
-# Correct DeepEval import
 from deepeval.models import GeminiModel
 
-# Import agent and runner components
+# Import schemas, agent, and runner components
+from congress_trades_agent.schemas import PoliticalContextPayload
 from congress_trades_agent.skills.congress_researcher.agent import congress_researcher
 from google.adk.runners import InMemoryRunner
 
@@ -20,7 +19,7 @@ HAS_GCP_CREDS = bool(
     os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GEMINI_API_KEY")
 )
 
-# Instantiate GeminiModel with Gemini 2.5 Flash / 3 Flash target
+# Instantiate GeminiModel with Gemini 2.5 Flash
 gemini_evaluator = GeminiModel(
     model="gemini-2.5-flash",
     api_key=os.getenv("GEMINI_API_KEY"),
@@ -110,7 +109,6 @@ async def test_eval_congress_researcher_scenarios(
         parts=[types.Part.from_text(text=prompt_text)],
     )
 
-    final_text = ""
     tool_outputs = [json.dumps(mock_bq_data)]  # Include the input signal data
 
     async for event in runner.run_async(
@@ -124,18 +122,39 @@ async def test_eval_congress_researcher_scenarios(
                 if hasattr(part, "function_response") and part.function_response:
                     tool_outputs.append(str(part.function_response.response))
 
-        if hasattr(event, "is_final_response") and event.is_final_response():
-            if event.content and event.content.parts:
-                final_text = "".join(
-                    part.text for part in event.content.parts if hasattr(part, "text") and part.text
-                )
+    # Retrieve updated session state populated by the SequentialAgent
+    updated_session = await runner.session_service.get_session(
+        app_name=runner.app_name, user_id=user_id, session_id=session.id
+    )
 
-    # Now retrieval_context contains BOTH signals and real/mocked contract query outputs
+    raw_political_context = updated_session.state.get("political_context")
+    assert raw_political_context is not None, "political_context was not found in session.state"
+
+    # 1. Deterministic Schema Validation
+    if isinstance(raw_political_context, str):
+        # Handle JSON strings if stored as raw text
+        clean_json = raw_political_context.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        payload_dict = json.loads(clean_json)
+    elif isinstance(raw_political_context, dict):
+        payload_dict = raw_political_context
+    else:
+        payload_dict = raw_political_context.model_dump() if hasattr(raw_political_context, "model_dump") else dict(raw_political_context)
+
+    validated_payload = PoliticalContextPayload.model_validate(payload_dict)
+
+    # Business rule checks for zero-activity vs active days
+    if not mock_bq_data:
+        assert len(validated_payload.primary_tickers) == 0, "Zero activity scenario should produce empty primary_tickers."
+    else:
+        assert len(validated_payload.primary_tickers) > 0, "Expected primary_tickers to be populated."
+
+    # 2. LLM GEval Validation
     retrieval_context_payload = tool_outputs if tool_outputs else ["No context found."]
+    actual_output_str = json.dumps(validated_payload.model_dump(), indent=2)
 
     test_case = LLMTestCase(
         input=prompt_text,
-        actual_output=final_text,
+        actual_output=actual_output_str,
         retrieval_context=retrieval_context_payload,
     )
 
