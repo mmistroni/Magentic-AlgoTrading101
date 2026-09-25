@@ -81,6 +81,24 @@ class ContractSignalsResponse(BaseModel):
     count: int = 0
     error: Optional[str] = None
 
+class PoliticalContextPayload(BaseModel):
+    analysis_date: str = Field(description="ISO date string (YYYY-MM-DD)")
+    primary_tickers: List[str] = Field(
+        description="Unique list of candidate tickers identified from congress and contract signals"
+    )
+    congress_signals: List[CongressSignalItem] = Field(
+        default_factory=list,
+        description="Aggregated congressional buying/selling activity per ticker"
+    )
+    contract_signals: List[ContractSignalItem] = Field(
+        default_factory=list,
+        description="Government contract awards fetched for candidate tickers"
+    )
+    asymmetric_flags: List[str] = Field(
+        default_factory=list,
+        description="Key anomalies or observations (e.g. 'Strong buying ahead of DoD contract award')"
+    )
+
 
 # ==========================================
 # 3. INSIDER ANALYST MODELS

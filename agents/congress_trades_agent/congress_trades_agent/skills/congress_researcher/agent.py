@@ -1,6 +1,8 @@
 from pathlib import Path
 from google.adk.agents import LlmAgent
+from google.genai import types
 from .tools import fetch_congress_signals_tool, fetch_contract_signals_tool
+from congress_trades_agent.schemas import PoliticalContextPayload
 
 SKILL_DIR = Path(__file__).parent
 
@@ -19,5 +21,9 @@ congress_researcher = LlmAgent(
     model='gemini-2.5-flash',
     instruction=parse_skill_instructions(SKILL_DIR),
     tools=[fetch_congress_signals_tool, fetch_contract_signals_tool],
-    output_key="political_context"
+    output_key="political_context",
+    generation_config=types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=PoliticalContextPayload,
+    )
 )
