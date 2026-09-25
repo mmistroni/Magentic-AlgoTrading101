@@ -20,7 +20,7 @@ HAS_GCP_CREDS = bool(
     os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GEMINI_API_KEY")
 )
 
-# Instantiate GeminiModel with Gemini 3 Flash
+# Instantiate GeminiModel with Gemini 2.5 Flash / 3 Flash target
 gemini_evaluator = GeminiModel(
     model="gemini-2.5-flash",
     api_key=os.getenv("GEMINI_API_KEY"),
@@ -30,9 +30,9 @@ gemini_evaluator = GeminiModel(
 political_relevance_metric = GEval(
     name="Political Strategy Relevance & Accuracy",
     criteria="""
-    1. Accurately summarize the congressional trading signals (tickers, purchase/sale counts, net buys) matching RETRIEVAL_CONTEXT.
+    1. Accurately summarize the congressional trading signals matching RETRIEVAL_CONTEXT (tickers, buy/sell counts, net buys, or structured response objects).
     2. Correctly incorporate the broader market regime context (e.g., market uptrend or downtrend) provided in RETRIEVAL_CONTEXT.
-    3. Maintain an authoritative, structured Washington Policy Strategist tone.
+    3. Maintain an authoritative, structured Washington Policy Strategist tone and structure output appropriately according to schema.
     4. Handle empty trading contexts gracefully without hallucinating non-existent congressional trades.
     """,
     evaluation_params=[
@@ -126,7 +126,9 @@ async def test_eval_congress_researcher_scenarios(
 
         if hasattr(event, "is_final_response") and event.is_final_response():
             if event.content and event.content.parts:
-                final_text = "".join(part.text for part in event.content.parts if part.text)
+                final_text = "".join(
+                    part.text for part in event.content.parts if hasattr(part, "text") and part.text
+                )
 
     # Now retrieval_context contains BOTH signals and real/mocked contract query outputs
     retrieval_context_payload = tool_outputs if tool_outputs else ["No context found."]
