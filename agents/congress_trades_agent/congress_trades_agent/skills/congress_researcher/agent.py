@@ -18,7 +18,7 @@ def parse_skill_instructions(skill_dir: Path) -> str:
 # 1. Research worker: Handles tool calling
 congress_researcher_worker = LlmAgent(
     name="CongressResearcherWorker",
-    model="gemini-2.5-flash",
+    model="gemini-3.5-flash",
     instruction=parse_skill_instructions(SKILL_DIR),
     tools=[fetch_congress_signals_tool, fetch_contract_signals_tool],
     output_key="research_notes",
@@ -27,7 +27,7 @@ congress_researcher_worker = LlmAgent(
 # 2. Schema formatter: No tools, enforces PoliticalContextPayload
 congress_researcher_formatter = LlmAgent(
     name="CongressResearcherFormatter",
-    model="gemini-2.5-flash",
+    model="gemini-3.5-flash",
     instruction=(
         "Review the gathered research notes in context and format the response "
         "to strictly match the required output schema."

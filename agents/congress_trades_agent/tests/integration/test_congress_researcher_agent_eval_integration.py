@@ -21,7 +21,7 @@ HAS_GCP_CREDS = bool(
 
 # Instantiate GeminiModel with Gemini 2.5 Flash
 gemini_evaluator = GeminiModel(
-    model="gemini-2.5-flash",
+    model="gemini-3.5-flash",
     api_key=os.getenv("GEMINI_API_KEY"),
 )
 
