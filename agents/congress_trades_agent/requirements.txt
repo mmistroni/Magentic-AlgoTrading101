@@ -1,17 +1,26 @@
+# --- Agent Framework & LLM SDKs ---
 google-adk>=1.6.1,<2.0.0
 google-genai
 pydantic>=2.7.0,<3.0.0
 pydantic-settings>=2.2.0
-opentelemetry-api<=1.41.1
+
+# --- Web & Telemetry ---
 fastapi>=0.110.0,<0.116.0
-posthog<4.0.0
 python-multipart<0.0.21
-db-dtypes
+opentelemetry-api<=1.41.1
+posthog<4.0.0
+
+# --- Data Science, ML & Finance ---
 pandas
 pyarrow
+db-dtypes
+yfinance
+rapidfuzz
+
+# --- Google Cloud Platform ---
 google-cloud-aiplatform
 google-cloud-bigquery
-yfinance
-requests
-rapidfuzz 
+
+# --- Evaluation & Networking ---
 deepeval
+requests
