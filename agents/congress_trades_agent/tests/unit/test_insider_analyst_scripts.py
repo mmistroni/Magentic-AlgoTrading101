@@ -1,71 +1,70 @@
-import unittest
-from unittest.mock import MagicMock, patch
-from pathlib import Path
+from unittest.mock import patch
 
-from congress_trades_agent.skills.insider_analyst.scripts.insider_signals import get_form4_data
-from congress_trades_agent.skills.insider_analyst.scripts.lobbying_signals import get_lobbying_data
+from congress_trades_agent.skills.insider_analyst.tools import (
+    fetch_form4_signals_tool,
+    fetch_lobbying_signals_tool,
+)
+from congress_trades_agent.schemas import (
+    Form4SignalsResponse,
+    LobbyingSignalsResponse,
+)
 
 
-class TestInsiderAnalystScripts(unittest.TestCase):
-
-    @patch("congress_trades_agent.skills.insider_analyst.scripts.insider_signals.get_bq_client")
-    def test_get_form4_data_invokes_bq_with_correct_params(self, mock_get_bq_client):
-        # 1. Setup Mock BigQuery Client & Job
-        mock_client = MagicMock()
-        mock_get_bq_client.return_value = mock_client
-
-        mock_query_job = MagicMock()
-        # Mock row return
-        mock_row = {
+@patch("congress_trades_agent.skills.insider_analyst.tools.get_form4_data")
+def test_fetch_form4_signals_tool_success(mock_get_form4):
+    # 1. Setup mock BigQuery script response
+    mock_get_form4.return_value = [
+        {
             "ticker": "NVDA",
             "issuer": "NVIDIA Corp",
             "net_buy_value": 500000.0,
-            "unique_buyers": 2,
-            "is_c_suite_buy": 1,
-            "buy_count": 2,
+            "unique_buyers": 3,
+            "is_c_suite_buy": True,
+            "is_cluster_buy": True,
+            "buy_count": 3,
             "sell_count": 0,
-            "is_cluster_buy": False,
-            "insider_activity_score": 45.0,
+            "insider_activity_score": 65.0,
         }
-        mock_query_job.result.return_value = [mock_row]
-        mock_client.query.return_value = mock_query_job
+    ]
 
-        # 2. Execute Function
-        test_date = "2026-03-01"
-        test_ticker = "NVDA"
-        results = get_form4_data(analysis_date=test_date, ticker=test_ticker, lookback_days=90)
+    # 2. Invoke tool wrapper function
+    response = fetch_form4_signals_tool.func(
+        analysis_date="2026-03-01", ticker="NVDA", lookback_days=90
+    )
 
-        # 3. Assertions
-        mock_client.query.assert_called_once()
-        
-        # Extract arguments passed to client.query(query, job_config=job_config)
-        args, kwargs = mock_client.query.call_args
-        sql_passed = args[0]
-        job_config_passed = kwargs.get("job_config")
+    # 3. Assertions using standard pytest syntax
+    mock_get_form4.assert_called_once_with(
+        analysis_date="2026-03-01", ticker="NVDA", lookback_days=90
+    )
+    assert isinstance(response, Form4SignalsResponse)
+    assert response.analysis_date == "2026-03-01"
+    assert response.count == 1
+    assert response.error is None
+    assert response.signals[0].ticker == "NVDA"
+    assert response.signals[0].is_cluster_buy is True
 
-        # Verify SQL content loaded from reference file
-        self.assertIn("form4_master", sql_passed)
-        self.assertIn("aggregated_insider", sql_passed)
 
-        # Verify BigQuery Parameter Bindings
-        params = {p.name: p.value for p in job_config_passed.query_parameters}
-        self.assertEqual(params["analysis_date"], "2026-03-01")
-        self.assertEqual(params["ticker"], "NVDA")
-        self.assertEqual(params["lookback_days"], 90)
+@patch("congress_trades_agent.skills.insider_analyst.tools.get_form4_data")
+def test_fetch_form4_signals_tool_error_handling(mock_get_form4):
+    # 1. Simulate database failure
+    mock_get_form4.side_effect = Exception("BigQuery Connection Timeout")
 
-        # Verify Output
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["ticker"], "NVDA")
+    # 2. Execute tool
+    response = fetch_form4_signals_tool.func(
+        analysis_date="2026-03-01", ticker="NVDA"
+    )
 
-    @patch("congress_trades_agent.skills.insider_analyst.scripts.lobbying_signals.get_bq_client")
-    def test_get_lobbying_data_invokes_bq_with_correct_params(self, mock_get_bq_client):
-        # 1. Setup Mock BigQuery Client & Job
-        mock_client = MagicMock()
-        mock_get_bq_client.return_value = mock_client
+    # 3. Verify graceful error packaging
+    assert isinstance(response, Form4SignalsResponse)
+    assert response.count == 0
+    assert "BigQuery Connection Timeout" in response.error
 
-        mock_query_job = MagicMock()
-        # Mock row return
-        mock_row = {
+
+@patch("congress_trades_agent.skills.insider_analyst.tools.get_lobbying_data")
+def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
+    # 1. Setup mock response
+    mock_get_lobbying.return_value = [
+        {
             "ticker": "AAPL",
             "client_name": "Apple Inc.",
             "key_issues": "CPT, TAX, TRD",
@@ -73,34 +72,34 @@ class TestInsiderAnalystScripts(unittest.TestCase):
             "prior_spend": 800000.0,
             "spend_growth_pct": 50.0,
         }
-        mock_query_job.result.return_value = [mock_row]
-        mock_client.query.return_value = mock_query_job
+    ]
 
-        # 2. Execute Function
-        test_date = "2026-03-01"
-        results = get_lobbying_data(analysis_date=test_date, ticker=None, lookback_days=90)
+    # 2. Invoke tool
+    response = fetch_lobbying_signals_tool.func(
+        analysis_date="2026-03-01", ticker="AAPL", lookback_days=90
+    )
 
-        # 3. Assertions
-        mock_client.query.assert_called_once()
-
-        args, kwargs = mock_client.query.call_args
-        sql_passed = args[0]
-        job_config_passed = kwargs.get("job_config")
-
-        # Verify SQL content loaded from reference file
-        self.assertIn("lobbying_signals", sql_passed)
-        self.assertIn("spend_growth_pct", sql_passed)
-
-        # Verify BigQuery Parameter Bindings
-        params = {p.name: p.value for p in job_config_passed.query_parameters}
-        self.assertEqual(params["analysis_date"], "2026-03-01")
-        self.assertIsNone(params["ticker"])
-        self.assertEqual(params["lookback_days"], 90)
-
-        # Verify Output
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["spend_growth_pct"], 50.0)
+    # 3. Assertions
+    mock_get_lobbying.assert_called_once_with(
+        analysis_date="2026-03-01", ticker="AAPL", lookback_days=90
+    )
+    assert isinstance(response, LobbyingSignalsResponse)
+    assert response.analysis_date == "2026-03-01"
+    assert response.count == 1
+    assert response.error is None
+    assert response.signals[0].ticker == "AAPL"
+    assert response.signals[0].spend_growth_pct == 50.0
 
 
-if __name__ == "__main__":
-    unittest.main()
+@patch("congress_trades_agent.skills.insider_analyst.tools.get_lobbying_data")
+def test_fetch_lobbying_signals_tool_error_handling(mock_get_lobbying):
+    # 1. Simulate failure
+    mock_get_lobbying.side_effect = Exception("Table not found")
+
+    # 2. Execute tool
+    response = fetch_lobbying_signals_tool.func(analysis_date="2026-03-01")
+
+    # 3. Assertions
+    assert isinstance(response, LobbyingSignalsResponse)
+    assert response.count == 0
+    assert "Table not found" in response.error
