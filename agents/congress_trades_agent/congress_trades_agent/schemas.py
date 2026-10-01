@@ -135,6 +135,25 @@ class LobbyingSignalsResponse(BaseModel):
     signals: List[LobbyingSignalItem] = Field(default_factory=list)
     error: Optional[str] = None
 
+class InsiderContextPayload(BaseModel):
+    analysis_date: str = Field(description="ISO date string (YYYY-MM-DD)")
+    primary_tickers: List[str] = Field(
+        description="Unique list of candidate tickers identified from congress and insider/lobbying signals"
+    )
+    form4_signals: List[Form4SignalItem] = Field(
+        default_factory=list,
+        description="Aggregated Form 4 filing activity per ticker"
+    )
+    lobbying_signals: List[LobbyingSignalItem] = Field(
+        default_factory=list,
+        description="Corporate lobbying expenditures and quarter-over-quarter growth per ticker"
+    )
+    asymmetric_flags: List[str] = Field(
+        default_factory=list,
+        description="Key anomalies or observations (e.g. 'Strong executive buying paired with accelerating lobbying spend')"
+    )
+
+
 
 # ==========================================
 # 4. SHARED MARKET MODELS
