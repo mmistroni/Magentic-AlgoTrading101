@@ -3,7 +3,7 @@ from unittest.mock import patch
 from google.adk.agents import LlmAgent, SequentialAgent
 
 from congress_trades_agent.schemas import InsiderContextPayload
-from congress_trades_agent.skills.insider_analyst import insider_analyst
+from congress_trades_agent.skills.insider_analyst.agent import insider_analyst
 from congress_trades_agent.skills.insider_analyst.tools import (
     fetch_form4_signals_tool,
     fetch_lobbying_signals_tool,

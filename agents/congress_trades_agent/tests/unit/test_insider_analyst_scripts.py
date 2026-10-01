@@ -76,8 +76,7 @@ def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
 
     # 2. Invoke tool
     response = fetch_lobbying_signals_tool.func(
-        analysis_date="2026-03-01", ticker="AAPL", lookback_days=90
-    )
+        analysis_date="2026-03-01", ticker="AAPL")
 
     # 3. Assertions
     mock_get_lobbying.assert_called_once_with(
