@@ -22,5 +22,5 @@ google-cloud-aiplatform
 google-cloud-bigquery
 
 # --- Evaluation & Networking ---
-deepeval
+deepeval>=3.0.0
 requests
