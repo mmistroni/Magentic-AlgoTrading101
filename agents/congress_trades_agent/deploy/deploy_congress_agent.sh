@@ -27,7 +27,7 @@ echo "✅ Authentication successful. Proceeding with deployment..."
 
 # GCLOUD Project and Location (Mandatory for the deploy command)
 GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-datascience-projects}"
-GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
+GOOGLE_CLOUD_LOCATION="us-central1"
 
 # Service Name (Used in the deploy command)
 SERVICE_NAME="congress-trades-agent"
