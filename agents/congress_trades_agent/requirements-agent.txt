@@ -1,0 +1,30 @@
+# --- Core Frameworks & ADK ---
+google-adk==1.6.1
+google-genai>=1.25.0
+google-ai-generativelanguage>=0.6.15
+google-api-core>=2.24.0
+google-cloud-core>=2.4.1
+
+# --- Data Validation & Serialization ---
+pydantic>=2.11.4
+pydantic-settings>=2.9.1
+typing-extensions>=4.12.0
+annotated-types>=0.7.0
+
+# --- Web & APIs ---
+fastapi>=0.115.0
+uvicorn>=0.34.0
+httpx>=0.28.0
+requests>=2.32.0
+
+# --- Database & Finance Data Utilities ---
+SQLAlchemy>=2.0.30
+aiosqlite>=0.20.0
+pandas>=2.2.0
+numpy>=2.0.0
+yfinance>=0.2.50
+
+# --- Testing & Code Quality ---
+pytest>=8.0.0
+pytest-asyncio>=0.23.5
+pytest-mock>=3.12.0
