@@ -29,13 +29,11 @@ def test_fetch_form4_signals_tool_success(mock_get_form4):
 
     # 2. Invoke tool wrapper function
     response = fetch_form4_signals_tool.func(
-        analysis_date="2026-03-01", ticker="NVDA", lookback_days=90
-    )
+        analysis_date="2026-03-01", ticker="NVDA")
 
     # 3. Assertions using standard pytest syntax
     mock_get_form4.assert_called_once_with(
-        analysis_date="2026-03-01", ticker="NVDA", lookback_days=90
-    )
+        analysis_date="2026-03-01", ticker="NVDA")
     assert isinstance(response, Form4SignalsResponse)
     assert response.analysis_date == "2026-03-01"
     assert response.count == 1
@@ -59,7 +57,6 @@ def test_fetch_form4_signals_tool_error_handling(mock_get_form4):
     assert response.count == 0
     assert "BigQuery Connection Timeout" in response.error
 
-
 @patch("congress_trades_agent.skills.insider_analyst.tools.get_lobbying_data")
 def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
     # 1. Setup mock response
@@ -76,12 +73,11 @@ def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
 
     # 2. Invoke tool
     response = fetch_lobbying_signals_tool.func(
-        analysis_date="2026-03-01", ticker="AAPL", lookback_days=90
+        analysis_date="2026-03-01", ticker="AAPL"
     )
 
-    # 3. Assertions
     mock_get_lobbying.assert_called_once_with(
-        analysis_date="2026-03-01", ticker="AAPL", lookback_days=90
+        analysis_date="2026-03-01", ticker="AAPL"
     )
     assert isinstance(response, LobbyingSignalsResponse)
     assert response.analysis_date == "2026-03-01"
