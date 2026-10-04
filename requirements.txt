@@ -1,26 +1,10 @@
 # --- Base Core & Agent Frameworks ---
-google-adk==1.6.1
 smolagents==1.18.0
 strands-agents
 fastmcp
 mcp[cli]
 crawl4ai
 trafilatura==2.0.0
-wikipedia
-
-# --- Google Cloud & Generative AI ---
-google-ai-generativelanguage>=0.6.15
-google-api-core>=2.24.2
-google-api-python-client>=2.169.0
-google-auth>=2.40.1
-google-cloud-aiplatform>=1.103.0
-google-cloud-bigquery>=3.32.0
-google-cloud-core>=2.4.3
-google-cloud-logging>=3.12.1
-google-cloud-secret-manager>=2.23.3
-google-cloud-storage>=2.19.0
-google-genai>=1.25.0
-google-generativeai>=0.8.5
 
 # --- Evaluation, Data Science & Finance ---
 numpy>=2.0.0
@@ -28,50 +12,9 @@ pandas>=2.2.3
 scikit-learn
 pyarrow>=19.0.1
 finvizfinance>=1.1.0
-openbb_core
-openbb_finviz
 ta
 vix_utils
 yfinance>=0.2.58
 pydantic-tfl-api
 rapidfuzz>=3.13.0
 
-# --- Web & APIs ---
-fastapi>=0.115.12
-starlette>=0.46.2
-uvicorn>=0.34.2
-httpx>=0.28.1
-requests>=2.32.4
-aiohttp>=3.11.18
-sse-starlette>=2.3.5
-websockets>=15.0.1
-twilio
-python-multipart>=0.0.20
-
-# --- Telemetry & Analytics ---
-
-# --- Data Validation, Serialization & Utilities ---
-pydantic>=2.11.4
-pydantic-settings>=2.9.1
-typing-extensions>=4.12.0
-annotated-types>=0.7.0
-dataclasses-json>=0.6.7
-protobuf>=5.29.4
-proto-plus>=1.26.1
-orjson>=3.10.18
-jsonschema>=4.23.0
-
-# --- Database & Storage ---
-
-# --- Testing & Quality ---
-pytest>=8.0.0
-pytest-asyncio>=0.23.5
-pytest-mock
-ruff>=0.7.4
-
-# --- Support & Environment Utilities ---
-python-dotenv>=1.1.0
-rich>=14.0.0
-tenacity>=8.5.0
-tiktoken>=0.9.0
-charset-normalizer>=3.3.2
