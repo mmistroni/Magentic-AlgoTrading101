@@ -32,9 +32,7 @@ def test_get_form4_data_query_parameters(mock_get_bq_client):
         "sell_count": 0,
         "insider_activity_score": 65.0,
     }
-    mock_row = MagicMock()
-    mock_row.items.return_value = row_data.items()
-    mock_query_job.result.return_value = [mock_row]
+    mock_query_job.result.return_value = [row_data]
 
     # 2. Invoke script function
     results = get_form4_data(
@@ -77,9 +75,7 @@ def test_get_lobbying_data_query_parameters(mock_get_bq_client):
         "prior_spend": 800000.0,
         "spend_growth_pct": 50.0,
     }
-    mock_row = MagicMock()
-    mock_row.items.return_value = row_data.items()
-    mock_query_job.result.return_value = row_data
+    mock_query_job.result.return_value = [row_data]
 
     # 2. Invoke script function
     results = get_lobbying_data(
