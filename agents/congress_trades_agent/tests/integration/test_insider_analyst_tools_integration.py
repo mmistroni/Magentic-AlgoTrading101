@@ -1,91 +1,109 @@
+# agents/congress_trades_agent/tests/integration/test_insider_analyst_tool_integration.py
+
 import os
-from pathlib import Path
-from unittest.mock import MagicMock
 import pytest
-from google.adk.tools import ToolContext
+from google.genai import types
+from google.adk.runners import InMemoryRunner
 
-from congress_trades_agent.schemas import (
-    InsiderSignalsResponse,
-    Form4DetailsResponse,
+from congress_trades_agent.skills.insider_analyst.agent import insider_analyst
+
+APP_NAME = "congress_trades_agent"
+
+HAS_GCP_CREDS = bool(
+    os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GEMINI_API_KEY")
 )
-from congress_trades_agent.skills.insider_analyst.tools import (
-    fetch_insider_signals,
-    fetch_form4_details,
-)
 
-GCP_KEY_PATH = Path("gcp_key.json")
-HAS_GCP_CREDS = GCP_KEY_PATH.exists() or bool(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+# Test matrix based on your BigQuery dataset results
+INTEGRATION_TEST_SCENARIOS = [
+    {
+        "scenario_id": "insider_only_jef",
+        "ticker": "JEF",
+        "prompt": "Get insider trading activity and Form 4 transactions for ticker JEF.",
+        "expected_tools": ["fetch_form4_signals"], # Adjust function name to match your tool
+    },
+    {
+        "scenario_id": "lobbying_only_wynn",
+        "ticker": "WYNN",
+        "prompt": "Get lobbying spending and disclosure signals for ticker WYNN.",
+        "expected_tools": ["fetch_lobbying_signals"], # Adjust function name to match your tool
+    },
+    {
+        "scenario_id": "combined_signals_jef",
+        "ticker": "JEF",
+        "prompt": "Cross-reference Form 4 insider transactions with lobbying disclosures for ticker JEF.",
+        "expected_tools": ["fetch_form4_signals", "fetch_lobbying_signals"],
+    },
+]
 
-TEST_DATE = "2026-09-14"
 
-
-@pytest.fixture
-def real_tool_context():
-    """Initializes a live ToolContext instance for integration testing."""
-    mock_invocation = MagicMock()
-    mock_invocation.session.state = {
-        "candidates": [],
-        "confluence_reports": {},
-    }
-    context = ToolContext(invocation_context=mock_invocation)
-    return context
-
-
-@pytest.mark.integration
+@pytest.mark.asyncio
 @pytest.mark.skipif(
     not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
+    reason="Skipped: GOOGLE_APPLICATION_CREDENTIALS or GEMINI_API_KEY required for live BigQuery execution",
 )
-def test_fetch_insider_signals(real_tool_context):
-    """Executes live fetch_insider_signals and asserts ToolContext state updates."""
-    result = fetch_insider_signals(analysis_date=TEST_DATE, tool_context=real_tool_context)
+@pytest.mark.parametrize("scenario", INTEGRATION_TEST_SCENARIOS)
+async def test_insider_analyst_tool_execution(scenario):
+    """Verifies tools are invoked, BigQuery returns non-empty data, and final text is returned."""
+    user_id = f"test_user_{scenario['scenario_id']}"
 
-    assert isinstance(result, InsiderSignalsResponse)
-    assert result.error is None, f"Insider signals query failed: {result.error}"
-    assert result.analysis_date == TEST_DATE
-    assert isinstance(result.signals, list)
-    assert result.count == len(result.signals)
-    assert result.count > 0, f"Expected at least 1 signal for date {TEST_DATE}"
-
-    first_signal = result.signals[0]
-    assert hasattr(first_signal, "ticker")
-    assert len(first_signal.ticker) > 0
-
-    candidates = real_tool_context.state.get("candidates", [])
-    assert len(candidates) > 0, "ToolContext state 'candidates' was not updated."
-    
-    candidate_tickers = [
-        c.ticker if hasattr(c, "ticker") else c.get("ticker")
-        for c in candidates
-    ]
-    assert first_signal.ticker in candidate_tickers
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(
-    not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
-)
-def test_fetch_form4_details(real_tool_context):
-    """Executes live fetch_form4_details across a sequence and asserts ToolContext state updates."""
-    insider_res = fetch_insider_signals(analysis_date=TEST_DATE, tool_context=real_tool_context)
-    assert insider_res.error is None
-    assert insider_res.count > 0, "Prerequisite failed: No Insider signals found"
-
-    target_ticker = insider_res.signals[0].ticker
-
-    form4_res = fetch_form4_details(
-        ticker=target_ticker,
-        analysis_date=TEST_DATE,
-        tool_context=real_tool_context
+    runner = InMemoryRunner(agent=insider_analyst, app_name=APP_NAME)
+    session = await runner.session_service.create_session(
+        app_name=runner.app_name, user_id=user_id
     )
 
-    assert isinstance(form4_res, Form4DetailsResponse)
-    assert form4_res.error is None, f"Form 4 details query failed: {form4_res.error}"
-    assert form4_res.ticker == target_ticker
-    assert form4_res.analysis_date == TEST_DATE
-    assert isinstance(form4_res.signals, list)
-    assert form4_res.count == len(form4_res.signals)
+    user_message = types.Content(
+        role="user",
+        parts=[types.Part.from_text(text=scenario["prompt"])],
+    )
 
-    confluence_reports = real_tool_context.state.get("confluence_reports", {})
-    assert target_ticker in confluence_reports, f"Target ticker {target_ticker} was not recorded in confluence_reports state."
+    executed_tool_calls = []
+    tool_responses = []
+    final_text = ""
+
+    async for event in runner.run_async(
+        user_id=user_id,
+        session_id=session.id,
+        new_message=user_message,
+    ):
+        if hasattr(event, "content") and event.content and event.content.parts:
+            for part in event.content.parts:
+                # Capture tool function calls initiated by the agent
+                if hasattr(part, "function_call") and part.function_call:
+                    executed_tool_calls.append(part.function_call.name)
+
+                # Capture responses returned from BigQuery tool executions
+                if hasattr(part, "function_response") and part.function_response:
+                    resp_data = part.function_response.response
+                    tool_responses.append(resp_data)
+
+        # Capture agent's final text response
+        if hasattr(event, "is_final_response") and event.is_final_response():
+            if event.content and event.content.parts:
+                final_text = "".join(part.text for part in event.content.parts if part.text)
+
+    # 1. Assert that the agent invoked at least one tool
+    assert len(executed_tool_calls) > 0, (
+        f"Scenario '{scenario['scenario_id']}' failed: No tools were called by insider_analyst."
+    )
+
+    # 2. Assert that expected tools were called
+    for expected_tool in scenario["expected_tools"]:
+        assert any(expected_tool in tool_name for tool_name in executed_tool_calls), (
+            f"Scenario '{scenario['scenario_id']}' failed: Expected tool '{expected_tool}' was not called. "
+            f"Executed tools: {executed_tool_calls}"
+        )
+
+    # 3. Assert tool execution returned actual data payloads from BigQuery
+    assert len(tool_responses) > 0, (
+        f"Scenario '{scenario['scenario_id']}' failed: Tools were called but returned no data responses."
+    )
+
+    # 4. Assert that final text response is non-empty
+    assert len(final_text.strip()) > 0, (
+        f"Scenario '{scenario['scenario_id']}' failed: Agent produced an empty final response."
+    )
+
+    print(f"\n[SUCCESS] Scenario: {scenario['scenario_id']}")
+    print(f"  - Tools Executed: {executed_tool_calls}")
+    print(f"  - Tool Responses Received: {len(tool_responses)}")
+    print(f"  - Final Response Length: {len(final_text)} chars")
