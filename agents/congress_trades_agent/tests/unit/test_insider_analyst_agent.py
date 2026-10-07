@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from google.adk.agents import LlmAgent, SequentialAgent
 
@@ -35,7 +35,7 @@ def test_agent_structure_and_hierarchy():
 @patch("congress_trades_agent.skills.insider_analyst.tools.get_form4_data")
 @patch("congress_trades_agent.skills.insider_analyst.tools.get_lobbying_data")
 def test_mock_agent_tool_execution(mock_get_lobbying, mock_get_form4):
-    """Test underlying tool responses consumed during agent workflow."""
+    """Test underlying tool responses and tool_context state mutations during agent workflow."""
     # 1. Setup Mock BigQuery Return Values
     mock_get_form4.return_value = [
         {
@@ -62,17 +62,37 @@ def test_mock_agent_tool_execution(mock_get_lobbying, mock_get_form4):
         }
     ]
 
-    # 2. Directly invoke tools as agent would call them
+    # 2. Setup mock ADK ToolContext
+    mock_tool_context = MagicMock()
+    mock_tool_context.state = {}
+
+    # 3. Directly invoke tools as agent would call them
     form4_res = fetch_form4_signals_tool.func(
-        analysis_date="2026-03-01", ticker="NVDA"
+        analysis_date="2026-03-01",
+        ticker="NVDA",
+        tool_context=mock_tool_context,
     )
     lobbying_res = fetch_lobbying_signals_tool.func(
-        analysis_date="2026-03-01", ticker="NVDA"
+        analysis_date="2026-03-01",
+        ticker="NVDA",
+        tool_context=mock_tool_context,
     )
 
-    # 3. Assert correct payload structure for Formatter consumption
+    # 4. Assert correct payload structure for Formatter consumption
     assert form4_res.signals[0].ticker == "NVDA"
     assert form4_res.signals[0].insider_activity_score == 85.0
 
     assert lobbying_res.signals[0].ticker == "NVDA"
     assert lobbying_res.signals[0].spend_growth_pct == 150.0
+
+    # 5. Assert ToolContext state mutations
+    assert "confluence_reports" in mock_tool_context.state
+    nvda_report = mock_tool_context.state["confluence_reports"]["NVDA"]
+
+    # Form 4 State Verification
+    assert nvda_report["form4_signal"] == "High Conviction Cluster Buy"
+    assert nvda_report["form4_details"]["count"] == 1
+
+    # Lobbying State Verification
+    assert nvda_report["lobbying_spend_usd"] == 2500000.0
+    assert nvda_report["lobbying_details"]["count"] == 1
