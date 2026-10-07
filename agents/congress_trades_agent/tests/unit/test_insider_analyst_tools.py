@@ -1,12 +1,12 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from congress_trades_agent.skills.insider_analyst.tools import (
-    fetch_form4_signals_tool,
-    fetch_lobbying_signals_tool,
-)
 from congress_trades_agent.schemas import (
     Form4SignalsResponse,
     LobbyingSignalsResponse,
+)
+from congress_trades_agent.skills.insider_analyst.tools import (
+    fetch_form4_signals_tool,
+    fetch_lobbying_signals_tool,
 )
 
 
@@ -27,19 +27,33 @@ def test_fetch_form4_signals_tool_success(mock_get_form4):
         }
     ]
 
-    # 2. Invoke tool wrapper function
-    response = fetch_form4_signals_tool.func(
-        analysis_date="2026-03-01", ticker="NVDA")
+    # 2. Setup mock ADK ToolContext
+    mock_tool_context = MagicMock()
+    mock_tool_context.state = {}
 
-    # 3. Assertions using standard pytest syntax
+    # 3. Invoke tool wrapper function with tool_context
+    response = fetch_form4_signals_tool.func(
+        analysis_date="2026-03-01",
+        ticker="NVDA",
+        tool_context=mock_tool_context,
+    )
+
+    # 4. Assertions on standard response
     mock_get_form4.assert_called_once_with(
-        analysis_date="2026-03-01", ticker="NVDA")
+        analysis_date="2026-03-01", ticker="NVDA"
+    )
     assert isinstance(response, Form4SignalsResponse)
     assert response.analysis_date == "2026-03-01"
     assert response.count == 1
     assert response.error is None
     assert response.signals[0].ticker == "NVDA"
     assert response.signals[0].is_cluster_buy is True
+
+    # 5. Assertions on ADK PipelineState mutations
+    assert "confluence_reports" in mock_tool_context.state
+    nvda_report = mock_tool_context.state["confluence_reports"]["NVDA"]
+    assert nvda_report["form4_signal"] == "High Conviction Cluster Buy"
+    assert nvda_report["form4_details"]["count"] == 1
 
 
 @patch("congress_trades_agent.skills.insider_analyst.tools.get_form4_data")
@@ -57,6 +71,7 @@ def test_fetch_form4_signals_tool_error_handling(mock_get_form4):
     assert response.count == 0
     assert "BigQuery Connection Timeout" in response.error
 
+
 @patch("congress_trades_agent.skills.insider_analyst.tools.get_lobbying_data")
 def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
     # 1. Setup mock response
@@ -71,9 +86,15 @@ def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
         }
     ]
 
-    # 2. Invoke tool
+    # 2. Setup mock ADK ToolContext
+    mock_tool_context = MagicMock()
+    mock_tool_context.state = {}
+
+    # 3. Invoke tool
     response = fetch_lobbying_signals_tool.func(
-        analysis_date="2026-03-01", ticker="AAPL"
+        analysis_date="2026-03-01",
+        ticker="AAPL",
+        tool_context=mock_tool_context,
     )
 
     mock_get_lobbying.assert_called_once_with(
@@ -86,6 +107,12 @@ def test_fetch_lobbying_signals_tool_success(mock_get_lobbying):
     assert response.signals[0].ticker == "AAPL"
     assert response.signals[0].spend_growth_pct == 50.0
 
+    # 4. Assertions on ADK PipelineState mutations
+    assert "confluence_reports" in mock_tool_context.state
+    aapl_report = mock_tool_context.state["confluence_reports"]["AAPL"]
+    assert aapl_report["lobbying_spend_usd"] == 1200000.0
+    assert aapl_report["lobbying_details"]["count"] == 1
+
 
 @patch("congress_trades_agent.skills.insider_analyst.tools.get_lobbying_data")
 def test_fetch_lobbying_signals_tool_error_handling(mock_get_lobbying):
@@ -93,7 +120,9 @@ def test_fetch_lobbying_signals_tool_error_handling(mock_get_lobbying):
     mock_get_lobbying.side_effect = Exception("Table not found")
 
     # 2. Execute tool
-    response = fetch_lobbying_signals_tool.func(analysis_date="2026-03-01")
+    response = fetch_lobbying_signals_tool.func(
+        analysis_date="2026-03-01", ticker="AAPL"
+    )
 
     # 3. Assertions
     assert isinstance(response, LobbyingSignalsResponse)

@@ -2,8 +2,8 @@
 
 from typing import Optional
 from google.adk.tools import FunctionTool, ToolContext
-from .scripts.form4_signals import get_bq_form4_data
-from .scripts.lobbying_signals import get_bq_lobbying_data
+from .scripts.insider_signals import get_form4_data
+from .scripts.lobbying_signals import get_lobbying_data
 from ...schemas import (
     Form4SignalsResponse,
     Form4SignalItem,
@@ -29,7 +29,7 @@ def fetch_form4_signals(
         Form4SignalsResponse: Pydantic response containing insider transaction signals.
     """
     try:
-        raw_signals = get_bq_form4_data(ticker=ticker, analysis_date=analysis_date)
+        raw_signals = get_form4_data(ticker=ticker, analysis_date=analysis_date)
         print(f"🔍 Fetched {len(raw_signals)} Form 4 signals for {ticker} up to {analysis_date}")
 
         signal_items = [Form4SignalItem(**item) for item in raw_signals]
@@ -101,7 +101,7 @@ def fetch_lobbying_signals(
         LobbyingSignalsResponse: Pydantic response containing corporate lobbying spend signals.
     """
     try:
-        raw_signals = get_bq_lobbying_data(ticker=ticker, analysis_date=analysis_date)
+        raw_signals = get_lobbying_data(ticker=ticker, analysis_date=analysis_date)
         print(f"🔍 Fetched {len(raw_signals)} lobbying signals for {ticker} up to {analysis_date}")
 
         signal_items = [LobbyingSignalItem(**item) for item in raw_signals]
