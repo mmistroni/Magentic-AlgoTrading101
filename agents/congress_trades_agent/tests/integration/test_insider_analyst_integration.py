@@ -11,6 +11,7 @@ GCP_KEY_PATH = Path("gcp_key.json")
 HAS_GCP_CREDS = GCP_KEY_PATH.exists() or bool(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
 
 TEST_DATE = "2026-09-14"
+TEST_TICKER = "JEF"
 APP_NAME = "congress_trades_agent"
 
 
@@ -21,7 +22,7 @@ APP_NAME = "congress_trades_agent"
     reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
 )
 async def test_insider_analyst_agent_execution():
-    """Verifies that the ADK insider_analyst agent executes tool calls and produces an analysis response."""
+    """Verifies ADK insider_analyst agent execution, tool calls, and session state updates."""
     runner = InMemoryRunner(agent=insider_analyst, app_name=APP_NAME)
 
     user_id = "test_user"
@@ -29,7 +30,14 @@ async def test_insider_analyst_agent_execution():
         app_name=runner.app_name, user_id=user_id
     )
 
-    prompt_text = f"Analyze Corporate Insider trading activity for {TEST_DATE} and cross-reference Form 4 transaction disclosures."
+    # Initialize shared pipeline state on the live ADK Session
+    session.state["confluence_reports"] = {}
+    await runner.session_service.update_session(session)
+
+    prompt_text = (
+        f"Analyze Form 4 insider trading activity and lobbying spend for ticker {TEST_TICKER} "
+        f"up to analysis date {TEST_DATE}."
+    )
     user_msg = types.Content(
         role="user",
         parts=[types.Part(text=prompt_text)]
@@ -50,6 +58,7 @@ async def test_insider_analyst_agent_execution():
     assert len(events) > 0, "Agent produced no events during execution"
     assert len(final_text) > 0, "Agent failed to return a final text response"
 
+    # Extract all executed tool calls across events
     tool_calls_executed = []
     for event in events:
         if hasattr(event, "get_function_calls") and callable(event.get_function_calls):
@@ -60,8 +69,18 @@ async def test_insider_analyst_agent_execution():
                 if hasattr(part, "function_call") and part.function_call:
                     tool_calls_executed.append(part.function_call.name)
 
-    assert "fetch_insider_signals" in tool_calls_executed, (
-        f"Agent failed to invoke fetch_insider_signals tool. Found tool calls: {tool_calls_executed}"
+    # Verify tool execution
+    assert "fetch_form4_signals" in tool_calls_executed, (
+        f"Agent failed to invoke fetch_form4_signals tool. Found tool calls: {tool_calls_executed}"
+    )
+
+    # Verify real ADK Session state mutation via ToolContext
+    updated_session = await runner.session_service.get_session(
+        app_name=runner.app_name, user_id=user_id, session_id=session.id
+    )
+    confluence_reports = updated_session.state.get("confluence_reports", {})
+    assert TEST_TICKER in confluence_reports, (
+        f"Session state 'confluence_reports' was not populated for {TEST_TICKER}"
     )
 
 
@@ -80,9 +99,12 @@ async def test_insider_analyst_agent_synthesis():
         app_name=runner.app_name, user_id=user_id
     )
 
+    session.state["confluence_reports"] = {}
+    await runner.session_service.update_session(session)
+
     prompt_text = (
-        f"Fetch Corporate Insider trading signals for {TEST_DATE}. For the top identified ticker, "
-        "check for institutional holdings filings and provide a short summary."
+        f"Fetch Corporate Insider Form 4 signals and lobbying activity for {TEST_TICKER} "
+        f"as of {TEST_DATE} and provide a concise summary of executive buying or lobbying spend."
     )
     user_msg = types.Content(
         role="user",
