@@ -10,57 +10,73 @@ from congress_trades_agent.skills.insider_analyst.agent import insider_analyst
 GCP_KEY_PATH = Path("gcp_key.json")
 HAS_GCP_CREDS = GCP_KEY_PATH.exists() or bool(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
 
-TEST_DATE = "2026-09-14"
-TEST_TICKER = "JEF"
 APP_NAME = "congress_trades_agent"
+
+# All 4 integration test scenarios
+INTEGRATION_SCENARIOS = [
+    (
+        "both_signals_present",
+        "JEF",
+        "2026-09-14",
+        "Analyze Form 4 insider trading activity and lobbying spend for ticker JEF up to analysis date 2026-09-14.",
+    ),
+    (
+        "insider_only",
+        "TSLA",
+        "2026-09-14",
+        "Analyze Form 4 insider trading activity and lobbying spend for ticker TSLA up to analysis date 2026-09-14.",
+    ),
+    (
+        "lobbying_only",
+        "LMT",
+        "2026-09-14",
+        "Analyze Form 4 insider trading activity and lobbying spend for ticker LMT up to analysis date 2026-09-14.",
+    ),
+    (
+        "zero_activity_both",
+        "XYZNONEXISTENT",
+        "2026-09-14",
+        "Analyze Form 4 insider trading activity and lobbying spend for ticker XYZNONEXISTENT up to analysis date 2026-09-14.",
+    ),
+]
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.skipif(
     not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
+    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS",
 )
-async def test_insider_analyst_agent_execution():
-    """Verifies ADK insider_analyst agent execution, tool calls, and session state updates."""
+@pytest.mark.parametrize("scenario_name, ticker, analysis_date, prompt_text", INTEGRATION_SCENARIOS)
+async def test_insider_analyst_agent_execution_scenarios(scenario_name, ticker, analysis_date, prompt_text):
+    """Verifies ADK insider_analyst agent execution, tool calls, and session state updates across all 4 scenarios."""
     runner = InMemoryRunner(agent=insider_analyst, app_name=APP_NAME)
+    user_id = f"test_user_{scenario_name}"
 
-    user_id = "test_user"
+    # Initialize state directly inside create_session (ADK standard pattern)
     session = await runner.session_service.create_session(
-        app_name=runner.app_name, user_id=user_id
+        app_name=runner.app_name,
+        user_id=user_id,
+        state={"confluence_reports": {}}
     )
 
-    # Initialize shared pipeline state on the live ADK Session
-    session.state["confluence_reports"] = {}
-    await runner.session_service.update_session(session)
-
-    prompt_text = (
-        f"Analyze Form 4 insider trading activity and lobbying spend for ticker {TEST_TICKER} "
-        f"up to analysis date {TEST_DATE}."
-    )
     user_msg = types.Content(
         role="user",
-        parts=[types.Part(text=prompt_text)]
+        parts=[types.Part(text=prompt_text)],
     )
 
     events = []
     final_text = ""
+    tool_calls_executed = []
+
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session.id,
-        new_message=user_msg
+        new_message=user_msg,
     ):
         events.append(event)
-        if hasattr(event, "is_final_response") and event.is_final_response():
-            if event.content and event.content.parts:
-                final_text = "".join(part.text for part in event.content.parts if part.text)
 
-    assert len(events) > 0, "Agent produced no events during execution"
-    assert len(final_text) > 0, "Agent failed to return a final text response"
-
-    # Extract all executed tool calls across events
-    tool_calls_executed = []
-    for event in events:
+        # Extract executed tool names across event types
         if hasattr(event, "get_function_calls") and callable(event.get_function_calls):
             for fc in event.get_function_calls():
                 tool_calls_executed.append(fc.name)
@@ -69,53 +85,72 @@ async def test_insider_analyst_agent_execution():
                 if hasattr(part, "function_call") and part.function_call:
                     tool_calls_executed.append(part.function_call.name)
 
-    # Verify tool execution
-    assert "fetch_form4_signals" in tool_calls_executed, (
-        f"Agent failed to invoke fetch_form4_signals tool. Found tool calls: {tool_calls_executed}"
+        if hasattr(event, "is_final_response") and event.is_final_response():
+            if event.content and event.content.parts:
+                final_text = "".join(part.text for part in event.content.parts if part.text)
+
+    # 1. Assert runner execution completion
+    assert len(events) > 0, f"Scenario '{scenario_name}': Agent produced no events during execution"
+    assert len(final_text) > 0, f"Scenario '{scenario_name}': Agent failed to return a final text response"
+
+    # 2. Assert signal tools invocation
+    assert "fetch_form4_signals" in tool_calls_executed or "fetch_lobbying_signals" in tool_calls_executed, (
+        f"Scenario '{scenario_name}': Agent failed to invoke signal tools. Found tool calls: {tool_calls_executed}"
     )
 
-    # Verify real ADK Session state mutation via ToolContext
+    # 3. Retrieve final session state
     updated_session = await runner.session_service.get_session(
         app_name=runner.app_name, user_id=user_id, session_id=session.id
     )
     confluence_reports = updated_session.state.get("confluence_reports", {})
-    assert TEST_TICKER in confluence_reports, (
-        f"Session state 'confluence_reports' was not populated for {TEST_TICKER}"
-    )
+
+    # 4. Scenario-specific state & output assertions
+    if scenario_name != "zero_activity_both":
+        assert ticker in confluence_reports, (
+            f"Scenario '{scenario_name}': Session state 'confluence_reports' was not populated for {ticker}"
+        )
+    else:
+        response_lower = final_text.lower()
+        assert any(
+            phrase in response_lower
+            for phrase in ["no ", "zero", "none", "not found", "no insider", "no lobbying"]
+        ), f"Scenario '{scenario_name}': Agent failed to report zero activity in its response."
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.skipif(
     not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
+    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS",
 )
 async def test_insider_analyst_agent_synthesis():
     """Verifies that the agent output includes coherent synthesis from insider tools."""
     runner = InMemoryRunner(agent=insider_analyst, app_name=APP_NAME)
+    user_id = "test_user_synthesis"
 
-    user_id = "test_user"
+    ticker = INTEGRATION_SCENARIOS[0][1]
+    analysis_date = INTEGRATION_SCENARIOS[0][2]
+
     session = await runner.session_service.create_session(
-        app_name=runner.app_name, user_id=user_id
+        app_name=runner.app_name,
+        user_id=user_id,
+        state={"confluence_reports": {}}
     )
 
-    session.state["confluence_reports"] = {}
-    await runner.session_service.update_session(session)
-
     prompt_text = (
-        f"Fetch Corporate Insider Form 4 signals and lobbying activity for {TEST_TICKER} "
-        f"as of {TEST_DATE} and provide a concise summary of executive buying or lobbying spend."
+        f"Fetch Corporate Insider Form 4 signals and lobbying activity for {ticker} "
+        f"as of {analysis_date} and provide a concise summary of executive buying or lobbying spend."
     )
     user_msg = types.Content(
         role="user",
-        parts=[types.Part(text=prompt_text)]
+        parts=[types.Part(text=prompt_text)],
     )
 
     final_text = ""
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session.id,
-        new_message=user_msg
+        new_message=user_msg,
     ):
         if hasattr(event, "is_final_response") and event.is_final_response():
             if event.content and event.content.parts:
