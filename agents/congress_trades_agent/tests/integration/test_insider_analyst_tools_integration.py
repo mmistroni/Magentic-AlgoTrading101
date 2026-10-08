@@ -1,12 +1,9 @@
-# agents/congress_trades_agent/tests/integration/test_insider_analyst_tools_integration.py
-
 import os
 from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
 from google.adk.tools import ToolContext
 
-# Adjust these imports to match your actual schema names and tool module paths
 from congress_trades_agent.schemas import (
     Form4SignalsResponse,
     LobbyingSignalsResponse,
@@ -30,10 +27,12 @@ def real_tool_context():
     """Initializes a live ToolContext instance for integration testing."""
     mock_invocation = MagicMock()
     mock_invocation.session.state = {
-        "candidates": [],
         "confluence_reports": {},
     }
     context = ToolContext(invocation_context=mock_invocation)
+    # Ensure tool_context.state direct property access resolves smoothly in ADK
+    if not hasattr(context, "_state") or context._state is None:
+        context.state = mock_invocation.session.state
     return context
 
 
@@ -61,9 +60,12 @@ def test_fetch_form4_signals_insider_only(real_tool_context):
     assert hasattr(first_signal, "ticker")
     assert first_signal.ticker == TEST_INSIDER_TICKER
 
-    # ToolContext state assertion
-    candidates = real_tool_context.state.get("candidates", [])
-    assert len(candidates) > 0, "ToolContext state 'candidates' was not updated."
+    # ToolContext state assertion: tools mutate confluence_reports[ticker]
+    confluence_reports = real_tool_context.state.get("confluence_reports", {})
+    assert TEST_INSIDER_TICKER in confluence_reports, (
+        f"ToolContext state 'confluence_reports' was not updated for {TEST_INSIDER_TICKER}."
+    )
+    assert "form4_signal" in confluence_reports[TEST_INSIDER_TICKER]
 
 
 @pytest.mark.integration
@@ -89,6 +91,13 @@ def test_fetch_lobbying_signals_lobbying_only(real_tool_context):
     first_signal = result.signals[0]
     assert hasattr(first_signal, "ticker")
     assert first_signal.ticker == TEST_LOBBYING_TICKER
+
+    # ToolContext state assertion
+    confluence_reports = real_tool_context.state.get("confluence_reports", {})
+    assert TEST_LOBBYING_TICKER in confluence_reports, (
+        f"ToolContext state 'confluence_reports' was not updated for {TEST_LOBBYING_TICKER}."
+    )
+    assert "lobbying_spend_usd" in confluence_reports[TEST_LOBBYING_TICKER]
 
 
 @pytest.mark.integration
@@ -121,3 +130,6 @@ def test_fetch_combined_signals(real_tool_context):
     assert TEST_INSIDER_TICKER in confluence_reports, (
         f"Ticker {TEST_INSIDER_TICKER} was not recorded in confluence_reports state."
     )
+    report = confluence_reports[TEST_INSIDER_TICKER]
+    assert "form4_signal" in report
+    assert "lobbying_spend_usd" in report
