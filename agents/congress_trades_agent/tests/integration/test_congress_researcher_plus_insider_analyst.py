@@ -13,7 +13,7 @@ HAS_GCP_CREDS = GCP_KEY_PATH.exists() or bool(os.environ.get("GOOGLE_APPLICATION
 
 APP_NAME = "congress_trades_agent"
 
-# Locked scenarios from your BigQuery correlation query results
+# Locked scenarios from BigQuery correlation query results
 MULTI_AGENT_SCENARIOS = [
     (
         "tsm_congress_and_insider",
@@ -37,14 +37,13 @@ MULTI_AGENT_SCENARIOS = [
 @pytest.mark.integration
 @pytest.mark.skipif(
     not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS",
+    reason="Integration test skipped: missing credentials",
 )
 @pytest.mark.parametrize("scenario_name, ticker, analysis_date", MULTI_AGENT_SCENARIOS)
 async def test_dual_agent_sequential_execution(scenario_name, ticker, analysis_date):
-    """Executes CongressResearcher followed by InsiderAnalyst on the same session state."""
+    """Executes CongressResearcher followed by InsiderAnalyst on the same shared ADK session state."""
     user_id = f"test_user_{scenario_name}"
 
-    # Initialize shared ADK state container
     session_state = {
         "confluence_reports": {},
         "congressional_context": {},
@@ -82,8 +81,12 @@ async def test_dual_agent_sequential_execution(scenario_name, ticker, analysis_d
     assert len(congress_text) > 0, f"CongressResearcher failed to generate commentary for {ticker}"
     assert len(congress_text.split()) > 20, f"CongressResearcher commentary for {ticker} was too brief"
 
-    # --- STEP 2: Execute InsiderAnalyst on the Same Session ---
-    insider_runner = InMemoryRunner(agent=insider_analyst, app_name=APP_NAME)
+    # --- STEP 2: Execute InsiderAnalyst sharing CongressRunner's Session Service ---
+    insider_runner = InMemoryRunner(
+        agent=insider_analyst,
+        app_name=APP_NAME,
+        session_service=congress_runner.session_service,  # Shared session memory
+    )
 
     insider_prompt = (
         f"Analyze Form 4 corporate insider trading and lobbying spend for ticker {ticker} "
@@ -109,8 +112,8 @@ async def test_dual_agent_sequential_execution(scenario_name, ticker, analysis_d
     assert len(insider_text.split()) > 20, f"InsiderAnalyst commentary for {ticker} was too brief"
 
     # --- STEP 3: Verify Final ADK Session State Population ---
-    updated_session = await insider_runner.session_service.get_session(
-        app_name=insider_runner.app_name, user_id=user_id, session_id=session.id
+    updated_session = await congress_runner.session_service.get_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session.id
     )
 
     confluence_reports = updated_session.state.get("confluence_reports", {})
