@@ -97,5 +97,4 @@ test_congress_researcher_agents.py
 - test_congress_resaearcher_eval evaluate response
 
   ====12/10.
-  
-  completing integration tets
+  Integration tests complete for congress researcher and insider analyist
