@@ -15,10 +15,9 @@ class ClinicalSignalRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-
 class ClinicalSignalResponse(BaseModel):
     reference_date: str = Field(description="Reference timestamp used for the query cutoff")
-    signals: List[ClinicalSignalItem] = Field(default_factory=list, description="List of extracted clinical trial signals")
+    signals: List[ClinicalSignalRecord] = Field(default_factory=list, description="List of extracted clinical trial signals")
     count: int = Field(default=0, description="Total number of signals retrieved")
     error: Optional[str] = Field(None, description="Error message if the query or processing failed")
 
