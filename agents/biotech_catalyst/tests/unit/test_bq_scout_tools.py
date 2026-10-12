@@ -15,11 +15,10 @@ spec.loader.exec_module(bq_scout_tools_module)
 # Extract the wrapped tool function from the dynamically loaded module
 fetch_clinical_signals_tool = bq_scout_tools_module.fetch_clinical_signals_tool
 
-from schemas import ClinicalSignalResponse
+from biotech_catalyst.schemas import ClinicalSignalResponse
 
 
-@patch("biotech_catalyst.skills.bq_scout.tools.fetch_clinical_signals") # Or patch directly on the module if needed
-def test_fetch_clinical_signals_tool_success(mock_fetch):
+def test_fetch_clinical_signals_tool_success():
     """Verifies that fetch_clinical_signals_tool correctly passes parameters, 
     populates shared state via ToolContext, and returns a valid response.
     """
@@ -36,22 +35,20 @@ def test_fetch_clinical_signals_tool_success(mock_fetch):
         "failure_reason": "Strategic business decision."
     }
     
-    mock_fetch.return_value = [fake_raw_data]
-
     # 2. Mock ADK ToolContext and its state dictionary
     mock_tool_context = MagicMock()
     mock_tool_context.state = {"candidates": []}
 
-    # 3. Act: Execute the wrapped tool function (unwrapping the FunctionTool to test the inner logic function)
-    # Note: FunctionTool wraps the callable under .func
-    tool_func = fetch_clinical_signals_tool.func if hasattr(fetch_clinical_signals_tool, "func") else fetch_clinical_signals_tool
-    response = tool_func(
-        reference_date=test_ref_date, 
-        tool_context=mock_tool_context
-    )
+    # 3. Act: Execute the wrapped tool function using patch.object to avoid string-path resolution issues
+    with patch.object(bq_scout_tools_module, "fetch_clinical_signals", return_value=[fake_raw_data]) as mock_fetch:
+        tool_func = fetch_clinical_signals_tool.func if hasattr(fetch_clinical_signals_tool, "func") else fetch_clinical_signals_tool
+        response = tool_func(
+            reference_date=test_ref_date, 
+            tool_context=mock_tool_context
+        )
 
-    # 4. Assertions: Underlying function call
-    mock_fetch.assert_called_once_with(test_ref_date)
+        # 4. Assertions: Underlying function call
+        mock_fetch.assert_called_once_with(test_ref_date)
 
     # 5. Assertions: Response structure
     assert isinstance(response, ClinicalSignalResponse)
@@ -74,13 +71,11 @@ def test_fetch_clinical_signals_tool_error_handling():
     """Verifies graceful error catching and reporting when the underlying fetch fails."""
     test_ref_date = "2025-12-03 23:59:59 UTC"
     
-    # Patch target path using dynamic reference or target patch string
-    with patch("biotech_catalyst.skills.bq_scout.tools.fetch_clinical_signals") as mock_fetch:
-        mock_fetch.side_effect = Exception("BigQuery connection timeout")
+    mock_tool_context = MagicMock()
+    mock_tool_context.state = {"candidates": []}
 
-        mock_tool_context = MagicMock()
-        mock_tool_context.state = {"candidates": []}
-
+    # Use patch.object on the loaded module to safely mock the exception side effect
+    with patch.object(bq_scout_tools_module, "fetch_clinical_signals", side_effect=Exception("BigQuery connection timeout")) as mock_fetch:
         tool_func = fetch_clinical_signals_tool.func if hasattr(fetch_clinical_signals_tool, "func") else fetch_clinical_signals_tool
         response = tool_func(
             reference_date=test_ref_date, 
