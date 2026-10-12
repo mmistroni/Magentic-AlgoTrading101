@@ -164,6 +164,3 @@ async def test_dual_agent_live_execution_with_evaluation(scenario_name, ticker, 
         f"Live multi-agent execution for {scenario_name} failed hallucination evaluation "
         f"with score {live_confluence_evaluation_metric.score}.\nReason: {live_confluence_evaluation_metric.reason}"
     )
-
-
-    
