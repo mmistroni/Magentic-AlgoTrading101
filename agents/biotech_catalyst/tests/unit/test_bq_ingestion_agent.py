@@ -3,6 +3,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
+from pathlib import Path
 
 # 1. Correct ADK Framework imports
 from google.adk.agents import LlmAgent
@@ -117,7 +118,20 @@ def test_fetch_clinical_signals_passes_reference_date():
 
 def test_bq_scout_tool_context_injection():
     """Verifies that the wrapped ADK tool correctly injects candidates into ToolContext.state."""
-    from biotech_catalyst.skills.bq_scout.tools import fetch_clinical_signals_tool
+    import importlib.util
+    
+    # Dynamically load tools.py from the hyphenated bq-scout folder
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    tools_path = os.path.normpath(
+        os.path.join(
+            current_dir, 
+            "../../biotech_catalyst/skills/bq-scout/tools.py"
+        )
+    )
+    spec_tools = importlib.util.spec_from_file_location("bq_scout_tools_module", tools_path)
+    bq_scout_tools_mod = importlib.util.module_from_spec(spec_tools)
+    spec_tools.loader.exec_module(bq_scout_tools_mod)
+    fetch_clinical_signals_tool = bq_scout_tools_mod.fetch_clinical_signals_tool
 
     fake_raw_data = {
         "ticker": "INCY",
@@ -135,7 +149,7 @@ def test_bq_scout_tool_context_injection():
 
     tool_func = fetch_clinical_signals_tool.func if hasattr(fetch_clinical_signals_tool, "func") else fetch_clinical_signals_tool
     
-    with patch("biotech_catalyst.skills.bq_scout.tools.fetch_clinical_signals", return_value=[fake_raw_data]):
+    with patch.object(bq_scout_tools_mod, "fetch_clinical_signals", return_value=[fake_raw_data]):
         response = tool_func(reference_date="2025-12-03 23:59:59 UTC", tool_context=mock_tool_context)
 
         assert response.count == 1
