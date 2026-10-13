@@ -8,4 +8,4 @@ short squeeze or dead cat bounce
 
 
 ==== TRACKEr
-24/9 - wrote tools.py  and writing tests. todo need agent integration test and agent eval test
+13.10 - unit test for bq_skills done.Need to run integ test
