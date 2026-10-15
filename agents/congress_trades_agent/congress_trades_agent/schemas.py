@@ -154,6 +154,50 @@ class InsiderContextPayload(BaseModel):
     )
 
 
+# ==========================================
+# CONGRESS TRADES AGENT MODELS
+# ==========================================
+class TradeSignalSummary(BaseModel):
+    ticker: str
+    congressional_net_buys: int = 0
+    congressional_conviction_score: float = 0.0
+    insider_net_buy_value: float = 0.0
+    insider_cluster_buy: bool = False
+    lobbying_spend: float = 0.0
+    contract_value: float = 0.0
+
+class FundamentalEvaluation(BaseModel):
+    pe_ratio: Optional[float] = None
+    forward_pe: Optional[float] = None
+    debt_to_equity: Optional[float] = None
+    free_cash_flow_yield: Optional[float] = None
+    return_on_equity: Optional[float] = None
+    valuation_verdict: str = "NEUTRAL"  # UNDERVALUED, FAIRLY_VALUED, OVERVALUED
+    fundamental_health_score: float = Field(..., ge=0.0, le=100.0)
+
+class DecisionRationaleBreakdown(BaseModel):
+    political_alignment_weight: str  # e.g., "High bipartisan buying intensity"
+    insider_confluence_weight: str   # e.g., "Confirmed C-suite cluster purchases"
+    fundamental_safety_check: str    # e.g., "P/E ratio at 22.4 supports growth valuation"
+    risk_factors: List[str]          # e.g., ["Elevated debt-to-equity ratio", "Regulatory scrutiny"]
+    final_synthesis_summary: str     # Detailed prose explaining the 'Why' behind the trade
+
+class TickerDecisionRecord(BaseModel):
+    ticker: str
+    action: str  # STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
+    conviction_score: float = Field(..., ge=0.0, le=100.0)
+    signals_aggregated: TradeSignalSummary
+    fundamentals: FundamentalEvaluation
+    rationale: DecisionRationaleBreakdown
+
+class CongressTraderPayload(BaseModel):
+    primary_tickers: List[str] = []
+    decisions: List[TickerDecisionRecord] = []
+    portfolio_macro_stance: str = "RISK_ON"
+
+
+
+
 
 # ==========================================
 # 4. SHARED MARKET MODELS
