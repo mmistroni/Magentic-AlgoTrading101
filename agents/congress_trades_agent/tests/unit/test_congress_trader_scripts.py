@@ -1,9 +1,12 @@
 import os
 from unittest.mock import patch
 import pytest
-from congress_trader.scripts.fundamentals import fetch_fmp_fundamentals
 
-@patch("congress_trader.scripts.fundamentals.requests.get")
+from congress_trades_agent.skills.congress_trader.scripts.fundamentals import \
+    fetch_fmp_fundamentals
+
+
+@patch("congress_trades_agent.skills.congress_trader.scripts.fundamentals.requests.get")
 def test_fetch_fmp_fundamentals_success(mock_get, monkeypatch):
     monkeypatch.setenv("FMP_API_KEY", "fake_key")
     
@@ -32,7 +35,7 @@ def test_fetch_fmp_fundamentals_success(mock_get, monkeypatch):
     assert result["debt_to_equity"] == 0.5
     assert result["valuation_verdict"] == "UNDERVALUED"
     assert result["fundamental_health_score"] > 50.0
-    assert result["error"] is None
+    assert result.get("error") is None
 
 def test_fetch_fmp_fundamentals_missing_key(monkeypatch):
     monkeypatch.delenv("FMP_API_KEY", raising=False)

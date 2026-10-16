@@ -44,9 +44,8 @@ def fetch_fmp_fundamentals(ticker: str) -> dict:
         fundamental_health_score=health_score
     )
 
-def _fetch_fmp_endpoint(endpoint: str, ticker: str) -> list | dict:
+def _fetch_fmp_endpoint(endpoint: str, ticker: str, api_key: str) -> list | dict:
     """Internal helper to safely query FMP API endpoints."""
-    api_key = os.getenv("FMP_API_KEY")
     url = f"https://financialmodelingprep.com/api/v3/{endpoint}/{ticker.upper()}?apikey={api_key}"
     try:
         response = requests.get(url, timeout=10)
