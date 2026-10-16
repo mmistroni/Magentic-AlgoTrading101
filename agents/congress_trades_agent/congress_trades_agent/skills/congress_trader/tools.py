@@ -1,10 +1,10 @@
-from google.adk.tools import tool
 from .scripts.fundamentals import fetch_fmp_fundamentals
 from ...schemas import (
     FundamentalEvaluation
     
 )
-@tool
+
+
 def get_fundamentals(ticker: str) -> FundamentalEvaluation:
     """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores 
     for a given ticker using the underlying FMP script logic.

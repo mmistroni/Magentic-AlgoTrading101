@@ -157,14 +157,6 @@ class InsiderContextPayload(BaseModel):
 # ==========================================
 # CONGRESS TRADES AGENT MODELS
 # ==========================================
-class TradeSignalSummary(BaseModel):
-    ticker: str
-    congressional_net_buys: int = 0
-    congressional_conviction_score: float = 0.0
-    insider_net_buy_value: float = 0.0
-    insider_cluster_buy: bool = False
-    lobbying_spend: float = 0.0
-    contract_value: float = 0.0
 
 class FundamentalEvaluation(BaseModel):
     pe_ratio: Optional[float] = None
@@ -182,13 +174,45 @@ class DecisionRationaleBreakdown(BaseModel):
     risk_factors: List[str]          # e.g., ["Elevated debt-to-equity ratio", "Regulatory scrutiny"]
     final_synthesis_summary: str     # Detailed prose explaining the 'Why' behind the trade
 
-class TickerDecisionRecord(BaseModel):
+class TradeSignalSummary(BaseModel):
     ticker: str
+    congressional_net_buys: int = 0
+    congressional_conviction_score: float = 0.0
+    insider_net_buy_value: float = 0.0
+    insider_cluster_buy: bool = False
+    lobbying_spend: float = 0.0
+    contract_value: float = 0.0
+    
+    # Add normalized 0-100 sub-scores for clean weighting math
+    congressional_sub_score: float = 0.0
+    insider_sub_score: float = 0.0
+    contract_sub_score: float = 0.0
+    lobbying_sub_score: float = 0.0
+
+class TickerDecisionRecord(BaseModel):
+    decision_id: str
+    ticker: str
+    decision_timestamp: str
     action: str  # STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
-    conviction_score: float = Field(..., ge=0.0, le=100.0)
+    conviction_score: float = Field(..., ge=0.0, le=100.0) # Acts as your confluence score
+    
+    # Capture the weights used for this specific run (Time Zero defaults or historical adjustments)
+    weights_applied: Dict[str, float] = Field(
+        default={
+            "fundamental_health_score": 0.35,
+            "insider_sub_score": 0.30,
+            "contract_sub_score": 0.15,
+            "congressional_sub_score": 0.10,
+            "lobbying_sub_score": 0.10,
+        }
+    )
+    
     signals_aggregated: TradeSignalSummary
     fundamentals: FundamentalEvaluation
     rationale: DecisionRationaleBreakdown
+    
+    # For tracking future performance when evaluating history
+    subsequent_performance: Optional[float] = None
 
 class CongressTraderPayload(BaseModel):
     primary_tickers: List[str] = []

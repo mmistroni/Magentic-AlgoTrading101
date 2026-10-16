@@ -1,8 +1,8 @@
 from unittest.mock import patch
-from congress_trader.tools import get_fundamentals
-from schemas import FundamentalEvaluation
+from congress_trades_agent.skills.congress_trader.tools import get_fundamentals
+from congress_trades_agent.schemas import FundamentalEvaluation
 
-@patch("congress_trader.tools.fetch_fmp_fundamentals")
+@patch("congress_trades_agent.skills.congress_trader.scripts.fundamentals.fetch_fmp_fundamentals")
 def test_get_fundamentals_tool_wraps_pydantic(mock_fetch):
     mock_fetch.return_value = {
         "ticker": "MSFT",
