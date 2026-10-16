@@ -4,7 +4,6 @@ from ...schemas import (
     
 )
 
-
 def get_fundamentals(ticker: str) -> FundamentalEvaluation:
     """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores 
     for a given ticker using the underlying FMP script logic.
