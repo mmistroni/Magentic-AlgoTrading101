@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, Literal
+from typing import List, Dict, Any, Optional, Literal, Enum
 from pydantic import BaseModel, Field
 
 # ==========================================
@@ -157,15 +157,29 @@ class InsiderContextPayload(BaseModel):
 # ==========================================
 # CONGRESS TRADES AGENT MODELS
 # ==========================================
+class ValuationVerdict(str, Enum):
+    UNDERVALUED = "UNDERVALUED"
+    FAIRLY_VALUED = "FAIRLY_VALUED"
+    OVERVALUED = "OVERVALUED"
+    NEUTRAL = "NEUTRAL"
+
+class TradeAction(str, Enum):
+    STRONG_BUY = "STRONG_BUY"
+    BUY = "BUY"
+    HOLD = "HOLD"
+    SELL = "SELL"
+    STRONG_SELL = "STRONG_SELL"
 
 class FundamentalEvaluation(BaseModel):
+    ticker: str  # <--- Add this field here
     pe_ratio: Optional[float] = None
     forward_pe: Optional[float] = None
     debt_to_equity: Optional[float] = None
     free_cash_flow_yield: Optional[float] = None
     return_on_equity: Optional[float] = None
-    valuation_verdict: str = "NEUTRAL"  # UNDERVALUED, FAIRLY_VALUED, OVERVALUED
+    valuation_verdict: ValuationVerdict = ValuationVerdict.NEUTRAL  # <--- Using Enum here
     fundamental_health_score: float = Field(..., ge=0.0, le=100.0)
+
 
 class DecisionRationaleBreakdown(BaseModel):
     political_alignment_weight: str  # e.g., "High bipartisan buying intensity"
@@ -193,7 +207,7 @@ class TickerDecisionRecord(BaseModel):
     decision_id: str
     ticker: str
     decision_timestamp: str
-    action: str  # STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
+    action: TradeAction  #  # STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
     conviction_score: float = Field(..., ge=0.0, le=100.0) # Acts as your confluence score
     
     # Capture the weights used for this specific run (Time Zero defaults or historical adjustments)
