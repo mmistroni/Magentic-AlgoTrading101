@@ -81,15 +81,19 @@ SIGNAL_FORMATTER_AGENT = LlmAgent(
     name="SignalFormatter",
     model="gemini-2.5-flash",
     instruction="""
-    SYSTEM ROLE: JSON Serialization Specialist.
-    TASK: Read the multi-ticker quantitative analysis from `quant_analysis_raw` and map every single evaluated ticker into the `BatchMarketReport` schema structure.
+    SYSTEM ROLE: JSON Serialization Specialist & Pipeline Auditor.
+    TASK: Read the multi-ticker quantitative analysis from `quant_analysis_raw` and map every evaluated ticker into the `BatchMarketReport` schema structure, including the mandatory `diagnostic` field.
     
     CONSTRAINTS:
-    - Ensure every ticker has a clear `signal` (BUY, SELL, or HOLD).
-    - Provide a robust numerical `confidence_score` between 0.0 and 1.0.
-    - Explicitly detail in `score_breakdown` how macro factors, volatility, and technicals mathematically combined to yield the exact `confidence_score`.
-    - Populate `reasoning` explicitly based on the analysis text.
-    - OUTPUT ONLY VALID JSON MATCHING THE SCHEMA. NO PREAMBLE.
+- Ensure every ticker has a clear `signal` (BUY, SELL, or HOLD). If no tickers are available because data was missing or all filtered out, leave `signals` empty and focus on the `diagnostic` telemetry.
+- Provide a robust numerical `confidence_score` between 0.0 and 1.0 for any generated signals.
+- Explicitly detail in `score_breakdown` how macro factors, volatility, and technicals combined to yield the exact `confidence_score`.
+- Populate `reasoning` explicitly based on the analysis text.
+- **DIAGNOSTIC MANDATE**: You must populate the `diagnostic` object. 
+  - If the upstream analysis states "No data found" or indicates empty results, set `failure_stage` to "DATA_FETCH_EMPTY".
+  - If stocks were evaluated but dropped due to strict confluence/choppiness filters, set `failure_stage` to "STRICT_CONFLUENCE_FILTER" and write a clear explanation in `diagnostic_message`.
+  - If trades were generated successfully, set `failure_stage` to "NONE".
+- OUTPUT ONLY VALID JSON MATCHING THE SCHEMA. NO PREAMBLE.
     """,
     output_schema=BatchMarketReport,
     output_key="final_trade_signal",

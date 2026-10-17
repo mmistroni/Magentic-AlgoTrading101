@@ -76,8 +76,19 @@ class TrendSignal(BaseModel):
 # ==========================================
 # NEW: Batch Container Model for Multi-Ticker Runs
 # ==========================================
+class PipelineDiagnostic(BaseModel):
+    snapshot_date_queried: str
+    rows_fetched_count: int = Field(description="Number of rows returned by BigQuery tool.")
+    failure_stage: Literal["NONE", "DATA_FETCH_EMPTY", "SCHEMA_VALIDATION_ERROR", "STRICT_CONFLUENCE_FILTER"] = Field(
+        description="The exact choke point where candidates were dropped."
+    )
+    diagnostic_message: str = Field(description="Detailed explanation of why no signals were generated.")
+
 class BatchMarketReport(BaseModel):
     signals: List[TrendSignal] = Field(
         description="List of individual stock trend signals evaluated during the pipeline run.",
         default_factory=list
     )
+    diagnostic: PipelineDiagnostic = Field(
+            description="Diagnostic metadata explaining pipeline health and why candidates were or were not generated."
+        )
