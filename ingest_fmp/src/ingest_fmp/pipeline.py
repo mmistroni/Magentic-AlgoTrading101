@@ -1,7 +1,7 @@
 from ingest_fmp.client import FMPClient
 from ingest_fmp.screeners import StockScreeners
-from ingest_fmp.fundamental_validator import FundamentalValidator
-from ingest_fmp.technical_validator import TechnicalValidator
+from ingest_fmp.fundamental_validator import FundamentalValidator, MarketDownFundamentalValidator
+from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalValidator
 
 def run_enrichment_pipeline():
     client = FMPClient()
@@ -20,3 +20,21 @@ def run_enrichment_pipeline():
     final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
 
     return final_watchlist
+
+def run_market_down_pipeline():
+    client = FMPClient()
+    
+    # 1. Descriptive
+    screeners = StockScreeners(client)
+    base_stocks = screeners.get_custom_universe(market_down_params)
+    symbols = [s["symbol"] for s in base_stocks]
+
+    # 2. Fundamentals (Negative EPS Next Year)
+    fund_validator = MarketDownFundamentalValidator(client)
+    filtered_funds = [sym for sym in symbols if fund_validator.evaluate(sym)]
+
+    # 3. Technicals (Price < SMA20 & Downward momentum)
+    tech_validator = BearishTechnicalValidator(client)
+    final_results = [sym for sym in filtered_funds if tech_validator.evaluate(sym)]
+
+    return final_results

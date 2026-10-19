@@ -67,3 +67,37 @@ class FundamentalValidator:
         except Exception as e:
             logger.error(f"Error evaluating fundamentals for {symbol}: {str(e)}")
             return False
+
+import logging
+from ingest_fmp.client import FMPClient
+
+logger = logging.getLogger(__name__)
+
+class MarketDownFundamentalValidator:
+    def __init__(self, client: FMPClient):
+        self.client = client
+
+    def evaluate(self, symbol: str) -> bool:
+        """
+        Validates fundamental criteria for the Market Down strategy:
+        - EPS Growth Next Year: Negative (< 0%)
+        """
+        try:
+            growth_data = self.client.get_financial_growth(symbol)
+            if not growth_data:
+                return False
+            
+            latest_growth = growth_data[0]
+            eps_next_year = latest_growth.get("epsgrowthnextyear")
+
+            # Condition: EPS growth next year must be strictly negative (< 0.0)
+            if eps_next_year is None or eps_next_year >= 0.0:
+                logger.debug(f"{symbol} failed negative EPS growth check (epsgrowthnextyear: {eps_next_year})")
+                return False
+
+            logger.info(f"✨ {symbol} passed Market Down fundamental filter (Negative EPS growth).")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error evaluating Market Down fundamentals for {symbol}: {str(e)}")
+            return False

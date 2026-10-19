@@ -52,3 +52,27 @@ class TechnicalValidator:
             logger.error(f"Error evaluating technicals for {symbol}: {str(e)}")
             time.sleep(self.throttle_seconds)
             return False
+
+class BearishTechnicalValidator:
+    def __init__(self, client):
+        self.client = client
+
+    def evaluate(self, symbol: str) -> bool:
+        """Validates bearish technicals: Price < SMA20"""
+        try:
+            sma20_data = self.client.get_sma(symbol=symbol, period_length=20, timeframe="1day")
+            if not sma20_data:
+                return False
+            
+            latest = sma20_data[0]
+            price = latest.get("close")
+            sma20 = latest.get("sma")
+            
+            # Condition: Price must be strictly below SMA20
+            if price is None or sma20 is None or price >= sma20:
+                return False
+
+            # Add 1M / 3M performance check here if needed via FMP stock performance endpoint
+            return True
+        except Exception:
+            return False
