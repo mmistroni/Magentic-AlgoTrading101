@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "🧹 Cleaning up any old virtual environment..."
-rm -rf .venv
+rm -rf .fmp_venv
 
 echo "🐍 Creating fresh virtual environment (.venv)..."
 python3 -m venv .fmp_venv
