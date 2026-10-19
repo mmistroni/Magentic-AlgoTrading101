@@ -19,7 +19,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --cov=ingest_fmp"
+addopts = "-ra -q"
 testpaths = [
     "tests",
 ]
