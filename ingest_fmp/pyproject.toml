@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ingest_fmp"
+version = "0.1.0"
+description = "Production FMP ingestion service replacing Finviz scraper"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "google-cloud-bigquery>=3.0.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=ingest_fmp"
+testpaths = [
+    "tests",
+]
+pythonpath = ["src"]
