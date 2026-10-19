@@ -29,3 +29,24 @@ class FMPClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"FMP API request failed: {str(e)}")
             return []
+    def get_sma(self, symbol: str, period_length: int = 20, timeframe: str = "1day") -> List[Dict[str, Any]]:
+        """Fetch Simple Moving Average (SMA) technical indicator for a given symbol."""
+        endpoint = f"{self.base_url}/technical-indicators/sma"
+        query_params = {
+            "symbol": symbol,
+            "periodLength": period_length,
+            "timeframe": timeframe,
+            "apikey": self.api_key
+        }
+
+        try:
+            response = requests.get(endpoint, params=query_params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            logger.warning(f"Unexpected response format from FMP SMA endpoint for {symbol}: {type(data)}")
+            return []
+        except requests.exceptions.RequestException as e:
+            logger.error(f"FMP SMA API request failed for {symbol}: {str(e)}")
+            return []

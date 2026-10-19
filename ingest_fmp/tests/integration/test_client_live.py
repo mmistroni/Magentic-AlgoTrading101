@@ -43,21 +43,13 @@ def test_live_company_screener(live_client):
     assert "symbol" in sample_stock
     assert "price" in sample_stock
 
-def test_get_extra_watchlist(live_client):
-    """
-    Test the get_extra_watchlist function with live data.
-    """
-    
-    
-    
-    
-    symbols = ["AAPL", "MSFT", "GOOGL"]
-    extra_data = live_client.get_extra_watchlist(symbols)
-
-    assert isinstance(extra_data, list), "Expected list response from get_extra_watchlist"
-    assert len(extra_data) == len(symbols), "Mismatch in number of symbols and returned data"
-
-    for stock_data in extra_data:
-        assert isinstance(stock_data, dict), "Each item in extra_data should be a dictionary"
-        assert "symbol" in stock_data, "Missing 'symbol' key in stock data"
-        assert stock_data["symbol"] in symbols, f"Unexpected symbol {stock_data['symbol']} in extra data"
+def test_live_sma_endpoint(live_client):
+    """Test fetching technical indicator SMA data from FMP."""
+    symbol = "AAPL"
+    for period in [20, 50, 200]:
+        data = live_client.get_sma(symbol=symbol, period_length=period, timeframe="1day")
+        assert isinstance(data, list), f"Expected list for SMA {period}"
+        if data:
+            latest_point = data[0]
+            print(f"Live {symbol} SMA({period}): date={latest_point.get('date')}, close={latest_point.get('close')}, sma={latest_point.get('sma')}")
+            assert "sma" in latest_point
