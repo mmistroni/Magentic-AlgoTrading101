@@ -2,6 +2,15 @@ from ingest_fmp.client import FMPClient
 from ingest_fmp.screeners import StockScreeners
 from ingest_fmp.fundamental_validator import FundamentalValidator, MarketDownFundamentalValidator
 from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalValidator
+import logging
+import pandas as pd
+from ingest_fmp.client import FMPClient
+from ingest_fmp.screeners import StockScreeners
+from ingest_fmp.fundamental_validator import FundamentalValidator
+
+logger = logging.getLogger(__name__)
+
+
 
 def run_enrichment_pipeline():
     client = FMPClient()
@@ -38,3 +47,56 @@ def run_market_down_pipeline():
     final_results = [sym for sym in filtered_funds if tech_validator.evaluate(sym)]
 
     return final_results
+
+
+def run_high_growth_float_watchlist() -> list:
+    """
+    Orchestrates the High-Growth / Low-Float Watchlist Pipeline:
+    1. Descriptive + Float Filter
+    2. Fundamental Validation (>20% EPS, >25% Sales/Next-Year, >15% ROE, >20% Inst Ownership)
+    """
+    client = FMPClient()
+    
+    # --- Step 1: Descriptive & Float Filtering ---
+    logger.info("Running Step 1: Descriptive screener & float filtering...")
+    base_params = {
+        "priceMoreThan": 5,
+        "avgVolumeMoreThan": 200000,
+        "country": "US",
+        "isEtf": "false",
+        "isFund": "false",
+        "isActivelyTrading": "true",
+        "limit": 1000
+    }
+    
+    screeners = StockScreeners(client)
+    raw_data = client.get_company_screener(base_params)
+    if not raw_data:
+        return []
+
+    df = pd.DataFrame(raw_data)
+    
+    # Filter Float < 50M locally via Pandas
+    if "floatShares" in df.columns:
+        df = df[df["floatShares"] < 50000000]
+        
+    symbols = df["symbol"].tolist() if "symbol" in df.columns else []
+    logger.info(f"Filtered down to {len(symbols)} candidate tickers after descriptive & float checks.")
+
+    # --- Step 2: Parameterized Fundamental Validation ---
+    logger.info("Running Step 2: Fundamental validation...")
+    validator = FundamentalValidator(
+        client=client,
+        min_eps_this_year=0.20,          # Over 20%
+        min_eps_next_year=0.25,          # Over 25%
+        min_eps_qtr=0.20,                # Over 20%
+        min_sales_qtr=0.25,              # Over 25%
+        min_roe=0.15,                    # Over 15%
+        min_gross_margin=0.0,            # Positive (>0%)
+        min_institutional_ownership=0.20 # Over 20%
+    )
+
+    final_watchlist = [sym for sym in symbols if validator.evaluate(sym)]
+    
+    logger.info(f"Pipeline complete. Final watchlist contains {len(final_watchlist)} stocks: {final_watchlist}")
+    return final_watchlist
