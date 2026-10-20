@@ -1,4 +1,4 @@
-INSERT INTO `datascience-projects.gcp_shareloader.trade_decisions` (
+INSERT INTO `{table_ref}` (
     decision_id, 
     ticker, 
     decision_timestamp, 
