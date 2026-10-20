@@ -98,10 +98,9 @@ test_congress_researcher_agents.py
 
   ====19/10.
   Congress trader unit tests. 
-  Broken test on sql executor
-
-  Now we need to add extra tools
-  for the big query schema
-
+  We need to add  a
+  - unit test for agent to simulate execution
+  - integration tests for everything , and then we still need to add the logic that allows
+  the agent to reason on strategies
 
   
