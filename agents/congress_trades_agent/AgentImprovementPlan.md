@@ -97,5 +97,8 @@ test_congress_researcher_agents.py
 - test_congress_resaearcher_eval evaluate response
 
   ====19/10.
-  Congress trader unit tests. Now we need to add extra tools
+  Congress trader unit tests. 
+  Broken test on sql executor
+
+  Now we need to add extra tools
   for the big query schema
