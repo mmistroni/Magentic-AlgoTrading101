@@ -4,17 +4,23 @@ from google.cloud import bigquery
 from typing import Optional
 
 # Initialize BigQuery client
-bq_client = bigquery.Client()
+def get_bq_client() -> bigquery.Client:
+    return bigquery.Client(project="datascience-projects")
 
 DATASET_ID = os.getenv("BQ_DATASET_ID", "gcp_shareloader")
 TABLE_ID = os.getenv("BQ_TABLE_ID", "trade_decisions")
-FULL_TABLE_REF = f"{bq_client.project}.{DATASET_ID}.{TABLE_ID}"
+FULL_TABLE_REF = f"datascience-projects.{DATASET_ID}.{TABLE_ID}"
 
-QUERIES_DIR = Path(__file__).parent / "queries"
+# Go up one level from 'scripts/' to 'congress_trader/', then into 'references/'
+REFERENCES_DIR = Path(__file__).parent.parent / "references"
 
 def _load_sql(filename: str) -> str:
     """Helper to load a SQL query template from the queries directory."""
-    return (QUERIES_DIR / filename).read_text(encoding="utf-8")
+    return (REFERENCES_DIR / filename).read_text(encoding="utf-8")
+
+def _load_sql(filename: str) -> str:
+    """Helper to load a SQL query template from the queries directory."""
+    return (REFERENCES_DIR / filename).read_text(encoding="utf-8")
 
 def execute_store_decision(
     decision_id: str,
@@ -25,7 +31,8 @@ def execute_store_decision(
     decision_snapshot_json: str
 ) -> None:
     """Executes the store decision SQL script."""
-    sql_template = _load_sql("store_decision.sql")
+    bq_client = get_bq_client()
+    sql_template = _load_sql("store_decisions.sql")
     query = sql_template.format(table_ref=FULL_TABLE_REF)
     
     job_config = bigquery.QueryJobConfig(
@@ -49,6 +56,7 @@ def execute_fetch_decisions(
     limit: int = 5
 ) -> bigquery.table.RowIterator:
     """Executes the fetch historical decisions SQL script."""
+    bq_client = get_bq_client()
     sql_template = _load_sql("fetch_decisions.sql")
     query = sql_template.format(table_ref=FULL_TABLE_REF)
     
