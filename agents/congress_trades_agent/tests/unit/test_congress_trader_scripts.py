@@ -47,9 +47,10 @@ def test_fetch_fmp_fundamentals_missing_key(monkeypatch):
     result = fetch_fmp_fundamentals("AAPL")
     assert result["error"] == "FMP_API_KEY environment variable is missing."
 
-@patch("congress_trades_agent.skills.congress_trader.scripts.sql_executor.get_bq_client")
-def test_execute_store_decision_success(mock_bq_client):
+@patch("congress_trades_agent.skills.congress_trader.scripts.sql_executor.bigquery.Client")
+def test_execute_store_decision_success(mock_client_class):
     """Test that execute_store_decision correctly compiles the query and triggers BigQuery execution."""
+    mock_bq_client = mock_client_class.return_value
     mock_query_job = MagicMock()
     mock_bq_client.query.return_value = mock_query_job
 
@@ -80,29 +81,22 @@ def test_execute_store_decision_success(mock_bq_client):
     
     param_dict = {p.name: p.value for p in job_config.query_parameters}
     assert param_dict["decision_id"] == decision_id
-    assert param_dict["ticker"] == "MSFT"  # Should be uppercase
+    assert param_dict["ticker"] == "MSFT"
     assert param_dict["action"] == "BUY"
     assert param_dict["conviction_score"] == 82.5
     assert param_dict["decision_snapshot_json"] == snapshot_json
 
 
-@patch("congress_trades_agent.skills.congress_trader.scripts.sql_executor.get_bq_client")
-def test_execute_fetch_decisions_with_filters(mock_get_bq_client):
+@patch("congress_trades_agent.skills.congress_trader.scripts.sql_executor.bigquery.Client")
+def test_execute_fetch_decisions_with_filters(mock_client_class):
     """Test that execute_fetch_decisions properly binds lookup filters and limits."""
-    # 1. Get the mock client instance
-    mock_bq_client = mock_get_bq_client.return_value
-
-    # 2. Setup the mock query job and its result iterator
+    mock_bq_client = mock_client_class.return_value
     mock_query_job = MagicMock()
     mock_iterator = MagicMock()
     
-    # Crucial: wire .result() to return our mock iterator
     mock_query_job.result.return_value = mock_iterator
-    
-    # Crucial: wire client.query(...) to return our mock query job
     mock_bq_client.query.return_value = mock_query_job
 
-    # 3. Execute the function
     result_iterator = execute_fetch_decisions(
         ticker="nvda",
         valuation_verdict="undervalued",
@@ -110,7 +104,7 @@ def test_execute_fetch_decisions_with_filters(mock_get_bq_client):
         limit=5
     )
 
-    # 4. Assertions
+    # Verify iterator is returned correctly
     assert result_iterator == mock_iterator
     mock_bq_client.query.assert_called_once()
     mock_query_job.result.assert_called_once()
