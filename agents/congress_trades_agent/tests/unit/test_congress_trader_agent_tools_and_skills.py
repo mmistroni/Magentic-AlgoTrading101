@@ -34,23 +34,33 @@ def test_congress_trader_agent_tool_bindings():
 
 @patch("congress_trades_agent.skills.congress_trader.tools.execute_store_decision")
 def test_store_trade_decision_tool_integration(mock_execute_store):
-    """Test that store_trade_decision correctly serializes inputs and calls the SQL executor."""
+    """Test that store_trade_decision correctly builds the Pydantic model, serializes JSON, and calls the SQL executor."""
     mock_execute_store.return_value = None
 
     result = store_trade_decision(
         ticker="nvda",
         action="BUY",
         conviction_score=82.5,
-        valuation_verdict="UNDERVALUED",
         pe_ratio=31.2,
-        notes="Bullish institutional flow."
+        valuation_verdict="UNDERVALUED",
+        fundamental_health_score=85.0,
+        congressional_net_buys=2,
+        insider_cluster_buy=True,
+        synthesis_summary="Bullish institutional flow and strong fundamentals."
     )
 
-    assert "Successfully stored decision" in result
+    assert "Successfully validated and stored decision record" in result
     mock_execute_store.assert_called_once()
+    
+    # Verify that the executor received the serialized JSON snapshot containing default weights
     _, kwargs = mock_execute_store.call_args
-    assert kwargs["ticker"] == "nvda"
+    assert kwargs["ticker"] == "NVDA"
     assert kwargs["action"] == "BUY"
+    assert kwargs["conviction_score"] == 82.5
+    assert "decision_snapshot_json" in kwargs
+    
+    # Optional: ensure the default weights were embedded in the serialized snapshot JSON
+    assert "weights_applied" in kwargs["decision_snapshot_json"]
 
 
 @patch("congress_trades_agent.skills.congress_trader.tools.execute_fetch_decisions")
