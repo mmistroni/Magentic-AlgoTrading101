@@ -18,52 +18,101 @@ def get_fundamentals(ticker: str) -> FundamentalEvaluation:
     result = fetch_fmp_fundamentals(ticker)
     return FundamentalEvaluation(**result)
 
+import json
+from datetime import datetime
+from typing import Optional
+from congress_trades_agent.schemas import (
+    TickerDecisionRecord,
+    TradeAction,
+    ValuationVerdict,
+    TradeSignalSummary,
+    FundamentalEvaluation,
+    DecisionRationaleBreakdown
+)
+from congress_trades_agent.skills.congress_trader.scripts.sql_executor import execute_store_decision
+
 def store_trade_decision(
     ticker: str,
-    action: str,
-    conviction_score: float,
-    valuation_verdict: str,
+    action: str,  # e.g., "BUY", "SELL", "HOLD"
+    conviction_score: float,  # Confluence score between 0.0 and 100.0
     pe_ratio: float,
-    notes: str
+    valuation_verdict: str,
+    fundamental_health_score: float,
+    congressional_net_buys: int,
+    insider_cluster_buy: bool,
+    synthesis_summary: str
 ) -> str:
-    """Store a formal trade decision and its structural snapshot into BigQuery episodic memory.
+    """Validates the trade decision via Pydantic (applying default weights), persists the snapshot to BigQuery, 
+    and returns a confirmation message to the agent.
     
     Args:
-        ticker: Stock symbol (e.g., 'NVDA', 'MSFT').
-        action: Proposed trade action ('BUY', 'SELL', 'HOLD').
-        conviction_score: Agent confidence score between 0.0 and 100.0.
-        valuation_verdict: Fundamental valuation verdict (e.g., 'UNDERVALUED', 'OVERVALUED').
-        pe_ratio: Price-to-earnings ratio at the time of decision.
-        notes: Qualitative reasoning or congressional context behind the decision.
+        ticker: Stock ticker symbol (e.g., 'NVDA').
+        action: Final trade action decided by agent ('STRONG_BUY', 'BUY', 'HOLD', 'SELL', 'STRONG_SELL').
+        conviction_score: Calculated confluence score between 0.0 and 100.0.
+        pe_ratio: P/E ratio from fundamental evaluation.
+        valuation_verdict: Valuation category ('UNDERVALUED', 'FAIRLY_VALUED', 'OVERVALUED', 'NEUTRAL').
+        fundamental_health_score: Score between 0.0 and 100.0.
+        congressional_net_buys: Count of net congressional purchases.
+        insider_cluster_buy: Boolean flag for insider cluster activity.
+        synthesis_summary: Detailed prose explaining the 'Why' behind the trade.
     """
     decision_id = f"dec-{ticker.upper()}-{int(datetime.utcnow().timestamp())}"
     decision_timestamp = datetime.utcnow().isoformat() + "Z"
     
-    # Build the structured snapshot payload
-    snapshot_data = {
-        "ticker": ticker.upper(),
-        "action": action.upper(),
-        "conviction_score": conviction_score,
-        "fundamentals": {
-            "valuation_verdict": valuation_verdict.upper(),
-            "pe_ratio": pe_ratio
-        },
-        "reasoning_notes": notes
-    }
+    # 1. Build nested sub-models from agent conclusions
+    fundamentals = FundamentalEvaluation(
+        ticker=ticker.upper(),
+        pe_ratio=pe_ratio,
+        valuation_verdict=ValuationVerdict(valuation_verdict.upper()),
+        fundamental_health_score=fundamental_health_score
+    )
     
+    signals = TradeSignalSummary(
+        ticker=ticker.upper(),
+        congressional_net_buys=congressional_net_buys,
+        insider_cluster_buy=insider_cluster_buy,
+        congressional_sub_score=70.0 if congressional_net_buys > 0 else 50.0,
+        insider_sub_score=80.0 if insider_cluster_buy else 50.0
+    )
+    
+    rationale = DecisionRationaleBreakdown(
+        political_alignment_weight=f"Congressional net buys: {congressional_net_buys}",
+        insider_confluence_weight=f"Insider cluster buy status: {insider_cluster_buy}",
+        fundamental_safety_check=f"P/E ratio at {pe_ratio} with verdict {valuation_verdict}",
+        risk_factors=["Standard market volatility", "Execution risk"],
+        final_synthesis_summary=synthesis_summary
+    )
+    
+    # 2. Instantiate TickerDecisionRecord. 
+    # This automatically applies your default weights_applied dict:
+    # {"fundamental_health_score": 0.35, "insider_sub_score": 0.30, ...}
+    decision_record = TickerDecisionRecord(
+        decision_id=decision_id,
+        ticker=ticker.upper(),
+        decision_timestamp=decision_timestamp,
+        action=TradeAction(action.upper()),
+        conviction_score=conviction_score,
+        signals_aggregated=signals,
+        fundamentals=fundamentals,
+        rationale=rationale
+    )
+    
+    # 3. Serialize the validated model to JSON specifically for BigQuery snapshot storage
+    snapshot_json = decision_record.model_dump_json()
+    
+    # 4. Execute storage via your BigQuery/SQL script
     try:
         execute_store_decision(
             decision_id=decision_id,
-            ticker=ticker,
+            ticker=ticker.upper(),
             decision_timestamp=decision_timestamp,
             action=action.upper(),
             conviction_score=conviction_score,
-            decision_snapshot_json=json.dumps(snapshot_data)
+            decision_snapshot_json=snapshot_json
         )
-        return f"Successfully stored decision {decision_id} for {ticker.upper()}."
+        return f"Successfully validated and stored decision record {decision_id} for {ticker.upper()}."
     except Exception as e:
-        return f"Error storing decision to BigQuery: {str(e)}"
-
+        return f"Error storing decision record to BigQuery: {str(e)}"
 
 def fetch_historical_episodes(
     ticker: Optional[str] = None,
