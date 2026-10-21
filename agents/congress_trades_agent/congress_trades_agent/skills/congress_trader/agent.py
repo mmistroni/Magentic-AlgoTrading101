@@ -1,6 +1,10 @@
 from pathlib import Path
 from google.adk.agents import LlmAgent, SequentialAgent
-from .tools import fetch_fmp_fundamentals
+from .tools import (
+    fetch_fmp_fundamentals,
+    store_trade_decision,
+    fetch_historical_episodes
+)
 
 SKILL_DIR = Path(__file__).parent
 
@@ -14,12 +18,14 @@ def parse_skill_instructions(skill_dir: Path) -> str:
             return parts[2].strip()
     return content.strip()
 
-# 1. Research worker: Handles tool calling
+# Research & Execution worker equipped with fundamental tools and BQ episodic memory
 congress_trader = LlmAgent(
     name="CongressTrader",
     model="gemini-3.5-flash",
     instruction=parse_skill_instructions(SKILL_DIR),
-    tools=[fetch_fmp_fundamentals],
-    
+    tools=[
+        fetch_fmp_fundamentals,
+        store_trade_decision,
+        fetch_historical_episodes
+    ],
 )
-
