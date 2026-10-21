@@ -96,11 +96,9 @@ test_congress_researcher_agents.py
  - test skills migration
 - test_congress_resaearcher_eval evaluate response
 
-  ====19/10.
+  ====21/10.
   Congress trader unit tests. 
-  We need to add  a
-  - unit test for agent to simulate execution
-  - integration tests for everything , and then we still need to add the logic that allows
-  the agent to reason on strategies
-
+  added agent tests, integrated storing episodes and
+  todo: we need to test the agent tools integration as well as return a json
+  response to the agent caller
   
