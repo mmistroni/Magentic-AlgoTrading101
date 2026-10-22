@@ -74,6 +74,7 @@ def test_fetch_historical_episodes_tool_integration(mock_execute_fetch):
     mock_row.conviction_score = 90.0
     mock_row.decision_snapshot = {"ticker": "NVDA", "fundamentals": {"pe_ratio": 31.2}}
 
+
     mock_execute_fetch.return_value = [mock_row]
 
     results = fetch_historical_episodes(

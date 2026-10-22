@@ -1,26 +1,12 @@
-from .scripts.fundamentals import fetch_fmp_fundamentals
 import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+
+from .scripts.fundamentals import fetch_fmp_fundamentals
 from .scripts.sql_executor import (
     execute_store_decision,
     execute_fetch_decisions
 )
-from ...schemas import (
-    FundamentalEvaluation
-    
-)
-
-def get_fundamentals(ticker: str) -> FundamentalEvaluation:
-    """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores 
-    for a given ticker using the underlying FMP script logic.
-    """
-    result = fetch_fmp_fundamentals(ticker)
-    return FundamentalEvaluation(**result)
-
-import json
-from datetime import datetime
-from typing import Optional
 from congress_trades_agent.schemas import (
     TickerDecisionRecord,
     TradeAction,
@@ -29,7 +15,15 @@ from congress_trades_agent.schemas import (
     FundamentalEvaluation,
     DecisionRationaleBreakdown
 )
-from congress_trades_agent.skills.congress_trader.scripts.sql_executor import execute_store_decision
+
+
+def get_fundamentals(ticker: str) -> FundamentalEvaluation:
+    """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores 
+    for a given ticker using the underlying FMP script logic.
+    """
+    result = fetch_fmp_fundamentals(ticker)
+    return FundamentalEvaluation(**result)
+
 
 def store_trade_decision(
     ticker: str,
@@ -113,6 +107,7 @@ def store_trade_decision(
         return f"Successfully validated and stored decision record {decision_id} for {ticker.upper()}."
     except Exception as e:
         return f"Error storing decision record to BigQuery: {str(e)}"
+
 
 def fetch_historical_episodes(
     ticker: Optional[str] = None,
