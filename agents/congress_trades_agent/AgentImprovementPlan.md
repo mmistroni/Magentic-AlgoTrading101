@@ -96,9 +96,8 @@ test_congress_researcher_agents.py
  - test skills migration
 - test_congress_resaearcher_eval evaluate response
 
-  ====21/10.
-  Congress trader unit tests. 
-  added agent tests, integrated storing episodes and
-  todo: we need to test the agent tools integration as well as return a json
-  response to the agent caller
+  ====22/10.
+  Congress trader unit tests completed
+  Sorted out trade decision. 
+  Next stop are integration tests
   
