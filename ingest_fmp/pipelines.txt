@@ -1,0 +1,26 @@
+if known_args.runtype == 'eod':
+            obb = run_eodmarket_pipeline(p, known_args.fmprepkey)
+
+                           get_eod_screener()
+
+
+        elif known_args.runtype == 'marketdown':
+                       
+           #plus500 = run_test_pipeline(p, known_args.fmprepkey, price_change=-0.10)
+           # finviz_md = run_finviz_marketdown(p, known_args.fmprepkey, price_change=-0.10)
+            stp = run_swingtrader_pipeline(p, known_args.fmprepkey, price_change=-
+                    eod_screener
+
+
+        elif known_args.runtype == 'tester':
+            #run_congresstrades_pipeline(p, known_args.googleapikey)
+            # obb = run_extra_pipeline(p, known_args.fmprepkey) we have it
+            (obb | 'obb new test mapped' >> beam.Map(lambda d: map_to_bq_dict(d))
+            #
+        else:
+
+            etoro = run_etoro_pipeline(p, known_args.fmprepkey)
+                        get_new_highs()
+
+            
+            

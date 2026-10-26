@@ -7,12 +7,19 @@ import pandas as pd
 from ingest_fmp.client import FMPClient
 from ingest_fmp.screeners import StockScreeners
 from ingest_fmp.fundamental_validator import FundamentalValidator
+import logging
+import pandas as pd
+from ingest_fmp.client import FMPClient
+from ingest_fmp.screeners import StockScreeners
+from ingest_fmp.fundamental_validator import MarketDownFundamentalValidator
+from ingest_fmp.technical_validator import BearishTechnicalValidator
 
 logger = logging.getLogger(__name__)
 
 
 
-def run_enrichment_pipeline():
+
+def get_extra_watchlist):
     client = FMPClient()
     
     # Step 1: Descriptive Universe
@@ -30,23 +37,58 @@ def run_enrichment_pipeline():
 
     return final_watchlist
 
-def run_market_down_pipeline():
+
+def run_market_down_pipeline() -> list:
+    """
+    Orchestrates the Market Down pipeline:
+    1. Descriptive (NASDAQ, Mid-cap > $2B, High Short Float > 20%)
+    2. Fundamental (Negative EPS growth next year)
+    3. Technical (Price < SMA20 bearish alignment)
+    """
     client = FMPClient()
-    
-    # 1. Descriptive
     screeners = StockScreeners(client)
-    base_stocks = screeners.get_custom_universe(market_down_params)
-    symbols = [s["symbol"] for s in base_stocks]
+    
+    # 1. Define native FMP descriptive parameters
+    market_down_params = {
+        "exchange": "NASDAQ",
+        "marketCapMoreThan": 2000000000,  # Mid cap over $2B
+        "country": "US",
+        "isActivelyTrading": "true",
+        "limit": 1000
+    }
+    
+    logger.info("Running Market Down Step 1: Fetching descriptive universe...")
+    raw_data = client.get_company_screener(market_down_params)
+    if not raw_data:
+        logger.warning("No data returned for Market Down descriptive screener.")
+        return []
+
+    df = pd.DataFrame(raw_data)
+    
+    # Optional local filter for Float Short > 20% (0.20) if the field is present in FMP payload
+    if "shortFloat" in df.columns:
+        df = df[df["shortFloat"] > 0.20]
+        
+    if "symbol" not in df.columns:
+        return []
+        
+    symbols = df["symbol"].tolist()
+    logger.info(f"Market Down descriptive universe secured: {len(symbols)} tickers.")
 
     # 2. Fundamentals (Negative EPS Next Year)
+    logger.info("Running Market Down Step 2: Fundamental validation (Negative EPS)...")
     fund_validator = MarketDownFundamentalValidator(client)
     filtered_funds = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    logger.info(f"{len(filtered_funds)} tickers passed fundamental checks.")
 
     # 3. Technicals (Price < SMA20 & Downward momentum)
+    logger.info("Running Market Down Step 3: Technical validation (Price < SMA20)...")
     tech_validator = BearishTechnicalValidator(client)
     final_results = [sym for sym in filtered_funds if tech_validator.evaluate(sym)]
 
+    logger.info(f"Market Down pipeline complete. Final watchlist: {final_results}")
     return final_results
+
 
 
 def run_high_growth_float_watchlist() -> list:
