@@ -205,3 +205,85 @@ def run_swing_trading_pipeline() -> list:
 
     logger.info(f"Swing Trading pipeline complete. Final watchlist: {final_watchlist}")
     return final_watchlist
+
+
+import logging
+import pandas as pd
+from ingest_fmp.client import FMPClient
+from ingest_fmp.screeners import StockScreeners
+from ingest_fmp.fundamental_validator import FundamentalValidator
+from ingest_fmp.technical_validator import TechnicalValidator
+
+logger = logging.getLogger(__name__)
+
+def run_new_highs_pipeline() -> list:
+    """
+    Orchestrates the New Highs Momentum Pipeline:
+    1. Descriptive: Market Cap > $300M, Price > $10, Avg Vol > 200K, 
+       Relative Vol > 1, Intraday Up (Price > Open & Close > Prev Close), 
+       and 52-Week New High.
+    2. Fundamentals: Positive EPS/Sales growth, ROE > 0, Institutional Ownership < 60%.
+    3. Technicals: Price above SMA20, SMA50, and SMA200.
+    """
+    client = FMPClient()
+    screeners = StockScreeners(client)
+    
+    # --- Step 1: Descriptive & Intraday Price Action Filtering ---
+    logger.info("Running New Highs Step 1: Descriptive & Price Action filters...")
+    base_params = {
+        "marketCapMoreThan": 300000000,    # Small cap over $300M
+        "priceMoreThan": 10,               # Price over $10
+        "avgVolumeMoreThan": 200000,       # Average volume over 200K
+        "country": "US",
+        "isEtf": "false",
+        "isFund": "false",
+        "isActivelyTrading": "true",
+        "limit": 1000
+    }
+    
+    raw_data = client.get_company_screener(base_params)
+    if not raw_data:
+        logger.warning("No data returned for New Highs screener.")
+        return []
+
+    df = pd.DataFrame(raw_data)
+    
+    # Filter Relative Volume > 1.0
+    if "relativeVolume" in df.columns:
+        df = df[df["relativeVolume"] > 1.0]
+
+    # Filter Intraday Up: Change > 0 (or price > previousClose) and Change from Open > 0 (price > open)
+    if all(col in df.columns for col in ["price", "previousClose"]):
+        df = df[df["price"] > df["previousClose"]]
+    if all(col in df.columns for col in ["price", "open"]):
+        df = df[df["price"] > df["open"]]
+
+    # Filter 52-Week High (New High: Price at or within 1% of yearHigh)
+    if all(col in df.columns for col in ["price", "yearHigh"]):
+        df = df[df["price"] >= df["yearHigh"] * 0.99]
+
+    symbols = df["symbol"].tolist() if "symbol" in df.columns else []
+    logger.info(f"Filtered down to {len(symbols)} candidates after descriptive and price action checks.")
+
+    # --- Step 2: Fundamental Validation (Positive Growth & Inst Ownership < 60%) ---
+    logger.info("Running New Highs Step 2: Fundamental validation...")
+    fund_validator = FundamentalValidator(
+        client=client,
+        min_eps_this_year=0.0,           # Positive (>0%)
+        min_eps_next_year=0.0,           # Positive (>0%)
+        min_eps_qtr=0.0,                 # Positive (>0%)
+        min_sales_qtr=0.0,               # Positive (>0%)
+        min_roe=0.0,                     # Positive (>0%)
+        max_institutional_ownership=0.60 # Under 60%
+    )
+
+    fundamentally_sound = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    logger.info(f"{len(fundamentally_sound)} symbols passed fundamental checks.")
+
+    # --- Step 3: Technical Validation (Price above SMA20, SMA50, SMA200) ---
+    logger.info("Running New Highs Step 3: Technical validation...")
+    tech_validator = TechnicalValidator(client)
+    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
+
+    logger.info(f"New Highs pipeline complete. Final watchlist: {final_watchlist}")
+    return final_watchlist
