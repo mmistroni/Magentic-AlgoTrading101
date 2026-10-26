@@ -3,23 +3,19 @@ from ingest_fmp.screeners import StockScreeners
 from ingest_fmp.fundamental_validator import FundamentalValidator, MarketDownFundamentalValidator
 from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalValidator
 import logging
-import pandas as pd
 from ingest_fmp.client import FMPClient
 from ingest_fmp.screeners import StockScreeners
 from ingest_fmp.fundamental_validator import FundamentalValidator
 import logging
-import pandas as pd
 from ingest_fmp.client import FMPClient
 from ingest_fmp.screeners import StockScreeners
 from ingest_fmp.fundamental_validator import MarketDownFundamentalValidator
 from ingest_fmp.technical_validator import BearishTechnicalValidator
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-
-
-
-def get_extra_watchlist):
+def get_extra_watchlist():
     client = FMPClient()
     
     # Step 1: Descriptive Universe
@@ -141,4 +137,71 @@ def run_high_growth_float_watchlist() -> list:
     final_watchlist = [sym for sym in symbols if validator.evaluate(sym)]
     
     logger.info(f"Pipeline complete. Final watchlist contains {len(final_watchlist)} stocks: {final_watchlist}")
+    return final_watchlist
+
+
+def run_swing_trading_pipeline() -> list:
+    """
+    Orchestrates the EOD Swing Trading Pipeline:
+    1. Descriptive: Price > $10, Avg Vol > 200K, Relative Vol > 1.5
+    2. Fundamentals: Positive growth across EPS/Sales, ROE > 0, 
+       Inst. Ownership < 60%, Debt/Equity < 1, Current Ratio > 1
+    3. Technicals: Price > SMA20 > SMA50 > SMA200 AND >= 5% below 52-week high
+    """
+    client = FMPClient()
+    screeners = StockScreeners(client)
+    
+    # --- Step 1: Descriptive & Relative Volume Filtering ---
+    logger.info("Running Swing Trading Step 1: Descriptive filters...")
+    base_params = {
+        "priceMoreThan": 10,
+        "avgVolumeMoreThan": 200000,
+        "country": "US",
+        "isEtf": "false",
+        "isFund": "false",
+        "isActivelyTrading": "true",
+        "limit": 1000
+    }
+    
+    raw_data = client.get_company_screener(base_params)
+    if not raw_data:
+        logger.warning("No data returned for Swing Trading screener.")
+        return []
+
+    df = pd.DataFrame(raw_data)
+    
+    # Filter Relative Volume > 1.5 locally if column exists
+    if "relativeVolume" in df.columns:
+        df = df[df["relativeVolume"] > 1.5]
+
+    # Filter 5% or more below 52-week high if columns exist
+    if "price" in df.columns and "yearHigh" in df.columns:
+        df = df[df["price"] <= df["yearHigh"] * 0.95]
+
+    symbols = df["symbol"].tolist() if "symbol" in df.columns else []
+    logger.info(f"Filtered down to {len(symbols)} candidates after descriptive and relative volume checks.")
+
+    # --- Step 2: Fundamental Validation (Swing Profile) ---
+    logger.info("Running Swing Trading Step 2: Fundamental validation...")
+    fund_validator = FundamentalValidator(
+        client=client,
+        min_eps_this_year=0.0,           # Positive (>0%)
+        min_eps_next_year=0.0,           # Positive (>0%)
+        min_eps_qtr=0.0,                 # Positive (>0%)
+        min_sales_qtr=0.0,               # Positive (>0%)
+        min_roe=0.0,                     # Positive (>0%)
+        max_institutional_ownership=0.60,# Under 60%
+        max_debt_to_equity=1.0,          # Under 1
+        min_current_ratio=1.0            # Over 1
+    )
+
+    fundamentally_sound = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    logger.info(f"{len(fundamentally_sound)} symbols passed fundamental checks.")
+
+    # --- Step 3: Technical Validation (Bullish SMAs) ---
+    logger.info("Running Swing Trading Step 3: Technical validation (SMA alignment)...")
+    tech_validator = TechnicalValidator(client)
+    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
+
+    logger.info(f"Swing Trading pipeline complete. Final watchlist: {final_watchlist}")
     return final_watchlist
