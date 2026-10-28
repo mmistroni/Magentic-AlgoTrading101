@@ -27,6 +27,7 @@ def get_extra_watchlist():
     fund_validator = FundamentalValidator(client)
     fundamentally_sound = [sym for sym in symbols if fund_validator.evaluate(sym)]
 
+    #
     # Step 3: Technical Enrichment (Run only on fundamentally qualified stocks)
     tech_validator = TechnicalValidator(client)
     final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
