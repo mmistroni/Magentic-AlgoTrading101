@@ -2,13 +2,13 @@ pyproject.toml
 src/ingest_fmp/__init__.py
 src/ingest_fmp/bq_loader.py
 src/ingest_fmp/client.py
+src/ingest_fmp/fundamental_validator.py
 src/ingest_fmp/main.py
+src/ingest_fmp/pipeline.py
 src/ingest_fmp/screeners.py
+src/ingest_fmp/technical_validator.py
 src/ingest_fmp.egg-info/PKG-INFO
 src/ingest_fmp.egg-info/SOURCES.txt
 src/ingest_fmp.egg-info/dependency_links.txt
 src/ingest_fmp.egg-info/requires.txt
 src/ingest_fmp.egg-info/top_level.txt
-tests/test_bqloader.py
-tests/test_client.py
-tests/test_screeners.py
