@@ -15,23 +15,79 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-def get_extra_watchlist():
+
+import logging
+import pandas as pd
+from ingest_fmp.client import FMPClient
+from ingest_fmp.fundamental_validator import FundamentalValidator
+from ingest_fmp.technical_validator import TechnicalValidator
+
+logger = logging.getLogger(__name__)
+
+def get_extra_watchlist() -> list[dict]:
+    """
+    Orchestrates the Extra Watchlist Pipeline:
+    1. Descriptive: Mid/Large Cap (> $2B), Price > $10, Avg Vol > 200K, Active US equities.
+    2. Fundamental: Positive growth, institutional limits, or standard fundamental profiles.
+    3. Technical: Bullish SMA alignment (Price > SMA20 > SMA50 > SMA200).
+    4. Output: Fully enriched dictionaries ready for BigQuery insertion.
+    """
     client = FMPClient()
     
-    # Step 1: Descriptive Universe
-    screeners = StockScreeners(client)
-    base_stocks = screeners.get_base_universe()
-    symbols = [stock["symbol"] for stock in base_stocks]
+    # --- Step 1: Direct FMP Descriptive Screener Call ---
+    desc_params = {
+        "marketCapMoreThan": 2000000000,    # Mid cap over $2B
+        "priceMoreThan": 10,               # Price over $10
+        "avgVolumeMoreThan": 200000,       # Average volume over 200K
+        "country": "US",                   # US markets only
+        "isEtf": "false",                  # Exclude ETFs
+        "isFund": "false",                 # Exclude Funds
+        "isActivelyTrading": "true",       # Actively trading equities
+        "limit": 1000
+    }
+    
+    logger.info("Fetching extra watchlist universe directly via FMP client...")
+    raw_data = client.get_company_screener(desc_params)
+    if not raw_data:
+        logger.warning("No data returned from FMP screener for Extra Watchlist.")
+        return []
 
-    # Step 2: Fundamental Enrichment
-    fund_validator = FundamentalValidator(client)
-    fundamentally_sound = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    df = pd.DataFrame(raw_data)
+    if "symbol" in df.columns:
+        df = df.dropna(subset=["symbol"])
 
-    #
-    # Step 3: Technical Enrichment (Run only on fundamentally qualified stocks)
-    tech_validator = TechnicalValidator(client)
-    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
+    candidates = df.to_dict(orient="records")
+    
+    # Stamp strategy metadata onto each record bag
+    for candidate in candidates:
+        candidate["strategy_name"] = "extra_watchlist"
+        candidate["timestamp"] = pd.Timestamp.utcnow().isoformat()
 
+    logger.info(f"Retrieved {len(candidates)} raw candidates. Starting fundamental validation...")
+
+    # --- Step 2: Fundamental Enrichment & Validation ---
+    fund_validator = FundamentalValidator(client=client)
+    fundamentally_sound = []
+    
+    for candidate in candidates:
+        # evaluate() mutates/enriches the dictionary in-place and returns it if passed, else {}
+        result = fund_validator.evaluate(candidate)
+        if result:
+            fundamentally_sound.append(result)
+
+    logger.info(f"{len(fundamentally_sound)} symbols passed fundamental checks. Starting technical validation...")
+
+    # --- Step 3: Technical Enrichment & Validation ---
+    tech_validator = TechnicalValidator(client=client)
+    final_watchlist = []
+    
+    for candidate in fundamentally_sound:
+        # evaluate() mutates/enriches with SMA data in-place if passed, else {}
+        result = tech_validator.evaluate(candidate)
+        if result:
+            final_watchlist.append(result)
+
+    logger.info(f"✨ Extra Watchlist pipeline complete. {len(final_watchlist)} fully enriched records ready for BigQuery.")
     return final_watchlist
 
 
@@ -43,8 +99,6 @@ def run_market_down_pipeline() -> list:
     3. Technical (Price < SMA20 bearish alignment)
     """
     client = FMPClient()
-    screeners = StockScreeners(client)
-    
     # 1. Define native FMP descriptive parameters
     market_down_params = {
         "exchange": "NASDAQ",
@@ -56,6 +110,7 @@ def run_market_down_pipeline() -> list:
     
     logger.info("Running Market Down Step 1: Fetching descriptive universe...")
     raw_data = client.get_company_screener(market_down_params)
+
     if not raw_data:
         logger.warning("No data returned for Market Down descriptive screener.")
         return []
@@ -109,7 +164,7 @@ def run_high_growth_float_watchlist() -> list:
     }
     
     screeners = StockScreeners(client)
-    raw_data = client.get_company_screener(base_params)
+    raw_data = screeners.get_screeners(base_params)
     if not raw_data:
         return []
 
