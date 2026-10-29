@@ -5,7 +5,7 @@ INSERT INTO `{table_ref}` (
     action, 
     conviction_score, 
     entry_price, 
-    decision_snapshot
+    decision_snapshot_json
 )
 VALUES (
     @decision_id, 

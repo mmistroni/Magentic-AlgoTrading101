@@ -175,12 +175,14 @@ class TradeAction(str, Enum):
 class FundamentalEvaluation(BaseModel):
     ticker: str  # <--- Add this field here
     pe_ratio: Optional[float] = None
+    price: Optional[float] = None
     forward_pe: Optional[float] = None
     debt_to_equity: Optional[float] = None
     free_cash_flow_yield: Optional[float] = None
     return_on_equity: Optional[float] = None
     valuation_verdict: ValuationVerdict = ValuationVerdict.NEUTRAL  # <--- Using Enum here
     fundamental_health_score: float = Field(..., ge=0.0, le=100.0)
+
 
 
 class DecisionRationaleBreakdown(BaseModel):
