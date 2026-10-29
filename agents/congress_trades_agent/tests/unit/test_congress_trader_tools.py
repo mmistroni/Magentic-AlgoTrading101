@@ -11,6 +11,7 @@ def test_get_fundamentals_tool_wraps_pydantic(mock_fetch):
     mock_fetch.return_value = {
         "ticker": "MSFT",
         "pe_ratio": 28.0,
+        "price": 300.0,
         "forward_pe": 25.0,
         "debt_to_equity": 0.8,
         "free_cash_flow_yield": 0.03,
@@ -25,6 +26,7 @@ def test_get_fundamentals_tool_wraps_pydantic(mock_fetch):
     assert isinstance(result, FundamentalEvaluation)
     assert result.ticker == "MSFT"
     assert result.valuation_verdict == "FAIRLY_VALUED"
+    assert result.price == 300.0
     mock_fetch.assert_called_once_with("msft")
 
 
@@ -33,22 +35,28 @@ def test_store_trade_decision_tool_success(mock_execute_store):
     """Test that the store_trade_decision tool correctly packages inputs and calls the underlying script."""
     mock_execute_store.return_value = None  # Executes successfully without error
 
+    test_ticker = 'nvda'
     result = store_trade_decision(
-        ticker="nvda",
-        action="BUY",
-        conviction_score=85.0,
-        valuation_verdict="UNDERVALUED",
-        pe_ratio=32.5,
-        notes="Strong congressional backing and bullish insider activity."
-    )
+                ticker=test_ticker,
+                action="BUY",
+                conviction_score=85.0,
+                pe_ratio=32.5,
+                valuation_verdict="UNDERVALUED",
+                fundamental_health_score=85.0,
+                congressional_net_buys=3,
+                insider_cluster_buy=True,
+                price=300.0,
+                synthesis_summary="Strong congressional backing and bullish insider activity."
+            )
 
-    assert "Successfully stored decision" in result
+    assert "Successfully validated and stored decision record" in result
     mock_execute_store.assert_called_once()
     
     # Verify the positional/keyword arguments passed down to the executor script
     _, kwargs = mock_execute_store.call_args
-    assert kwargs["ticker"] == "nvda"
+    assert kwargs["ticker"] == test_ticker.upper()
     assert kwargs["action"] == "BUY"
+    assert kwargs['entry_price'] == 300.0
     assert kwargs["conviction_score"] == 85.0
 
 

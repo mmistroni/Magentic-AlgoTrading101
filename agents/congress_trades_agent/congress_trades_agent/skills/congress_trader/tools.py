@@ -28,12 +28,13 @@ def get_fundamentals(ticker: str) -> FundamentalEvaluation:
 def store_trade_decision(
     ticker: str,
     action: str,  # e.g., "BUY", "SELL", "HOLD"
-    conviction_score: float,  # Confluence score between 0.0 and 100.0
+    conviction_score: float,  # Confluence score between 0.0 and 100.0``
     pe_ratio: float,
     valuation_verdict: str,
     fundamental_health_score: float,
     congressional_net_buys: int,
     insider_cluster_buy: bool,
+    price: float,
     synthesis_summary: str
 ) -> str:
     """Validates the trade decision via Pydantic (applying default weights), persists the snapshot to BigQuery, 
@@ -48,6 +49,7 @@ def store_trade_decision(
         fundamental_health_score: Score between 0.0 and 100.0.
         congressional_net_buys: Count of net congressional purchases.
         insider_cluster_buy: Boolean flag for insider cluster activity.
+        price: Current stock price.
         synthesis_summary: Detailed prose explaining the 'Why' behind the trade.
     """
     decision_id = f"dec-{ticker.upper()}-{int(datetime.utcnow().timestamp())}"
@@ -57,6 +59,7 @@ def store_trade_decision(
     fundamentals = FundamentalEvaluation(
         ticker=ticker.upper(),
         pe_ratio=pe_ratio,
+        price = price,
         valuation_verdict=ValuationVerdict(valuation_verdict.upper()),
         fundamental_health_score=fundamental_health_score
     )
@@ -102,6 +105,7 @@ def store_trade_decision(
             decision_timestamp=decision_timestamp,
             action=action.upper(),
             conviction_score=conviction_score,
+            entry_price = price,
             decision_snapshot_json=snapshot_json
         )
         return f"Successfully validated and stored decision record {decision_id} for {ticker.upper()}."
