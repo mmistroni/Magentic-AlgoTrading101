@@ -96,8 +96,7 @@ test_congress_researcher_agents.py
  - test skills migration
 - test_congress_resaearcher_eval evaluate response
 
-  ====22/10.
-  Congress trader unit tests completed
-  Sorted out trade decision. 
-  Next stop are integration tests
-  
+  ====29/10.
+  started integ test for tools
+  we need to add agent integ and eval integ, fetching
+  also the right data from big query
