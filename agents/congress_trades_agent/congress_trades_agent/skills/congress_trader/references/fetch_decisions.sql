@@ -1,8 +1,13 @@
-SELECT decision_snapshot, entry_price, decision_timestamp, ticker
+SELECT 
+    decision_id,
+    ticker,
+    decision_timestamp,
+    action,
+    conviction_score,
+    entry_price,
+    decision_snapshot_json  -- <-- Updated from decision_snapshot
 FROM `{table_ref}`
-WHERE 1=1
-  AND (@ticker IS NULL OR ticker = @ticker)
-  AND (@val_verdict IS NULL OR JSON_VALUE(decision_snapshot, '$.fundamentals.valuation_verdict') = @val_verdict)
-  AND (@min_conviction IS NULL OR CAST(JSON_VALUE(decision_snapshot, '$.conviction_score') AS FLOAT64) >= @min_conviction)
+WHERE ticker = @ticker
+  AND conviction_score >= @min_conviction
 ORDER BY decision_timestamp DESC
 LIMIT @limit;

@@ -58,11 +58,10 @@ def test_get_fundamentals_live():
 def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
     """Verify storing trade decision populates all fields, round-trips correctly, and cleans up after itself."""
     
-    # We can inject a unique token or inspect what decision_id is generated, 
-    # or ensure our test uses a unique signature. 
-    # Since store_trade_decision generates its own ID using timestamp, 
-    # we can fetch the latest record for NVDA right after inserting to grab its decision_id, then delete it.
-    
+    # Optional: fetch live price first to use in our store call, or pass a mock/real float
+    fund_data = get_fundamentals(TEST_TICKER)
+    live_price = getattr(fund_data, "price", 138.50) or 138.50
+
     try:
         response_msg = store_trade_decision(
             ticker=TEST_TICKER,
@@ -73,6 +72,7 @@ def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
             fundamental_health_score=85.0,
             congressional_net_buys=3,
             insider_cluster_buy=True,
+            price=live_price,  # <-- Pass price here!
             synthesis_summary="Integration test checking full field population and cleanup."
         )
         assert "Successfully validated and stored decision record" in response_msg
@@ -86,10 +86,12 @@ def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
         assert isinstance(episodes, list)
         assert len(episodes) > 0
 
+        print("DEBUG EPISODES RETURNED:", episodes)  # <-- See what it actually contains
+
         latest_ep = episodes[0]
         test_decision_id = latest_ep["decision_id"]
 
-        # Assert top-level fields
+        # Assert top-level fields (including entry_price if returned by your fetch executor)
         assert latest_ep["ticker"] == TEST_TICKER
         assert latest_ep["action"] == "BUY"
         assert latest_ep["conviction_score"] == 88.5

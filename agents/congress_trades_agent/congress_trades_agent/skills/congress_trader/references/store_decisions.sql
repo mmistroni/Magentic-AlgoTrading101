@@ -14,5 +14,5 @@ VALUES (
     @action, 
     @conviction_score, 
     @entry_price, 
-    PARSE_JSON(@decision_snapshot_json)
+    @decision_snapshot_json
 );

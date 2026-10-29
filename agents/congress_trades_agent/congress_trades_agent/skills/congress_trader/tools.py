@@ -143,7 +143,7 @@ def fetch_historical_episodes(
                 "timestamp": row.decision_timestamp,
                 "action": row.action,
                 "conviction_score": row.conviction_score,
-                "decision_snapshot": row.decision_snapshot
+                "decision_snapshot": row.decision_snapshot_json
             })
         return episodes
     except Exception as e:

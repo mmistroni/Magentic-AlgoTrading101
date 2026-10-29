@@ -27,6 +27,7 @@ def execute_store_decision(
     ticker: str,
     decision_timestamp: str,
     action: str,
+    entry_price: float,
     conviction_score: float,
     decision_snapshot_json: str
 ) -> None:
@@ -41,6 +42,7 @@ def execute_store_decision(
             bigquery.ScalarQueryParameter("ticker", "STRING", ticker.upper()),
             bigquery.ScalarQueryParameter("decision_timestamp", "STRING", decision_timestamp),
             bigquery.ScalarQueryParameter("action", "STRING", action),
+            bigquery.ScalarQueryParameter("entry_price", "FLOAT64", entry_price),
             bigquery.ScalarQueryParameter("conviction_score", "FLOAT64", conviction_score),
             bigquery.ScalarQueryParameter("decision_snapshot_json", "STRING", decision_snapshot_json),
         ]
