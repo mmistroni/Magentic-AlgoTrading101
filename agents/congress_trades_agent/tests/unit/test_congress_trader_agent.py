@@ -1,109 +1,106 @@
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
-from congress_trades_agent.skills.congress_trader.agent import congress_trader
+from google.adk.agents import LlmAgent
+from google.adk.tools import FunctionTool
 
-@pytest.mark.asyncio
-async def test_agent_tool_integration_fetch_historical_episodes_success():
-    """Use Case 1: Agent successfully integrates and calls fetch_historical_episodes to retrieve past trade context."""
-    with patch("congress_trades_agent.skills.congress_trader.agent.fetch_historical_episodes") as mock_fetch:
-        mock_fetch.return_value = [
-            {
-                "decision_id": "dec-NVDA-101",
-                "ticker": "NVDA",
-                "action": "BUY",
-                "conviction_score": 85.0,
-                "decision_snapshot": {"fundamentals": {"valuation_verdict": "UNDERVALUED"}}
-            }
-        ]
-
-        # Simulate agent tool invocation or runner logic
-        results = mock_fetch(ticker="NVDA", valuation_verdict="UNDERVALUED", min_conviction=80.0)
-
-        assert isinstance(results, list)
-        assert len(results) == 1
-        assert results[0]["ticker"] == "NVDA"
-        assert results[0]["conviction_score"] == 85.0
-        mock_fetch.assert_called_once_with(
-            ticker="NVDA", 
-            valuation_verdict="UNDERVALUED", 
-            min_conviction=80.0
-        )
+from congress_trades_agent.skills.congress_trader.agent import (
+    congress_trader,
+    parse_skill_instructions,
+    SKILL_DIR
+)
+from congress_trades_agent.skills.congress_trader.tools import (
+    get_fundamentals,
+    fetch_historical_episodes,
+    store_trade_decision
+)
 
 
-@pytest.mark.asyncio
-async def test_agent_tool_integration_fetch_historical_episodes_empty():
-    """Use Case 2: Agent handles an empty historical episodes result gracefully when no prior trades match."""
-    with patch("congress_trades_agent.skills.congress_trader.agent.fetch_historical_episodes") as mock_fetch:
-        mock_fetch.return_value = []
+def test_congress_trader_agent_structure_and_hierarchy():
+    """Verify LlmAgent structure, model configuration, skill instruction loading, and tool bindings."""
+    assert isinstance(congress_trader, LlmAgent)
+    assert congress_trader.name == "CongressTrader"
+    assert congress_trader.model == "gemini-3.5-flash"
+    
+    # Verify instructions were successfully loaded from SKILL.md and frontmatter stripped
+    assert isinstance(congress_trader.instruction, str)
+    assert len(congress_trader.instruction) > 0
+    assert not congress_trader.instruction.startswith("---")
+    assert "CongressTrader Playbook" in congress_trader.instruction
 
-        results = mock_fetch(ticker="UNKNOWN", min_conviction=90.0)
-
-        assert isinstance(results, list)
-        assert len(results) == 0
-        mock_fetch.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_agent_tool_integration_store_trade_decision_success():
-    """Use Case 3: Agent successfully invokes store_trade_decision upon reaching a final trade verdict."""
-    with patch("congress_trades_agent.skills.congress_trader.agent.store_trade_decision") as mock_store:
-        mock_store.return_value = "Successfully stored decision dec-MSFT-500 for MSFT."
-
-        response = mock_store(
-            ticker="MSFT",
-            action="BUY",
-            conviction_score=92.0,
-            valuation_verdict="UNDERVALUED",
-            pe_ratio=26.5,
-            notes="Strong congressional buying cluster matched with excellent FCF yield."
-        )
-
-        assert "Successfully stored decision" in response
-        mock_store.assert_called_once()
-        _, kwargs = mock_store.call_args
-        assert kwargs["ticker"] == "MSFT"
-        assert kwargs["action"] == "BUY"
-        assert kwargs["conviction_score"] == 92.0
+    # Verify all core tools are bound to the agent instance
+    registered_tools = {t.func if isinstance(t, FunctionTool) else t for t in congress_trader.tools}
+    # agent.py registers fetch_fmp_fundamentals
+    from congress_trades_agent.skills.congress_trader.tools import fetch_fmp_fundamentals
+    assert fetch_fmp_fundamentals in registered_tools
+    assert fetch_historical_episodes in registered_tools
+    assert store_trade_decision in registered_tools
 
 
-@pytest.mark.asyncio
-async def test_agent_tool_integration_combined_workflow():
-    """Use Case 4: Agent executes a multi-tool flow (fetching past history, checking fundamentals, then storing decision)."""
-    with patch("congress_trades_agent.skills.congress_trader.agent.fetch_historical_episodes") as mock_fetch_history, \
-         patch("congress_trades_agent.skills.congress_trader.agent.fetch_fmp_fundamentals") as mock_fetch_fundamentals, \
-         patch("congress_trades_agent.skills.congress_trader.agent.store_trade_decision") as mock_store_decision:
+def test_parse_skill_instructions_utility():
+    """Verify that SKILL.md frontmatter parser correctly strips YAML frontmatter."""
+    instructions = parse_skill_instructions(SKILL_DIR)
+    assert isinstance(instructions, str)
+    assert len(instructions) > 0
+    assert not instructions.startswith("---")
 
-        # Step 1: Mock historical memory response
-        mock_fetch_history.return_value = [{"decision_id": "dec-1", "action": "BUY"}]
-        
-        # Step 2: Mock live fundamental review
-        mock_fetch_fundamentals.return_value = {
-            "ticker": "AAPL",
-            "valuation_verdict": "FAIRLY_VALUED",
-            "pe_ratio": 29.0,
-            "error": None
-        }
 
-        # Step 3: Mock storage response
-        mock_store_decision.return_value = "Successfully stored decision."
+@patch("congress_trades_agent.skills.congress_trader.tools.fetch_fmp_fundamentals")
+@patch("congress_trades_agent.skills.congress_trader.tools.execute_fetch_decisions")
+@patch("congress_trades_agent.skills.congress_trader.tools.execute_store_decision")
+def test_congress_trader_tool_implementations(mock_execute_store, mock_execute_fetch, mock_fetch_fmp):
+    """Test actual underlying tool execution logic (fundamentals, history, and Pydantic validation storage)."""
+    
+    # Setup mocks
+    mock_fetch_fmp.return_value = {
+        "ticker": "NVDA",
+        "pe_ratio": 31.2,
+        "valuation_verdict": "UNDERVALUED",
+        "fundamental_health_score": 85.0
+    }
+    
+    mock_row = MagicMock()
+    mock_row.decision_id = "dec-NVDA-101"
+    mock_row.ticker = "NVDA"
+    mock_row.decision_timestamp = "2026-10-29T12:00:00Z"
+    mock_row.action = "BUY"
+    mock_row.conviction_score = 85.0
+    mock_row.decision_snapshot = '{"ticker": "NVDA"}'
+    mock_execute_fetch.return_value = [mock_row]
+    
+    mock_execute_store.return_value = None
 
-        # Execute simulated workflow steps
-        history = mock_fetch_history(ticker="AAPL")
-        fundamentals = mock_fetch_fundamentals("AAPL")
-        storage_res = mock_store_decision(
-            ticker="AAPL",
-            action="HOLD",
-            conviction_score=50.0,
-            valuation_verdict=fundamentals["valuation_verdict"],
-            pe_ratio=fundamentals["pe_ratio"],
-            notes="Holding based on mixed history and fair valuation."
-        )
+    # Test 1: get_fundamentals wrapper calls fetch_fmp_fundamentals and returns Pydantic model
+    fund_res = get_fundamentals("nvda")
+    assert fund_res.ticker == "NVDA"
+    assert fund_res.pe_ratio == 31.2
+    assert fund_res.valuation_verdict == "UNDERVALUED"
 
-        # Assertions across the combined tool chain
-        assert len(history) == 1
-        assert fundamentals["valuation_verdict"] == "FAIRLY_VALUED"
-        assert "Successfully stored" in storage_res
-        
-        mock_fetch_history.assert_called_once()
-        mock_fetch_fundamentals.assert_called_once_with("AAPL")
-        mock_store_decision.assert_called_once()
+    # Test 2: fetch_historical_episodes tool wrapper
+    history_res = fetch_historical_episodes(ticker="NVDA", min_conviction=80.0)
+    assert isinstance(history_res, list)
+    assert len(history_res) == 1
+    assert history_res[0]["ticker"] == "NVDA"
+    assert history_res[0]["action"] == "BUY"
+
+    # Test 3: store_trade_decision tool wrapper (validates via Pydantic & embeds default weights)
+    store_res = store_trade_decision(
+        ticker="nvda",
+        action="BUY",
+        conviction_score=82.5,
+        pe_ratio=31.2,
+        valuation_verdict="UNDERVALUED",
+        fundamental_health_score=85.0,
+        congressional_net_buys=2,
+        insider_cluster_buy=True,
+        synthesis_summary="Bullish institutional flow and strong fundamentals."
+    )
+
+    assert "Successfully validated and stored decision record" in store_res
+    mock_execute_store.assert_called_once()
+    
+    # Verify default weights applied by Pydantic schema made it into the BigQuery payload
+    _, kwargs = mock_execute_store.call_args
+    assert kwargs["ticker"] == "NVDA"
+    assert kwargs["action"] == "BUY"
+    assert "weights_applied" in kwargs["decision_snapshot_json"]
