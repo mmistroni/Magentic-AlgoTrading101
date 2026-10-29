@@ -93,6 +93,7 @@ def test_congress_trader_tool_implementations(mock_execute_store, mock_execute_f
         fundamental_health_score=85.0,
         congressional_net_buys=2,
         insider_cluster_buy=True,
+        price=138.50,  # <-- Added price here
         synthesis_summary="Bullish institutional flow and strong fundamentals."
     )
 
@@ -103,4 +104,5 @@ def test_congress_trader_tool_implementations(mock_execute_store, mock_execute_f
     _, kwargs = mock_execute_store.call_args
     assert kwargs["ticker"] == "NVDA"
     assert kwargs["action"] == "BUY"
+    assert kwargs["entry_price"] == 138.50  # <-- Verify entry_price is passed correctly
     assert "weights_applied" in kwargs["decision_snapshot_json"]
