@@ -48,27 +48,28 @@ class FMPClient:
             logger.error(f"FMP API request failed for {url}: {str(e)}")
             return []
 
-    # Specific Endpoint Wrappers
+    # Specific Endpoint Wrappers (Using query parameter dictionary format)
     def get_company_screener(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
         return self._get("company-screener", params)
 
     def get_financial_growth(self, symbol: str) -> List[Dict[str, Any]]:
-        """Fetches income statement growth metrics via stable endpoint."""
-        return self._get("income-statement-growth", {"symbol": symbol})
-
+        """Fetches unified financial statement growth metrics via stable endpoint."""
+        return self._get("financial-growth", {"symbol": symbol})
+    
     def get_balance_sheet_growth(self, symbol: str) -> List[Dict[str, Any]]:
-        """Fetches balance sheet growth metrics via stable endpoint."""
+        """Fetches balance sheet growth metrics via stable query parameter endpoint."""
         return self._get("balance-sheet-statement-growth", {"symbol": symbol})
 
     def get_cash_flow_growth(self, symbol: str) -> List[Dict[str, Any]]:
-        """Fetches cash flow statement growth metrics via stable endpoint."""
+        """Fetches cash flow statement growth metrics via stable query parameter endpoint."""
         return self._get("cash-flow-statement-growth", {"symbol": symbol})
 
     def get_key_metrics_ttm(self, symbol: str) -> List[Dict[str, Any]]:
-        return self._get(f"key-metrics-ttm/{symbol}")
+        """Fetches key metrics TTM via stable query parameter endpoint."""
+        return self._get("key-metrics-ttm", {"symbol": symbol})
 
     def get_institutional_ownership_summary(self, symbol: str) -> Dict[str, Any]:
-        data = self._get(f"institutional-ownership/{symbol}/summary")
+        data = self._get("institutional-ownership/summary", {"symbol": symbol})
         return data[0] if isinstance(data, list) and data else {}
 
     def get_sma(self, symbol: str, period_length: int = 20, timeframe: str = "1day") -> List[Dict[str, Any]]:
