@@ -52,6 +52,10 @@ class FMPClient:
     def get_company_screener(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
         return self._get("company-screener", params)
 
+    def get_quote(self, symbol: str) -> List[Dict[str, Any]]:
+        """Fetches real-time stock quote including yearHigh, yearLow, and price via stable endpoint."""
+        return self._get("quote", {"symbol": symbol})
+    
     def get_financial_growth(self, symbol: str) -> List[Dict[str, Any]]:
         """Fetches unified financial statement growth metrics via stable endpoint."""
         return self._get("financial-growth", {"symbol": symbol})

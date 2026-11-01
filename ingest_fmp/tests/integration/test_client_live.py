@@ -96,3 +96,18 @@ def test_live_sma_endpoint(live_client):
             latest = data[0]
             print(f"\n[SMA Success] {symbol} SMA({period}): close={latest.get('close')}, sma={latest.get('sma')}")
             assert "sma" in latest
+
+def test_live_quote_endpoint(live_client):
+    """Verifies get_quote returns real-time pricing data including yearHigh and yearLow."""
+    symbol = "AAPL"
+    results = live_client.get_quote(symbol)
+    
+    assert isinstance(results, list), f"Expected list for quote of {symbol}"
+    assert len(results) > 0, f"Quote returned empty for {symbol}."
+    
+    sample = results[0]
+    print(f"\n[Quote Success] {symbol} Price: {sample.get('price')} | 52W High: {sample.get('yearHigh')} | 52W Low: {sample.get('yearLow')}")
+    
+    assert "price" in sample
+    assert "yearHigh" in sample
+    assert "yearLow" in sample
