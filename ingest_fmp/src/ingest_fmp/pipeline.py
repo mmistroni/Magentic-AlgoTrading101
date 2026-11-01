@@ -1,26 +1,9 @@
+import logging
+import pandas as pd
 from ingest_fmp.client import FMPClient
 from ingest_fmp.screeners import StockScreeners
 from ingest_fmp.fundamental_validator import FundamentalValidator, MarketDownFundamentalValidator
 from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalValidator
-import logging
-from ingest_fmp.client import FMPClient
-from ingest_fmp.screeners import StockScreeners
-from ingest_fmp.fundamental_validator import FundamentalValidator
-import logging
-from ingest_fmp.client import FMPClient
-from ingest_fmp.screeners import StockScreeners
-from ingest_fmp.fundamental_validator import MarketDownFundamentalValidator
-from ingest_fmp.technical_validator import BearishTechnicalValidator
-import pandas as pd
-
-logger = logging.getLogger(__name__)
-
-
-import logging
-import pandas as pd
-from ingest_fmp.client import FMPClient
-from ingest_fmp.fundamental_validator import FundamentalValidator
-from ingest_fmp.technical_validator import TechnicalValidator
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +53,6 @@ def get_extra_watchlist() -> list[dict]:
     fundamentally_sound = []
     
     for candidate in candidates:
-        # evaluate() mutates/enriches the dictionary in-place and returns it if passed, else {}
         result = fund_validator.evaluate(candidate)
         if result:
             fundamentally_sound.append(result)
@@ -82,7 +64,6 @@ def get_extra_watchlist() -> list[dict]:
     final_watchlist = []
     
     for candidate in fundamentally_sound:
-        # evaluate() mutates/enriches with SMA data in-place if passed, else {}
         result = tech_validator.evaluate(candidate)
         if result:
             final_watchlist.append(result)
@@ -99,7 +80,6 @@ def run_market_down_pipeline() -> list:
     3. Technical (Price < SMA20 bearish alignment)
     """
     client = FMPClient()
-    # 1. Define native FMP descriptive parameters
     market_down_params = {
         "exchange": "NASDAQ",
         "marketCapMoreThan": 2000000000,  # Mid cap over $2B
@@ -117,7 +97,6 @@ def run_market_down_pipeline() -> list:
 
     df = pd.DataFrame(raw_data)
     
-    # Optional local filter for Float Short > 20% (0.20) if the field is present in FMP payload
     if "shortFloat" in df.columns:
         df = df[df["shortFloat"] > 0.20]
         
@@ -127,31 +106,29 @@ def run_market_down_pipeline() -> list:
     symbols = df["symbol"].tolist()
     logger.info(f"Market Down descriptive universe secured: {len(symbols)} tickers.")
 
-    # 2. Fundamentals (Negative EPS Next Year)
+    # 2. Fundamentals (Negative EPS)
     logger.info("Running Market Down Step 2: Fundamental validation (Negative EPS)...")
     fund_validator = MarketDownFundamentalValidator(client)
-    filtered_funds = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    filtered_funds = [sym for sym in symbols if fund_validator.evaluate({"symbol": sym})]
     logger.info(f"{len(filtered_funds)} tickers passed fundamental checks.")
 
-    # 3. Technicals (Price < SMA20 & Downward momentum)
+    # 3. Technicals (Price < SMA20)
     logger.info("Running Market Down Step 3: Technical validation (Price < SMA20)...")
     tech_validator = BearishTechnicalValidator(client)
-    final_results = [sym for sym in filtered_funds if tech_validator.evaluate(sym)]
+    final_results = [sym for sym in filtered_funds if tech_validator.evaluate({"symbol": sym})]
 
     logger.info(f"Market Down pipeline complete. Final watchlist: {final_results}")
     return final_results
-
 
 
 def run_high_growth_float_watchlist() -> list:
     """
     Orchestrates the High-Growth / Low-Float Watchlist Pipeline:
     1. Descriptive + Float Filter
-    2. Fundamental Validation (>20% EPS, >25% Sales/Next-Year, >15% ROE, >20% Inst Ownership)
+    2. Fundamental Validation
     """
     client = FMPClient()
     
-    # --- Step 1: Descriptive & Float Filtering ---
     logger.info("Running Step 1: Descriptive screener & float filtering...")
     base_params = {
         "priceMoreThan": 5,
@@ -163,35 +140,28 @@ def run_high_growth_float_watchlist() -> list:
         "limit": 1000
     }
     
-    screeners = StockScreeners(client)
-    raw_data = screeners.get_screeners(base_params)
+    raw_data = client.get_company_screener(base_params)
     if not raw_data:
         return []
 
     df = pd.DataFrame(raw_data)
     
-    # Filter Float < 50M locally via Pandas
     if "floatShares" in df.columns:
         df = df[df["floatShares"] < 50000000]
         
     symbols = df["symbol"].tolist() if "symbol" in df.columns else []
     logger.info(f"Filtered down to {len(symbols)} candidate tickers after descriptive & float checks.")
 
-    # --- Step 2: Parameterized Fundamental Validation ---
     logger.info("Running Step 2: Fundamental validation...")
     validator = FundamentalValidator(
         client=client,
-        min_eps_this_year=0.20,          # Over 20%
-        min_eps_next_year=0.25,          # Over 25%
-        min_eps_qtr=0.20,                # Over 20%
-        min_sales_qtr=0.25,              # Over 25%
-        min_roe=0.15,                    # Over 15%
-        min_gross_margin=0.0,            # Positive (>0%)
-        min_institutional_ownership=0.20 # Over 20%
+        min_eps_growth=0.20,
+        min_roe=0.15,
+        min_gross_margin=0.0,
+        max_institutional_ownership=0.80
     )
 
-    final_watchlist = [sym for sym in symbols if validator.evaluate(sym)]
-    
+    final_watchlist = [sym for sym in symbols if validator.evaluate({"symbol": sym})]
     logger.info(f"Pipeline complete. Final watchlist contains {len(final_watchlist)} stocks: {final_watchlist}")
     return final_watchlist
 
@@ -200,13 +170,12 @@ def run_swing_trading_pipeline() -> list:
     """
     Orchestrates the EOD Swing Trading Pipeline:
     1. Descriptive: Price > $10, Avg Vol > 200K, Relative Vol > 1.5
-    2. Fundamentals: Positive growth across EPS/Sales, ROE > 0, 
-       Inst. Ownership < 60%, Debt/Equity < 1, Current Ratio > 1
-    3. Technicals: Price > SMA20 > SMA50 > SMA200 AND >= 5% below 52-week high
+    2. Quote Filter: Price >= 5% below 52-week high (price <= yearHigh * 0.95)
+    3. Fundamentals: Positive growth, ROE > 0, Inst. Ownership < 60%
+    4. Technicals: Price > SMA20 > SMA50 > SMA200
     """
     client = FMPClient()
     
-    # --- Step 1: Descriptive & Relative Volume Filtering ---
     logger.info("Running Swing Trading Step 1: Descriptive filters...")
     base_params = {
         "priceMoreThan": 10,
@@ -225,69 +194,64 @@ def run_swing_trading_pipeline() -> list:
 
     df = pd.DataFrame(raw_data)
     
-    # Filter Relative Volume > 1.5 locally if column exists
     if "relativeVolume" in df.columns:
         df = df[df["relativeVolume"] > 1.5]
 
-    # Filter 5% or more below 52-week high if columns exist
-    if "price" in df.columns and "yearHigh" in df.columns:
-        df = df[df["price"] <= df["yearHigh"] * 0.95]
-
     symbols = df["symbol"].tolist() if "symbol" in df.columns else []
-    logger.info(f"Filtered down to {len(symbols)} candidates after descriptive and relative volume checks.")
+    logger.info(f"Screened {len(symbols)} candidates. Checking 52-week high via quote endpoint...")
 
-    # --- Step 2: Fundamental Validation (Swing Profile) ---
+    # --- Step 1b: Quote Filtering (>= 5% below 52-week high) ---
+    quote_filtered_symbols = []
+    for symbol in symbols:
+        quote_data = client.get_quote(symbol)
+        if not quote_data:
+            continue
+        q = quote_data[0]
+        price = q.get("price", 0)
+        year_high = q.get("yearHigh", 0)
+        
+        if year_high and price <= year_high * 0.95:
+            quote_filtered_symbols.append(symbol)
+
+    logger.info(f"Filtered down to {len(quote_filtered_symbols)} candidates after 52-week high check.")
+
+    # --- Step 2: Fundamental Validation ---
     logger.info("Running Swing Trading Step 2: Fundamental validation...")
     fund_validator = FundamentalValidator(
         client=client,
-        min_eps_this_year=0.0,           # Positive (>0%)
-        min_eps_next_year=0.0,           # Positive (>0%)
-        min_eps_qtr=0.0,                 # Positive (>0%)
-        min_sales_qtr=0.0,               # Positive (>0%)
-        min_roe=0.0,                     # Positive (>0%)
-        max_institutional_ownership=0.60,# Under 60%
-        max_debt_to_equity=1.0,          # Under 1
-        min_current_ratio=1.0            # Over 1
+        min_eps_growth=0.0,
+        min_roe=0.0,
+        min_gross_margin=0.0,
+        max_institutional_ownership=0.60
     )
 
-    fundamentally_sound = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    fundamentally_sound = [sym for sym in quote_filtered_symbols if fund_validator.evaluate({"symbol": sym})]
     logger.info(f"{len(fundamentally_sound)} symbols passed fundamental checks.")
 
-    # --- Step 3: Technical Validation (Bullish SMAs) ---
-    logger.info("Running Swing Trading Step 3: Technical validation (SMA alignment)...")
+    # --- Step 3: Technical Validation ---
+    logger.info("Running Swing Trading Step 3: Technical validation...")
     tech_validator = TechnicalValidator(client)
-    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
+    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate({"symbol": sym})]
 
     logger.info(f"Swing Trading pipeline complete. Final watchlist: {final_watchlist}")
     return final_watchlist
 
 
-import logging
-import pandas as pd
-from ingest_fmp.client import FMPClient
-from ingest_fmp.screeners import StockScreeners
-from ingest_fmp.fundamental_validator import FundamentalValidator
-from ingest_fmp.technical_validator import TechnicalValidator
-
-logger = logging.getLogger(__name__)
-
 def run_new_highs_pipeline() -> list:
     """
     Orchestrates the New Highs Momentum Pipeline:
-    1. Descriptive: Market Cap > $300M, Price > $10, Avg Vol > 200K, 
-       Relative Vol > 1, Intraday Up (Price > Open & Close > Prev Close), 
-       and 52-Week New High.
-    2. Fundamentals: Positive EPS/Sales growth, ROE > 0, Institutional Ownership < 60%.
-    3. Technicals: Price above SMA20, SMA50, and SMA200.
+    1. Descriptive: Price > $10, Avg Vol > 200K, Relative Vol > 1.0
+    2. Quote Filter: Intraday Up & 52-Week New High (Price >= 99% of yearHigh)
+    3. Fundamentals: Positive growth & Inst Ownership < 60%
+    4. Technicals: Price above SMA20, SMA50, SMA200
     """
     client = FMPClient()
     
-    # --- Step 1: Descriptive & Intraday Price Action Filtering ---
-    logger.info("Running New Highs Step 1: Descriptive & Price Action filters...")
+    logger.info("Running New Highs Step 1: Descriptive filters...")
     base_params = {
-        "marketCapMoreThan": 300000000,    # Small cap over $300M
-        "priceMoreThan": 10,               # Price over $10
-        "avgVolumeMoreThan": 200000,       # Average volume over 200K
+        "marketCapMoreThan": 300000000,
+        "priceMoreThan": 10,
+        "avgVolumeMoreThan": 200000,
         "country": "US",
         "isEtf": "false",
         "isFund": "false",
@@ -302,42 +266,48 @@ def run_new_highs_pipeline() -> list:
 
     df = pd.DataFrame(raw_data)
     
-    # Filter Relative Volume > 1.0
     if "relativeVolume" in df.columns:
         df = df[df["relativeVolume"] > 1.0]
 
-    # Filter Intraday Up: Change > 0 (or price > previousClose) and Change from Open > 0 (price > open)
-    if all(col in df.columns for col in ["price", "previousClose"]):
-        df = df[df["price"] > df["previousClose"]]
-    if all(col in df.columns for col in ["price", "open"]):
-        df = df[df["price"] > df["open"]]
-
-    # Filter 52-Week High (New High: Price at or within 1% of yearHigh)
-    if all(col in df.columns for col in ["price", "yearHigh"]):
-        df = df[df["price"] >= df["yearHigh"] * 0.99]
-
     symbols = df["symbol"].tolist() if "symbol" in df.columns else []
-    logger.info(f"Filtered down to {len(symbols)} candidates after descriptive and price action checks.")
+    logger.info(f"Screened {len(symbols)} candidates. Evaluating live quotes & 52-week highs...")
 
-    # --- Step 2: Fundamental Validation (Positive Growth & Inst Ownership < 60%) ---
+    # --- Step 1b: Quote & New High Filtering ---
+    new_high_candidates = []
+    for symbol in symbols:
+        quote_data = client.get_quote(symbol)
+        if not quote_data:
+            continue
+        q = quote_data[0]
+        price = q.get("price", 0)
+        open_price = q.get("open", 0)
+        prev_close = q.get("previousClose", 0)
+        year_high = q.get("yearHigh", 0)
+        
+        # Check Intraday Up & 52-Week New High conditions
+        if year_high and price and open_price and prev_close:
+            if price > prev_close and price > open_price and price >= year_high * 0.99:
+                new_high_candidates.append(symbol)
+
+    logger.info(f"Filtered down to {len(new_high_candidates)} candidates meeting New High criteria.")
+
+    # --- Step 2: Fundamental Validation ---
     logger.info("Running New Highs Step 2: Fundamental validation...")
     fund_validator = FundamentalValidator(
         client=client,
-        min_eps_this_year=0.0,           # Positive (>0%)
-        min_eps_next_year=0.0,           # Positive (>0%)
-        min_eps_qtr=0.0,                 # Positive (>0%)
-        min_sales_qtr=0.0,               # Positive (>0%)
-        min_roe=0.0,                     # Positive (>0%)
-        max_institutional_ownership=0.60 # Under 60%
+        min_eps_growth=0.0,
+        min_roe=0.0,
+        min_gross_margin=0.0,
+        max_institutional_ownership=0.60
     )
 
-    fundamentally_sound = [sym for sym in symbols if fund_validator.evaluate(sym)]
+    fundamentally_sound = [sym for sym in new_high_candidates if fund_validator.evaluate({"symbol": sym})]
     logger.info(f"{len(fundamentally_sound)} symbols passed fundamental checks.")
 
-    # --- Step 3: Technical Validation (Price above SMA20, SMA50, SMA200) ---
+    # --- Step 3: Technical Validation ---
     logger.info("Running New Highs Step 3: Technical validation...")
     tech_validator = TechnicalValidator(client)
-    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate(sym)]
+    final_watchlist = [sym for sym in fundamentally_sound if tech_validator.evaluate({"symbol": sym})]
 
     logger.info(f"New Highs pipeline complete. Final watchlist: {final_watchlist}")
     return final_watchlist
