@@ -205,7 +205,6 @@ def run_swing_trading_pipeline() -> list:
     3. Technicals: Price > SMA20 > SMA50 > SMA200 AND >= 5% below 52-week high
     """
     client = FMPClient()
-    screeners = StockScreeners(client)
     
     # --- Step 1: Descriptive & Relative Volume Filtering ---
     logger.info("Running Swing Trading Step 1: Descriptive filters...")
@@ -282,7 +281,6 @@ def run_new_highs_pipeline() -> list:
     3. Technicals: Price above SMA20, SMA50, and SMA200.
     """
     client = FMPClient()
-    screeners = StockScreeners(client)
     
     # --- Step 1: Descriptive & Intraday Price Action Filtering ---
     logger.info("Running New Highs Step 1: Descriptive & Price Action filters...")

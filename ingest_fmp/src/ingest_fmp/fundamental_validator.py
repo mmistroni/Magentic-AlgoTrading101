@@ -20,22 +20,19 @@ class BaseFundamentalValidator:
         inst_ownership_pct: float = None
     ) -> dict:
         """
-        Returns a standardized dictionary of fundamental metrics 
-        to ensure uniform BigQuery schema output across all strategies.
+        Maps actual FMP response keys to our standardized schema dictionary.
         """
         growth_latest = growth_latest or {}
         metrics_latest = metrics_latest or {}
 
         return {
-            "eps_growth_this_year": growth_latest.get("epsgrowththisyear"),
-            "eps_growth_next_year": growth_latest.get("epsgrowthnextyear"),
-            "eps_growth_qtr": growth_latest.get("epsGrowthQuarterOverQuarter"),
-            "revenue_growth_qtr": growth_latest.get("revenueGrowthQuarterOverQuarter"),
+            "eps_growth": growth_latest.get("epsgrowth"),
+            "revenue_growth": growth_latest.get("revenueGrowth"),
+            "net_income_growth": growth_latest.get("netIncomeGrowth"),
             "return_on_equity": metrics_latest.get("returnOnEquityTTM"),
             "gross_margin": metrics_latest.get("grossProfitMarginTTM"),
             "institutional_ownership_pct": inst_ownership_pct
         }
-
 
 class FundamentalValidator(BaseFundamentalValidator):
     def __init__(

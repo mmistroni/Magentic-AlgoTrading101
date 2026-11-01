@@ -53,7 +53,16 @@ class FMPClient:
         return self._get("company-screener", params)
 
     def get_financial_growth(self, symbol: str) -> List[Dict[str, Any]]:
-        return self._get(f"financial-growth/{symbol}")
+        """Fetches income statement growth metrics via stable endpoint."""
+        return self._get("income-statement-growth", {"symbol": symbol})
+
+    def get_balance_sheet_growth(self, symbol: str) -> List[Dict[str, Any]]:
+        """Fetches balance sheet growth metrics via stable endpoint."""
+        return self._get("balance-sheet-statement-growth", {"symbol": symbol})
+
+    def get_cash_flow_growth(self, symbol: str) -> List[Dict[str, Any]]:
+        """Fetches cash flow statement growth metrics via stable endpoint."""
+        return self._get("cash-flow-statement-growth", {"symbol": symbol})
 
     def get_key_metrics_ttm(self, symbol: str) -> List[Dict[str, Any]]:
         return self._get(f"key-metrics-ttm/{symbol}")
