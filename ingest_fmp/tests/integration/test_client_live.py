@@ -50,8 +50,8 @@ def test_live_balance_sheet_growth(live_client):
     assert len(results) > 0, f"Balance sheet growth returned empty for {symbol}."
     
     sample = results[0]
-    print(f"\n[Balance Sheet Growth Success] {symbol} Asset Growth: {sample.get('assetGrowth')}")
-    assert "assetGrowth" in sample or "debtGrowth" in sample
+    print(f"\n[Balance Sheet Growth Success] {symbol} Asset Growth: {sample.get('growthTotalAssets')}")
+    assert "growthTotalAssets" in sample or "growthTotalDebt" in sample
 
 def test_live_cash_flow_growth(live_client):
     """Verifies get_cash_flow_growth returns cash flow statement growth metrics."""
@@ -62,8 +62,8 @@ def test_live_cash_flow_growth(live_client):
     assert len(results) > 0, f"Cash flow growth returned empty for {symbol}."
     
     sample = results[0]
-    print(f"\n[Cash Flow Growth Success] {symbol} Free Cash Flow Growth: {sample.get('freeCashFlowGrowth')}")
-    assert "freeCashFlowGrowth" in sample or "operatingCashFlowGrowth" in sample
+    print(f"\n[Cash Flow Growth Success] {symbol} Free Cash Flow Growth: {sample.get('growthFreeCashFlow')}")
+    assert "growthFreeCashFlow" in sample or "growthOperatingCashFlow" in sample
 
 def test_live_key_metrics_ttm(live_client):
     """Verifies get_key_metrics_ttm returns trailing twelve month metrics."""

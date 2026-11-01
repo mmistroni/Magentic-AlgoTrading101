@@ -15,38 +15,41 @@ class BaseFundamentalValidator:
 
     def _get_standard_enrichment(
         self, 
-        growth_latest: dict = None, 
+        income_growth: dict = None, 
+        bs_growth: dict = None, 
+        cf_growth: dict = None,
         metrics_latest: dict = None, 
         inst_ownership_pct: float = None
     ) -> dict:
         """
-        Maps actual fields from the FMP financial-growth endpoint to our 
+        Maps stable statement growth endpoint keys (growth*-prefixed) to our 
         standardized BigQuery and Agent schema.
         """
-        growth_latest = growth_latest or {}
+        income_growth = income_growth or {}
+        bs_growth = bs_growth or {}
+        cf_growth = cf_growth or {}
         metrics_latest = metrics_latest or {}
 
         return {
-            # Income Statement / Core Growth
-            "eps_growth": growth_latest.get("epsgrowth"),
-            "revenue_growth": growth_latest.get("revenueGrowth"),
-            "net_income_growth": growth_latest.get("netIncomeGrowth"),
+            # Income Statement Growth
+            "eps_growth": income_growth.get("growthEps") or income_growth.get("epsgrowth"),
+            "revenue_growth": income_growth.get("growthRevenue") or income_growth.get("revenueGrowth"),
+            "net_income_growth": income_growth.get("growthNetIncome") or income_growth.get("netIncomeGrowth"),
             
-            # Balance Sheet Growth
-            "asset_growth": growth_latest.get("assetGrowth"),
-            "debt_growth": growth_latest.get("debtGrowth"),
-            "book_value_growth": growth_latest.get("bookValueperShareGrowth"),
+            # Balance Sheet Growth (Stable keys use growth* prefix)
+            "asset_growth": bs_growth.get("growthTotalAssets"),
+            "debt_growth": bs_growth.get("growthTotalDebt"),
+            "book_value_growth": bs_growth.get("growthBookValuePerShare"),
             
-            # Cash Flow Growth
-            "operating_cash_flow_growth": growth_latest.get("operatingCashFlowGrowth"),
-            "free_cash_flow_growth": growth_latest.get("freeCashFlowGrowth"),
+            # Cash Flow Statement Growth
+            "operating_cash_flow_growth": cf_growth.get("growthOperatingCashFlow") or cf_growth.get("growthNetCashProvidedByOperatingActivites"),
+            "free_cash_flow_growth": cf_growth.get("growthFreeCashFlow"),
             
-            # TTM Profitability & Ownership Ratios
+            # Profitability & Ownership TTM Ratios
             "return_on_equity": metrics_latest.get("returnOnEquityTTM"),
             "gross_margin": metrics_latest.get("grossProfitMarginTTM"),
             "institutional_ownership_pct": inst_ownership_pct
         }
-
 
 class FundamentalValidator(BaseFundamentalValidator):
     def __init__(
