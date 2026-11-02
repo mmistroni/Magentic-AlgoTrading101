@@ -91,14 +91,6 @@ class FundamentalValidator(BaseFundamentalValidator):
             if roe < self.min_roe or gross_margin < self.min_gross_margin:
                 return {}
 
-            # 3. Institutional Ownership check
-            inst_ownership_pct = 100.0
-            if self.max_institutional_ownership < 1.0:
-                ownership_data = self.client.get_institutional_ownership_summary(symbol)
-                inst_ownership_pct = ownership_data.get("institutionalOwnershipPercentage", 100) if ownership_data else 100
-                if inst_ownership_pct >= self.max_institutional_ownership:
-                    return {}
-
             logger.info(f"✨ {symbol} passed fundamental filters with unified financial-growth enrichment.")
             
             symbol_dict.update(self._get_standard_enrichment(latest_growth, latest_metrics, inst_ownership_pct))

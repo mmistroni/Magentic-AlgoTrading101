@@ -16,15 +16,12 @@ def test_fundamental_validator_live_fetch(fmp_client):
     and correctly enriches the input dictionary with standardized schema keys.
     """
     validator = FundamentalValidator(
-        client=fmp_client,
-        min_eps_this_year=-999.0,  # Loose thresholds to ensure a major stock passes
-        min_eps_next_year=-999.0,
-        min_eps_qtr=-999.0,
-        min_sales_qtr=-999.0,
-        min_roe=-999.0,
-        min_gross_margin=-999.0,
-        max_institutional_ownership=1.0 # Skip hard block for test
-    )
+            client=fmp_client,
+            min_eps_growth=-999.0,            # Loose threshold to ensure AAPL passes
+            min_roe=-999.0,
+            min_gross_margin=-999.0,
+            max_institutional_ownership=1.0   # Skip hard block for test
+        )
     
     test_record = {"symbol": "AAPL", "strategy_name": "test_strategy"}
     
