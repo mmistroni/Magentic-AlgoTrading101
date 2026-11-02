@@ -31,13 +31,15 @@ def test_fundamental_validator_live_fetch(fmp_client):
     
     # Assertions to verify all expected enrichment keys are present
     assert enriched_dict, "FundamentalValidator returned empty dict! API call or threshold failed."
-    assert "eps_growth_this_year" in enriched_dict
-    assert "eps_growth_next_year" in enriched_dict
-    assert "eps_growth_qtr" in enriched_dict
-    assert "revenue_growth_qtr" in enriched_dict
+    # Change old key assertions like:
+    # assert "eps_growth_this_year" in enriched_dict
+    
+    # To the new unified schema keys:
+    assert "eps_growth" in enriched_dict
+    assert "revenue_growth" in enriched_dict
+    assert "net_income_growth" in enriched_dict
     assert "return_on_equity" in enriched_dict
     assert "gross_margin" in enriched_dict
-    assert "institutional_ownership_pct" in enriched_dict
     assert enriched_dict["symbol"] == "AAPL"
 
 def test_market_down_validator_live_fetch(fmp_client):

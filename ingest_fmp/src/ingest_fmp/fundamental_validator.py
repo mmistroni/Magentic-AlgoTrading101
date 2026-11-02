@@ -93,7 +93,7 @@ class FundamentalValidator(BaseFundamentalValidator):
 
             logger.info(f"✨ {symbol} passed fundamental filters with unified financial-growth enrichment.")
             
-            symbol_dict.update(self._get_standard_enrichment(latest_growth, latest_metrics, inst_ownership_pct))
+            symbol_dict.update(self._get_standard_enrichment(latest_growth, latest_metrics))
             return symbol_dict
 
         except Exception as e:
