@@ -23,7 +23,7 @@ def test_agent_enrichment_payload():
         min_gross_margin=-999.0,
         max_institutional_ownership=1.0
     )
-    tech_validator = TechnicalValidator(client=client)
+    tech_validator = TechnicalValidator(client=client, strict_mode=False, throttle_seconds=5)
 
     # Test candidate record
     candidate = {

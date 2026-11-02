@@ -28,47 +28,42 @@ class BaseTechnicalValidator:
 
 
 class TechnicalValidator(BaseTechnicalValidator):
+    def __init__(self, client: FMPClient, throttle_seconds: int = 5, strict_mode: bool = True):
+        super().__init__(client, throttle_seconds)
+        self.strict_mode = strict_mode
+
     def evaluate(self, symbol_dict: dict) -> dict:
-        """
-        Validates bullish technical alignment with short-circuiting:
-        Price > SMA20 > SMA50 > SMA200
-        """
         symbol = self._get_symbol(symbol_dict)
         try:
-            # 1. SMA 20 (Shortest - fail fast)
             latest_20 = self._fetch_sma(symbol, 20)
-            if not latest_20:
-                return {}
-            
-            price = latest_20.get("close")
-            sma20 = latest_20.get("sma")
-            if price is None or sma20 is None or price <= sma20:
-                return {}
-
-            # 2. SMA 50
             latest_50 = self._fetch_sma(symbol, 50)
-            if not latest_50:
-                return {}
-            sma50 = latest_50.get("sma")
-            if sma50 is None or sma20 <= sma50:
-                return {}
-
-            # 3. SMA 200
             latest_200 = self._fetch_sma(symbol, 200)
-            if not latest_200:
-                return {}
-            sma200 = latest_200.get("sma")
-            if sma200 is None or sma50 <= sma200:
-                return {}
 
-            logger.info(f"✨ {symbol} passed technical filters.")
-            symbol_dict.update({'price': price, 'sma20': sma20, 'sma50': sma50, 'sma200': sma200})
+            price = latest_20.get("close") if latest_20 else None
+            sma20 = latest_20.get("sma") if latest_20 else None
+            sma50 = latest_50.get("sma") if latest_50 else None
+            sma200 = latest_200.get("sma") if latest_200 else None
+
+            # If strict mode is on, enforce strict bullish checks
+            if self.strict_mode:
+                if not (price and sma20 and sma50 and sma200):
+                    return {}
+                if not (price > sma20 > sma50 > sma200):
+                    return {}
+            
+            # Always attach whatever data we successfully pulled for debugging/agent context
+            symbol_dict.update({
+                'price': price, 
+                'sma20': sma20, 
+                'sma50': sma50, 
+                'sma200': sma200,
+                'technical_passed': bool(price and sma20 and sma50 and sma200 and price > sma20 > sma50 > sma200)
+            })
             return symbol_dict
 
         except Exception as e:
             logger.error(f"Error evaluating technicals for {symbol}: {str(e)}")
-            return {}
-
+            return symbol_dict if not self.strict_mode else {}
 
 class BearishTechnicalValidator(BaseTechnicalValidator):
     def evaluate(self, symbol_dict: dict) -> dict:
