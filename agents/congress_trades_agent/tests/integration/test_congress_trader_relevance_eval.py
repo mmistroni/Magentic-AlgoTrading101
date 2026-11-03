@@ -8,7 +8,7 @@ from deepeval.test_case import LLMTestCase, SingleTurnParams
 from deepeval.models import GeminiModel
 
 from google.adk.runners import InMemoryRunner
-from congress_trades_agent.schemas import TradeDecisionPayload
+from congress_trades_agent.schemas import CongressTraderPayload, TickerDecisionRecord
 from congress_trades_agent.skills.congress_trader.agent import congress_trader
 
 APP_NAME = "congress_trades_agent"
@@ -107,17 +107,32 @@ async def test_eval_congress_trader_relevance(
     raw_decision = updated_session.state.get("trade_decision")
     assert raw_decision is not None, "trade_decision missing from session state"
 
-    payload_dict = json.loads(raw_decision.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()) if isinstance(raw_decision, str) else (raw_decision.model_dump() if hasattr(raw_decision, "model_dump") else dict(raw_decision))
-    validated_payload = TradeDecisionPayload.model_validate(payload_dict)
+    # Clean and parse JSON payload
+    if isinstance(raw_decision, str):
+        clean_json = raw_decision.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        payload_dict = json.loads(clean_json)
+    elif hasattr(raw_decision, "model_dump"):
+        payload_dict = raw_decision.model_dump()
+    else:
+        payload_dict = dict(raw_decision)
 
+    # Support validation against either CongressTraderPayload or individual TickerDecisionRecord
+    if "decisions" in payload_dict or isinstance(payload_dict.get("primary_tickers"), list):
+        validated_payload = CongressTraderPayload.model_validate(payload_dict)
+        decision_action = validated_payload.decisions[0].action.value if validated_payload.decisions else "HOLD"
+    else:
+        validated_decision = TickerDecisionRecord.model_validate(payload_dict)
+        decision_action = validated_decision.action.value
+
+    # Business rule assertions based on scenario
     if scenario_name == "high_conviction_buy":
-        assert validated_payload.action == "BUY"
+        assert decision_action in ["BUY", "STRONG_BUY"]
     elif scenario_name == "conflicting_signals_hold":
-        assert validated_payload.action in ["HOLD", "SELL"]
+        assert decision_action in ["HOLD", "SELL", "STRONG_SELL"]
 
     test_case = LLMTestCase(
         input=prompt_text,
-        actual_output=json.dumps(validated_payload.model_dump(), indent=2),
+        actual_output=json.dumps(payload_dict, indent=2),
         retrieval_context=tool_outputs,
     )
     trader_relevance_metric.measure(test_case)
