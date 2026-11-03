@@ -25,6 +25,7 @@ gemini_evaluator = GeminiModel(
     api_key=os.getenv("GEMINI_API_KEY"),
 )
 
+
 trader_evaluation_metric = GEval(
     name="CongressTrader Decision Synthesis & Grounding Metric",
     criteria="""
