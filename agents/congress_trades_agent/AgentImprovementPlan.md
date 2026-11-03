@@ -96,6 +96,66 @@ test_congress_researcher_agents.py
  - test skills migration
 - test_congress_resaearcher_eval evaluate response
 
+====================== Query to find data ====================
+WITH candidate_dates AS (
+  -- Extract distinct filing/action dates from your core signal tables
+  SELECT DISTINCT action_date AS signal_date FROM `datascience-projects.gcp_shareloader.contract_signals` WHERE action_date IS NOT NULL
+  UNION DISTINCT
+  SELECT DISTINCT AS_OF_DATE AS signal_date FROM `datascience-projects.gcp_shareloader.senate_disclosures` WHERE AS_OF_DATE IS NOT NULL
+  UNION DISTINCT
+  SELECT DISTINCT filing_date AS signal_date FROM `datascience-projects.gcp_shareloader.form4_master` WHERE filing_date IS NOT NULL
+  UNION DISTINCT
+  SELECT DISTINCT filing_date AS signal_date FROM `datascience-projects.gcp_shareloader.lobbying_signals` WHERE filing_date IS NOT NULL
+),
+scored_dates AS (
+  SELECT 
+    d.signal_date,
+    -- Count how many signals/filings happened on or around this date
+    (SELECT COUNT(*) FROM `datascience-projects.gcp_shareloader.senate_disclosures` WHERE AS_OF_DATE = d.signal_date) AS senate_count,
+    (SELECT COUNT(*) FROM `datascience-projects.gcp_shareloader.form4_master` WHERE filing_date = d.signal_date) AS insider_count,
+    (SELECT COUNT(*) FROM `datascience-projects.gcp_shareloader.contract_signals` WHERE action_date = d.signal_date) AS contract_count,
+    (SELECT COUNT(*) FROM `datascience-projects.gcp_shareloader.lobbying_signals` WHERE filing_date = d.signal_date) AS lobbying_count
+  FROM candidate_dates d
+  WHERE d.signal_date >= '2024-01-01'  -- Adjust window as needed (e.g., last 1-2 years)
+)
+SELECT 
+  signal_date,
+  senate_count,
+  insider_count,
+  contract_count,
+  lobbying_count,
+  (senate_count + insider_count + contract_count + lobbying_count) AS total_activity_score
+FROM scored_dates
+WHERE (senate_count > 0 OR insider_count > 0)  -- Ensure at least congress or insider data is present
+ORDER BY total_activity_score DESC
+LIMIT 15;
+
+
+Top Recommended Test Dates
+Comprehensive Multi-Signal Date (Best Overall for Full Integration):
+
+Date: 2025-04-01
+
+Why: Excellent multi-pillar coverage with 9 Senate disclosures, 3,645 insider filings, 19 contract signals, and 9 lobbying signals. This will thoroughly test the CongressTrader agent's ability to synthesize a crowded multi-signal environment.
+
+High Congressional + Insider Density Date:
+
+Date: 2025-05-15
+
+Why: Features a massive spike in Senate activity (284 disclosures) alongside robust insider trading volume (2,644 filings) and contracts. Perfect for testing high-conviction congressional filtering.
+
+Recent 2026 Test Case:
+
+Date: 2026-03-02
+
+Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider filings, and contract activity to verify your tools against the latest data schema.
+
+
+
+
+
+====================================================================
+
   ====29/10.
   started integ test for tools
   we need to add agent integ and eval integ, fetching
