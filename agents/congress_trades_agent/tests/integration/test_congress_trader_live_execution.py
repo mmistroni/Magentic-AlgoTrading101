@@ -21,7 +21,7 @@ APP_NAME = "congress_trades_agent"
 TRUSTWORTHY_SCORE_THRESHOLD = 0.85
 
 gemini_evaluator = GeminiModel(
-    model="gemini-2.5-flash",
+    model="gemini-3.5-flash",
     api_key=os.getenv("GEMINI_API_KEY"),
 )
 
