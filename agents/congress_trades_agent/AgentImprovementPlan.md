@@ -156,7 +156,6 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
 
 ====================================================================
 
-  ====29/10.
-  started integ test for tools
-  we need to add agent integ and eval integ, fetching
-  also the right data from big query
+  ==== 3/11
+  added integ test for congress trader
+  added eval tests.
