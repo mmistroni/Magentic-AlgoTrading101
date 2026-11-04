@@ -156,6 +156,6 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
 
 ====================================================================
 
-  ==== 3/11
-  added integ test for congress trader
-  added eval tests. but they fail due to a missing import
+  ==== 4/11
+  updated eval test and skills
+  todo:rerun all integ tests.. and brain storm reg test and backtests
