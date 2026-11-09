@@ -10,6 +10,7 @@ from congress_trades_agent.skills.congress_trader.scripts.sql_executor import (
     execute_fetch_decisions
 )
 
+from congress_trades_agent.skills.congress_trader.scripts.prices_fetcher import calculate_trailing_return
 
 
 @patch("congress_trades_agent.skills.congress_trader.scripts.fundamentals.requests.get")
@@ -124,3 +125,43 @@ def test_execute_fetch_decisions_with_filters(mock_client_class):
     assert param_dict["min_conviction"] == 75.0
     assert param_dict["limit"] == 5
 
+#### Prices FEtcher tests
+
+@patch("congress_trades_agent.skills.congress_trader.scripts.prices_fetcher.requests.get")
+def test_calculate_trailing_return_success(mock_get, monkeypatch):
+    monkeypatch.setenv("FMP_API_KEY", "fake_key")
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    # FMP light EOD response: newest first (index 0), oldest last (index -1)
+    mock_response.json.return_value = [
+        {"date": "2026-11-01", "close": 150.0}, # Newest / Current price
+        {"date": "2026-06-01", "close": 100.0}  # Oldest / Entry price
+    ]
+    mock_get.return_value = mock_response
+
+    result = calculate_trailing_return("AAPL", "2026-06-01")
+
+    assert result["ticker"] == "AAPL"
+    assert result["entry_price"] == 100.0
+    assert result["current_price"] == 150.0
+    assert result["trailing_return_pct"] == 50.0
+    assert "error" not in result
+
+def test_calculate_trailing_return_missing_key(monkeypatch):
+    monkeypatch.delenv("FMP_API_KEY", raising=False)
+    result = calculate_trailing_return("AAPL", "2026-06-01")
+    assert result["error"] == "FMP_API_KEY environment variable is missing."
+
+@patch("congress_trades_agent.skills.congress_trader.scripts.prices_fetcher.requests.get")
+def test_calculate_trailing_return_insufficient_data(mock_get, monkeypatch):
+    monkeypatch.setenv("FMP_API_KEY", "fake_key")
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = [{"date": "2026-06-01", "close": 100.0}] # Only 1 bar returned
+    mock_get.return_value = mock_response
+
+    result = calculate_trailing_return("AAPL", "2026-06-01")
+    assert "error" in result
+    assert "Insufficient price history found" in result["error"]
