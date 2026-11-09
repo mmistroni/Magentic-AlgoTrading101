@@ -87,3 +87,29 @@ def test_fetch_historical_episodes_tool_success(mock_execute_fetch):
     assert results[0]["ticker"] == "NVDA"
     assert results[0]["conviction_score"] == 90.0
     assert results[0]["decision_snapshot"]["fundamentals"]["pe_ratio"] == 32.5
+
+
+## Prices Fetcer    
+from unittest.mock import patch
+import pytest
+from congress_trades_agent.skills.congress_trader.tools import get_trailing_return
+
+@patch("congress_trades_agent.skills.congress_trader.tools.calculate_trailing_return")
+def test_get_trailing_return_wrapper(mock_calculate):
+    # Mock return value from the underlying prices_fetcher script
+    mock_calculate.return_value = {
+        "ticker": "AAPL",
+        "entry_date": "2026-06-01",
+        "entry_price": 100.0,
+        "current_price": 150.0,
+        "trailing_return_pct": 50.0
+    }
+
+    result = get_trailing_return("AAPL", "2026-06-01", entry_price=100.0)
+
+    # Verify underlying script was called with correct arguments
+    mock_calculate.assert_called_once_with("AAPL", "2026-06-01", 100.0)
+
+    # Validate wrapper output
+    assert result["ticker"] == "AAPL"
+    assert result["trailing_return_pct"] == 50.0
