@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from .scripts.fundamentals import fetch_fmp_fundamentals
-from .scripts.price_fetcher import calculate_trailing_return
+from .scripts.prices_fetcher import calculate_trailing_return
 from .scripts.sql_executor import (
     execute_store_decision,
     execute_fetch_decisions

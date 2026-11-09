@@ -10,6 +10,12 @@ from congress_trades_agent.skills.congress_trader.scripts.sql_executor import (
     execute_fetch_decisions
 )
 
+### Prices Fetcher
+from congress_trades_agent.skills.congress_trader.scripts.prices_fetcher import (
+    fetch_fmp_price_series,
+    calculate_trailing_return
+)
+
 
 @patch("congress_trades_agent.skills.congress_trader.scripts.fundamentals.requests.get")
 def test_fetch_fmp_fundamentals_success(mock_get, monkeypatch):
@@ -119,3 +125,50 @@ def test_execute_fetch_decisions_with_filters(mock_client_class):
     assert param_dict["val_verdict"] == "UNDERVALUED"
     assert param_dict["min_conviction"] == 75.0
     assert param_dict["limit"] == 5
+
+@patch("congress_trades_agent.skills.congress_trader.scripts.prices_fetcher.requests.get")
+def test_fetch_fmp_price_series_success(mock_get, monkeypatch):
+    monkeypatch.setenv("FMP_API_KEY", "fake_key")
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = [
+        {"date": "2026-10-20", "close": 150.0},
+        {"date": "2026-06-01", "close": 100.0}
+    ]
+    mock_get.return_value = mock_response
+
+    series = fetch_fmp_price_series("AAPL", "2026-06-01")
+    
+    assert isinstance(series, list)
+    assert len(series) == 2
+    assert series[0]["close"] == 150.0
+
+def test_fetch_fmp_price_series_missing_key(monkeypatch):
+    monkeypatch.delenv("FMP_API_KEY", raising=False)
+    result = fetch_fmp_price_series("AAPL", "2026-06-01")
+    assert len(result) == 1
+    assert "error" in result[0]
+    assert "FMP_API_KEY environment variable is missing." in result[0]["error"]
+
+@patch("congress_trades_agent.skills.congress_trader.scripts.prices_fetcher.fetch_fmp_price_series")
+def test_calculate_trailing_return_success(mock_fetch_series):
+    # Mocking price series (FMP returns newest first, oldest last)
+    mock_fetch_series.return_value = [
+        {"date": "2026-11-01", "close": 150.0}, # Current price
+        {"date": "2026-06-01", "close": 100.0}  # Entry price
+    ]
+
+    result = calculate_trailing_return("AAPL", "2026-06-01")
+
+    assert result["ticker"] == "AAPL"
+    assert result["entry_price"] == 100.0
+    assert result["current_price"] == 150.0
+    assert result["trailing_return_pct"] == 50.0
+
+@patch("congress_trades_agent.skills.congress_trader.scripts.prices_fetcher.fetch_fmp_price_series")
+def test_calculate_trailing_return_insufficient_data(mock_fetch_series):
+    mock_fetch_series.return_value = [{"date": "2026-06-01", "close": 100.0}] # Only 1 bar
+
+    result = calculate_trailing_return("AAPL", "2026-06-01")
+    assert "error" in result
