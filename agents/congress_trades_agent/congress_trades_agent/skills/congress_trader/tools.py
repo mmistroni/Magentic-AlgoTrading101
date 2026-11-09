@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from .scripts.fundamentals import fetch_fmp_fundamentals
+from .scripts.price_fetcher import calculate_trailing_return
 from .scripts.sql_executor import (
     execute_store_decision,
     execute_fetch_decisions
@@ -148,3 +149,12 @@ def fetch_historical_episodes(
         return episodes
     except Exception as e:
         return [{"error": f"Failed to fetch historical episodes: {str(e)}"}]
+
+
+def get_trailing_return(ticker: str, entry_date: str, entry_price: Optional[float] = None) -> Dict[str, Any]:
+    """
+    Wrapper tool for the agent to calculate trailing returns from past decision timestamps
+    using the underlying prices_fetcher script logic.
+    """
+    result = calculate_trailing_return(ticker, entry_date, entry_price)
+    return result
