@@ -3,7 +3,8 @@ from google.adk.agents import LlmAgent, SequentialAgent
 from .tools import (
     fetch_fmp_fundamentals,
     store_trade_decision,
-    fetch_historical_episodes
+    fetch_historical_episodes,
+    get_trailing_return
 )
 
 SKILL_DIR = Path(__file__).parent
@@ -26,6 +27,7 @@ congress_trader = LlmAgent(
     tools=[
         fetch_fmp_fundamentals,
         store_trade_decision,
-        fetch_historical_episodes
+        fetch_historical_episodes,
+        get_trailing_return
     ],
 )
