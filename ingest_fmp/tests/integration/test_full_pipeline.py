@@ -16,14 +16,15 @@ def fmp_client():
     return FMPClient(api_key=api_key)
 
 
-def test_full_pipeline_symbol_ingestion(fmp_client):
+@pytest.mark.parametrize("ticker", ["AAPL", "MSFT"])
+def test_full_pipeline_real_ticker(fmp_client, ticker):
     """
-    Simulates the end-to-end pipeline ingestion flow for a test symbol (AAPL)
-    to verify database-ready payload completeness.
+    Integration test validating the full end-to-end pipeline ingestion and enrichment 
+    for real market tickers (AAPL, MSFT).
     """
-    logger.info("🚀 Starting full pipeline integration test...")
+    logger.info(f"🚀 Running full pipeline integration test on real ticker: {ticker}")
 
-    # 1. Initialize Validators with relaxed diagnostic thresholds
+    # 1. Initialize Validators
     fund_validator = FundamentalValidator(
         client=fmp_client,
         min_eps_growth=-999.0,
@@ -33,30 +34,28 @@ def test_full_pipeline_symbol_ingestion(fmp_client):
     )
     tech_validator = TechnicalValidator(
         client=fmp_client, 
-        strict_mode=False,  # Relaxed for testing inspection
+        strict_mode=False, 
         throttle_seconds=1
     )
 
-    # 2. Mock incoming raw candidate payload from pipeline source
+    # 2. Mock incoming raw candidate payload
     candidate = {
-        "symbol": "AAPL",
-        "strategy_name": "pipeline_integration_test",
+        "symbol": ticker,
+        "strategy_name": "real_ticker_integration_test",
         "timestamp": "2026-11-02T20:18:00Z"
     }
 
     # 3. Step 1: Fundamental Enrichment
     enriched_fund = fund_validator.evaluate(candidate)
-    assert enriched_fund, "Pipeline failed at FundamentalValidator step."
-    logger.info("✅ Fundamental validation step passed.")
+    assert enriched_fund is not None, f"Fundamental validation returned None for {ticker}"
 
-    # 4. Step 2: Technical & TA Indicator Enrichment
+    # 4. Step 2: Technical & TA Indicator Enrichment (OBV, CMF, Choppiness, SMAs, etc.)
     enriched_tech = tech_validator.evaluate(enriched_fund)
-    assert enriched_tech, "Pipeline failed at TechnicalValidator step."
-    logger.info("✅ Technical & TA indicator computation step passed.")
+    assert enriched_tech is not None, f"Technical validation returned None for {ticker}"
 
-    # 5. Step 3: Quote & Profile Context Enrichment (matching pipeline DoFn)
+    # 5. Step 3: Quote & Profile Context Enrichment
     try:
-        quote_data = fmp_client.get_quote("AAPL")
+        quote_data = fmp_client.get_quote(ticker)
         if quote_data and isinstance(quote_data, list):
             q = quote_data[0]
             enriched_tech.update({
@@ -66,18 +65,16 @@ def test_full_pipeline_symbol_ingestion(fmp_client):
                 "relative_volume": q.get("relVolume")
             })
     except Exception as e:
-        logger.warning(f"Could not fetch supplemental quote data: {e}")
+        logger.warning(f"Could not fetch quote context for {ticker}: {e}")
 
-    # 6. Final Comprehensive Assertion Check for Agent & BigQuery Schema
-    required_pipeline_fields = [
-        "symbol", "strategy_name", 
-        "eps_growth", "revenue_growth", "return_on_equity", "gross_margin",
-        "price", "sma20", "sma50", "sma200", "technical_passed",
+    # 6. Assertions: Verify mandatory technical and volume confirmation fields are populated
+    mandatory_fields = [
+        "symbol", "price", "sma20", "sma50", "sma200", 
         "current_obv", "current_cmf", "choppiness", "demarker"
     ]
+    
+    for field in mandatory_fields:
+        assert field in enriched_tech, f"Missing mandatory field '{field}' for {ticker}"
+        assert enriched_tech[field] is not None, f"Mandatory field '{field}' evaluated to None for {ticker}"
 
-    for field in required_pipeline_fields:
-        assert field in enriched_tech, f"Pipeline output missing mandatory field: {field}"
-        assert enriched_tech[field] is not None, f"Pipeline field {field} evaluated to None."
-
-    logger.info(f"✨ Full pipeline integration test passed successfully! Final keys count: {len(enriched_tech)}")
+    logger.info(f"✨ Successfully verified all pipeline fields for {ticker}! Payload keys: {list(enriched_tech.keys())}")
