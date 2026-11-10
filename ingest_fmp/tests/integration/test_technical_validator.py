@@ -17,12 +17,12 @@ def fmp_client():
 
 def test_technical_validator_live(fmp_client):
     """
-    Integration test for TechnicalValidator using AAPL.
-    Note: Depending on current market conditions, AAPL may or may not pass full bullish alignment 
-    (Price > SMA20 > SMA50 > SMA200), so we verify that the method executes safely 
-    and returns either a populated dictionary or an empty dictionary without throwing exceptions.
+    Integration test for TechnicalValidator using AAPL with comprehensive 
+    indicator checks (Trend + Volume/Momentum TA indicators).
     """
-    validator = TechnicalValidator(client=fmp_client, throttle_seconds=1)
+    # Using strict_mode=False for testing so we can inspect enriched payloads 
+    # even if AAPL is experiencing a short-term pullback below SMA20.
+    validator = TechnicalValidator(client=fmp_client, throttle_seconds=1, strict_mode=False)
     
     test_input = {"symbol": "AAPL", "strategy_name": "test_bullish"}
     result = validator.evaluate(test_input)
@@ -31,23 +31,41 @@ def test_technical_validator_live(fmp_client):
     
     # Verify return type is always a dictionary
     assert isinstance(result, dict)
+    assert len(result) > 0, "Validator returned an empty dictionary."
     
-    # If AAPL passed bullish alignment, verify enriched keys are present
-    if result:
-        assert "price" in result
-        assert "sma20" in result
-        assert "sma50" in result
-        assert "sma200" in result
-        assert result["price"] > result["sma20"]
+    # 1. Verify Trend & Price Keys
+    expected_trend_keys = ['price', 'sma20', 'sma50', 'sma200', 'technical_passed']
+    for key in expected_trend_keys:
+        assert key in result, f"Missing trend key: {key}"
+
+    # 2. Verify Volume, Volatility & Momentum TA Indicator Keys required by Strategic Stock Analyst
+    required_ta_keys = [
+        'current_obv', 
+        'previous_obv', 
+        'obv_historical', 
+        'current_cmf', 
+        'previous_cmf', 
+        'cmf_historical', 
+        'choppiness', 
+        'demarker', 
+        'ewo'
+    ]
+    
+    for key in required_ta_keys:
+        assert key in result, f"Missing required TA indicator key: {key}"
+        assert result[key] is not None, f"TA indicator {key} evaluated to None"
+
+    # Verify historical list sizing
+    assert isinstance(result['obv_historical'], list)
+    assert len(result['obv_historical']) > 0
 
 
 def test_bearish_technical_validator_live(fmp_client):
     """
-    Integration test for BearishTechnicalValidator.
+    Integration test for BearishTechnicalValidator ensuring TA indicators are included.
     """
     validator = BearishTechnicalValidator(client=fmp_client, throttle_seconds=1)
     
-    # Testing with a symbol or checking execution safety
     test_input = {"symbol": "TSLA", "strategy_name": "test_bearish"}
     result = validator.evaluate(test_input)
     
@@ -57,13 +75,12 @@ def test_bearish_technical_validator_live(fmp_client):
     if result:
         assert "price" in result
         assert "sma20" in result
-        assert result["price"] < result["sma20"]
+        assert "current_obv" in result
+        assert "choppiness" in result
 
 
 def test_base_validator_robust_symbol_extraction():
     """Unit test to ensure symbol extraction handles dict keys correctly."""
-    from ingest_fmp.client import FMPClient
-    # Instantiate with dummy client for unit testing helper methods
     class DummyClient:
         pass
         

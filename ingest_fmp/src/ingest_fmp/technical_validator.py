@@ -1,11 +1,16 @@
 import time
 import logging
+import requests
+import numpy as np
+import pandas as pd
+from ta.volume import OnBalanceVolumeIndicator, ChaikinMoneyFlowIndicator
+from ta.momentum import AwesomeOscillatorIndicator
 from ingest_fmp.client import FMPClient
 
 logger = logging.getLogger(__name__)
 
 class BaseTechnicalValidator:
-    """Base class to share common SMA fetching and throttling logic."""
+    """Base class to share common SMA fetching, historical data fetching, and throttling logic."""
     def __init__(self, client: FMPClient, throttle_seconds: int = 5):
         self.client = client
         self.throttle_seconds = throttle_seconds
@@ -25,6 +30,74 @@ class BaseTechnicalValidator:
             logger.error(f"Error fetching SMA{period} for {symbol}: {str(e)}")
             time.sleep(self.throttle_seconds)
         return None
+
+    def _fetch_historical_data(self, symbol: str) -> list:
+        """Fetches full historical price/volume data for TA indicator calculations."""
+        try:
+            # Assumes FMPClient has an api_key attribute or we can call the historical endpoint via client/requests
+            api_key = getattr(self.client, "api_key", None)
+            if not api_key:
+                return []
+            hist_url = f'https://financialmodelingprep.com/api/v3/historical-price-full/{symbol}?apikey={api_key}'
+            r = requests.get(hist_url, timeout=10)
+            if r.status_code == 200:
+                return r.json().get('historical', [])
+        except Exception as e:
+            logger.error(f"Error fetching historical data for {symbol}: {str(e)}")
+        return []
+
+    def _compute_ta_indicators(self, symbol: str) -> dict:
+        """Computes OBV, CMF, Choppiness, DeMarker, and EWO using `ta` and `pandas`."""
+        try:
+            raw_history = self._fetch_historical_data(symbol)
+            if not raw_history or not isinstance(raw_history, list):
+                return {}
+
+            df = pd.DataFrame(raw_history)
+            if df.empty or 'close' not in df.columns or 'volume' not in df.columns:
+                return {}
+
+            # Ensure chronological order
+            df = df.iloc[::-1].reset_index(drop=True)
+
+            # 1. OBV & CMF
+            df['obv'] = OnBalanceVolumeIndicator(close=df['close'], volume=df['volume']).on_balance_volume()
+            df['cmf'] = ChaikinMoneyFlowIndicator(high=df['high'], low=df['low'], close=df['close'], volume=df['volume']).chaikin_money_flow()
+
+            # 2. Choppiness & DeMarker
+            window = 14
+            high_low = df['high'] - df['low']
+            high_close = np.abs(df['high'] - df['close'].shift(1))
+            low_close = np.abs(df['low'] - df['close'].shift(1))
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            tr_sum = tr.rolling(window=window).sum()
+            max_h = df['high'].rolling(window=window).max()
+            min_l = df['low'].rolling(window=window).min()
+            df['choppiness'] = 100 * (np.log10(tr_sum / (max_h - min_l)) / np.log10(window))
+
+            high_diff = df['high'] - df['high'].shift(1)
+            demax = high_diff.where(high_diff > 0, 0.0)
+            low_diff = df['low'].shift(1) - df['low']
+            demin = low_diff.where(low_diff > 0, 0.0)
+            df['demarker'] = demax.rolling(window=window).mean() / (demax.rolling(window=window).mean() + demin.rolling(window=window).mean())
+
+            last = df.iloc[-1]
+            prev = df.iloc[-2] if len(df) > 1 else last
+
+            return {
+                'previous_obv': prev.get('obv'),
+                'current_obv': last.get('obv'),
+                'obv_historical': df['obv'].dropna().tolist()[-20:],
+                'previous_cmf': prev.get('cmf'),
+                'current_cmf': last.get('cmf'),
+                'cmf_historical': df['cmf'].dropna().tolist()[-20:],
+                'choppiness': last.get('choppiness'),
+                'demarker': last.get('demarker'),
+                'ewo': AwesomeOscillatorIndicator(high=df['high'], low=df['low']).awesome_oscillator().iloc[-1]
+            }
+        except Exception as e:
+            logger.error(f"Error computing TA indicators for {symbol}: {str(e)}")
+            return {}
 
 
 class TechnicalValidator(BaseTechnicalValidator):
@@ -51,19 +124,24 @@ class TechnicalValidator(BaseTechnicalValidator):
                 if not (price > sma20 > sma50 > sma200):
                     return {}
             
+            # Compute advanced TA volume/momentum indicators required by agent instructions
+            ta_metrics = self._compute_ta_indicators(symbol)
+
             # Always attach whatever data we successfully pulled for debugging/agent context
             symbol_dict.update({
                 'price': price, 
                 'sma20': sma20, 
                 'sma50': sma50, 
                 'sma200': sma200,
-                'technical_passed': bool(price and sma20 and sma50 and sma200 and price > sma20 > sma50 > sma200)
+                'technical_passed': bool(price and sma20 and sma50 and sma200 and price > sma20 > sma50 > sma200),
+                **ta_metrics
             })
             return symbol_dict
 
         except Exception as e:
             logger.error(f"Error evaluating technicals for {symbol}: {str(e)}")
             return symbol_dict if not self.strict_mode else {}
+
 
 class BearishTechnicalValidator(BaseTechnicalValidator):
     def evaluate(self, symbol_dict: dict) -> dict:
@@ -98,12 +176,15 @@ class BearishTechnicalValidator(BaseTechnicalValidator):
             if sma200 is None:
                 return {}
                             
+            ta_metrics = self._compute_ta_indicators(symbol)
+
             logger.info(f"📉 {symbol} passed bearish technical filters.")
             symbol_dict.update({
                 'price': price, 
                 'sma20': sma20, 
                 'sma50': sma50, 
-                'sma200': sma200
+                'sma200': sma200,
+                **ta_metrics
             })
             return symbol_dict
 

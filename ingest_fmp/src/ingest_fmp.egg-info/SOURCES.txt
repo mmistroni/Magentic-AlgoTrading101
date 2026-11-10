@@ -7,6 +7,7 @@ src/ingest_fmp/main.py
 src/ingest_fmp/pipeline.py
 src/ingest_fmp/screeners.py
 src/ingest_fmp/technical_validator.py
+src/ingest_fmp/utils.py
 src/ingest_fmp.egg-info/PKG-INFO
 src/ingest_fmp.egg-info/SOURCES.txt
 src/ingest_fmp.egg-info/dependency_links.txt
