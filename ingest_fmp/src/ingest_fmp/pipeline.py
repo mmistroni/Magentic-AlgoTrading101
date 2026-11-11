@@ -311,3 +311,65 @@ def run_new_highs_pipeline() -> list:
 
     logger.info(f"New Highs pipeline complete. Final watchlist: {final_watchlist}")
     return final_watchlist
+
+def run_eod_screener() -> list:
+    """
+    Orchestrates the End-of-Day (EOD) Screener Pipeline:
+    1. Descriptive: Price > $10, Avg Vol > 200K, Relative Vol > 1.5
+    2. Fundamental: Positive EPS growth (current year, next year, qtr over qtr),
+       Positive sales growth qtr/qtr, Positive ROE, Institutional Ownership < 60%,
+       Debt/Equity < 1, Current Ratio > 1.
+    3. Price/Technical: Month Up, Price above SMA20, SMA50, SMA200, 
+       5% or more below 52-week high.
+    """
+    client = FMPClient()
+    
+    logger.info("Running EOD Screener Step 1: Descriptive filters...")
+    descriptive_params = {
+        "priceMoreThan": 10,
+        "avgVolumeMoreThan": 200000,
+        "country": "US",
+        "isEtf": "false",
+        "isFund": "false",
+        "isActivelyTrading": "true",
+        "limit": 1000
+    }
+    
+    raw_data = client.get_company_screener(descriptive_params)
+    if not raw_data:
+        logger.warning("No data returned for EOD screener descriptive filters.")
+        return []
+
+    df = pd.DataFrame(raw_data)
+    
+    if "relativeVolume" in df.columns:
+        df = df[df["relativeVolume"] > 1.5]
+
+    symbols = df["symbol"].tolist() if "symbol" in df.columns else []
+    logger.info(f"Screened {len(symbols)} candidates. Checking EOD price & fundamental conditions...")
+
+    # --- Step 2 & 3: Fundamental & Technical Validators ---
+    fund_validator = FundamentalValidator(
+        client=client,
+        min_eps_growth=0.0,
+        min_roe=0.0,
+        min_gross_margin=0.0,
+        max_institutional_ownership=0.60
+    )
+    tech_validator = TechnicalValidator(client)
+
+    final_watchlist = []
+    for symbol in symbols:
+        # Evaluate fundamental criteria
+        fund_res = fund_validator.evaluate({"symbol": symbol})
+        if not fund_res:
+            continue
+            
+        # Evaluate technical & price criteria (SMA hierarchy, Month Up, etc.)
+        tech_res = tech_validator.evaluate(fund_res)
+        if tech_res:
+            tech_res["strategy_name"] = "eod_screener"
+            final_watchlist.append(tech_res)
+
+    logger.info(f"EOD Screener pipeline complete. Final watchlist: {len(final_watchlist)} records.")
+    return final_watchlist
