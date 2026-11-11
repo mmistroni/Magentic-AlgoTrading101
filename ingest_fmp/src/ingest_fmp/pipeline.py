@@ -312,20 +312,21 @@ def run_new_highs_pipeline() -> list:
     logger.info(f"New Highs pipeline complete. Final watchlist: {final_watchlist}")
     return final_watchlist
 
+import time
+import pandas as pd
+from ingest_fmp.client import FMPClient
+from ingest_fmp.fundamental_validator import FundamentalValidator
+from ingest_fmp.technical_validator import TechnicalValidator
+
 def run_eod_screener() -> list:
-    """
-    Orchestrates the End-of-Day (EOD) Screener Pipeline:
-    1. Descriptive: Price > $10, Avg Vol > 200K, Relative Vol > 1.5
-    2. Fundamental: Positive EPS growth (current year, next year, qtr over qtr),
-       Positive sales growth qtr/qtr, Positive ROE, Institutional Ownership < 60%,
-       Debt/Equity < 1, Current Ratio > 1.
-    3. Price/Technical: Month Up, Price above SMA20, SMA50, SMA200, 
-       5% or more below 52-week high.
-    """
+    
+    start_time = time.time()
+    print("⏱️ [EOD Screener] Starting pipeline execution...", flush=True)
+    
     client = FMPClient()
     
-    logger.info("Running EOD Screener Step 1: Descriptive filters...")
-    descriptive_params = {
+    print("📡 [EOD Screener] Step 1: Requesting descriptive screener data from FMP...", flush=True)
+    base_params = {
         "priceMoreThan": 10,
         "avgVolumeMoreThan": 200000,
         "country": "US",
@@ -335,20 +336,45 @@ def run_eod_screener() -> list:
         "limit": 1000
     }
     
-    raw_data = client.get_company_screener(descriptive_params)
+    raw_data = client.get_company_screener(base_params)
     if not raw_data:
-        logger.warning("No data returned for EOD screener descriptive filters.")
+        print("⚠️ [EOD Screener] No data returned from FMP screener.", flush=True)
         return []
 
     df = pd.DataFrame(raw_data)
+    print(f"📊 [EOD Screener] Fetched {len(df)} raw symbols from FMP screener.", flush=True)
     
     if "relativeVolume" in df.columns:
         df = df[df["relativeVolume"] > 1.5]
+        print(f"🔍 [EOD Screener] {len(df)} symbols passed Relative Volume > 1.5 filter.", flush=True)
 
     symbols = df["symbol"].tolist() if "symbol" in df.columns else []
-    logger.info(f"Screened {len(symbols)} candidates. Checking EOD price & fundamental conditions...")
 
-    # --- Step 2 & 3: Fundamental & Technical Validators ---
+    # --- Step 1b: Quote Filtering ---
+    print(f"📡 [EOD Screener] Step 1b: Fetching quotes for {len(symbols)} candidates (52-week high check)...", flush=True)
+    quote_filtered_symbols = []
+    for i, symbol in enumerate(symbols):
+        if i > 0 and i % 50 == 0:
+            print(f"⏳ [EOD Screener] Progress: Processed quotes for {i}/{len(symbols)} symbols...", flush=True)
+        
+        try:
+            quote_data = client.get_quote(symbol)
+            if not quote_data:
+                continue
+            q = quote_data[0]
+            price = q.get("price", 0)
+            year_high = q.get("yearHigh", 0)
+            
+            if year_high and price <= year_high * 0.95:
+                quote_filtered_symbols.append(symbol)
+        except Exception as e:
+            # Catch individual quote lookup failures so the loop never freezes/hangs
+            continue
+
+    print(f"✅ [EOD Screener] {len(quote_filtered_symbols)} symbols passed quote filtering.", flush=True)
+
+    # --- Step 2: Fundamental Validation ---
+    print("🔬 [EOD Screener] Step 2: Running fundamental validation...", flush=True)
     fund_validator = FundamentalValidator(
         client=client,
         min_eps_growth=0.0,
@@ -356,20 +382,36 @@ def run_eod_screener() -> list:
         min_gross_margin=0.0,
         max_institutional_ownership=0.60
     )
-    tech_validator = TechnicalValidator(client)
 
-    final_watchlist = []
-    for symbol in symbols:
-        # Evaluate fundamental criteria
-        fund_res = fund_validator.evaluate({"symbol": symbol})
-        if not fund_res:
+    fundamentally_sound = []
+    for i, symbol in enumerate(quote_filtered_symbols):
+        if i > 0 and i % 20 == 0:
+            print(f"⏳ [EOD Screener] Fundamental check progress: {i}/{len(quote_filtered_symbols)}...", flush=True)
+        try:
+            if fund_validator.evaluate({"symbol": symbol}):
+                fundamentally_sound.append(symbol)
+        except Exception:
             continue
             
-        # Evaluate technical & price criteria (SMA hierarchy, Month Up, etc.)
-        tech_res = tech_validator.evaluate(fund_res)
-        if tech_res:
-            tech_res["strategy_name"] = "eod_screener"
-            final_watchlist.append(tech_res)
+    print(f"✅ [EOD Screener] {len(fundamentally_sound)} symbols passed fundamental checks.", flush=True)
 
-    logger.info(f"EOD Screener pipeline complete. Final watchlist: {len(final_watchlist)} records.")
+    # --- Step 3: Technical Validation ---
+    print("📈 [EOD Screener] Step 3: Running technical validation...", flush=True)
+    tech_validator = TechnicalValidator(client)
+    final_watchlist = []
+    
+    for i, symbol in enumerate(fundamentally_sound):
+        if i > 0 and i % 10 == 0:
+            print(f"⏳ [EOD Screener] Technical check progress: {i}/{len(fundamentally_sound)}...", flush=True)
+        try:
+            result = tech_validator.evaluate({"symbol": symbol})
+            if result:
+                result["strategy_name"] = "eod_screener"
+                result["timestamp"] = pd.Timestamp.utcnow().isoformat()
+                final_watchlist.append(result)
+        except Exception:
+            continue
+
+    elapsed = time.time() - start_time
+    print(f"✨ [EOD Screener] Pipeline complete in {elapsed:.2f} seconds. Final records: {len(final_watchlist)}", flush=True)
     return final_watchlist
