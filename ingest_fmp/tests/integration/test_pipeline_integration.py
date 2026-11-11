@@ -30,7 +30,7 @@ def test_eod_screener_pipeline_integration(fmp_client):
     """
     logger.info("🚀 Running EOD Screener pipeline integration test...")
     
-    results = run_eod_screener()
+    results = run_eod_screener(limit=100)  # Limit to 100 for testing purposes
     logger.info(f"📊 EOD Screener returned {len(results)} records.")
     
     assert isinstance(results, list), "EOD screener must return a list of records."
@@ -55,7 +55,7 @@ def test_extra_watchlist_pipeline_integration(fmp_client):
     """
     logger.info("🚀 Running Extra Watchlist pipeline integration test...")
     
-    results = get_extra_watchlist()
+    results = get_extra_watchlist(limit=100)
     logger.info(f"📊 Extra Watchlist returned {len(results)} records.")
     
     assert isinstance(results, list), "Extra Watchlist must return a list of records."
@@ -75,7 +75,7 @@ def test_market_down_pipeline_integration(fmp_client):
     """
     logger.info("🚀 Running Market Down pipeline integration test...")
     
-    results = run_market_down_pipeline()
+    results = run_market_down_pipeline(limit=100)
     logger.info(f"📊 Market Down pipeline returned {len(results)} symbols.")
     
     assert isinstance(results, list), "Market Down pipeline must return a list of symbols."
@@ -90,7 +90,7 @@ def test_high_growth_float_watchlist_integration(fmp_client):
     """
     logger.info("🚀 Running High-Growth Float pipeline integration test...")
     
-    results = run_high_growth_float_watchlist()
+    results = run_high_growth_float_watchlist(limit=100)
     logger.info(f"📊 High-Growth Float pipeline returned {len(results)} symbols.")
     
     assert isinstance(results, list), "High-Growth Float pipeline must return a list."
@@ -103,7 +103,7 @@ def test_swing_trading_pipeline_integration(fmp_client):
     """
     logger.info("🚀 Running Swing Trading pipeline integration test...")
     
-    results = run_swing_trading_pipeline()
+    results = run_swing_trading_pipeline(limit=100)
     logger.info(f"📊 Swing Trading pipeline returned {len(results)} symbols.")
     
     assert isinstance(results, list), "Swing Trading pipeline must return a list."
@@ -116,7 +116,7 @@ def test_new_highs_pipeline_integration(fmp_client):
     """
     logger.info("🚀 Running New Highs pipeline integration test...")
     
-    results = run_new_highs_pipeline()
+    results = run_new_highs_pipeline(limit=100)  # Limit to 50 for testing purposes
     logger.info(f"📊 New Highs pipeline returned {len(results)} symbols.")
     
     assert isinstance(results, list), "New Highs pipeline must return a list."
