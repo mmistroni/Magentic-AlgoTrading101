@@ -9,7 +9,7 @@ from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalV
 
 logger = logging.getLogger(__name__)
 
-def get_extra_watchlist() -> list[dict]:
+def get_extra_watchlist(limit: int = None) -> list[dict]:
     start_time = time.time()
     print("⏱️ [Extra Watchlist] Starting pipeline execution...", flush=True)
     
@@ -82,7 +82,7 @@ def get_extra_watchlist() -> list[dict]:
     return final_watchlist
 
 
-def run_market_down_pipeline() -> list:
+def run_market_down_pipeline(limit: int = None) -> list:
     start_time = time.time()
     print("⏱️ [Market Down] Starting pipeline execution...", flush=True)
     
@@ -92,7 +92,7 @@ def run_market_down_pipeline() -> list:
         "marketCapMoreThan": 2000000000,  # Mid cap over $2B
         "country": "US",
         "isActivelyTrading": "true",
-        "limit": 1000
+        "limit": limit if limit is not None else 1000
     }
     
     print("📡 [Market Down] Step 1: Fetching descriptive universe...", flush=True)
@@ -146,7 +146,7 @@ def run_market_down_pipeline() -> list:
     return final_results
 
 
-def run_high_growth_float_watchlist() -> list:
+def run_high_growth_float_watchlist(limit: int = None) -> list:
     start_time = time.time()
     print("⏱️ [High Growth Float] Starting pipeline execution...", flush=True)
     
@@ -160,7 +160,7 @@ def run_high_growth_float_watchlist() -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": 1000
+        "limit": limit if limit is not None else 1000
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -200,7 +200,7 @@ def run_high_growth_float_watchlist() -> list:
     return final_watchlist
 
 
-def run_swing_trading_pipeline() -> list:
+def run_swing_trading_pipeline(limit: int = None) -> list:
     start_time = time.time()
     print("⏱️ [Swing Trading] Starting pipeline execution...", flush=True)
     
@@ -214,7 +214,7 @@ def run_swing_trading_pipeline() -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": 1000
+        "limit": limit if limit is not None else 1000
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -291,7 +291,7 @@ def run_swing_trading_pipeline() -> list:
     return final_watchlist
 
 
-def run_new_highs_pipeline() -> list:
+def run_new_highs_pipeline(limit: int = None) -> list:
     start_time = time.time()
     print("⏱️ [New Highs] Starting pipeline execution...", flush=True)
     
@@ -306,7 +306,7 @@ def run_new_highs_pipeline() -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": 1000
+        "limit": limit if limit is not None else 1000
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -386,7 +386,7 @@ def run_new_highs_pipeline() -> list:
     return final_watchlist
 
 
-def run_eod_screener() -> list:
+def run_eod_screener(limit: int = None) -> list:
     start_time = time.time()
     print("⏱️ [EOD Screener] Starting pipeline execution...", flush=True)
     
@@ -400,7 +400,7 @@ def run_eod_screener() -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": 1000
+        "limit": limit if limit is not None else 1000
     }
     
     raw_data = client.get_company_screener(base_params)
