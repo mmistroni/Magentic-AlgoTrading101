@@ -130,9 +130,9 @@ class TechnicalValidator(BaseTechnicalValidator):
             # Always attach whatever data we successfully pulled for debugging/agent context
             symbol_dict.update({
                 'price': price, 
-                'sma20': sma20, 
-                'sma50': sma50, 
-                'sma200': sma200,
+                'SMA20': sma20, 
+                'SMA50': sma50, 
+                'SMA200': sma200,
                 'technical_passed': bool(price and sma20 and sma50 and sma200 and price > sma20 > sma50 > sma200),
                 **ta_metrics
             })
@@ -181,9 +181,9 @@ class BearishTechnicalValidator(BaseTechnicalValidator):
             logger.info(f"📉 {symbol} passed bearish technical filters.")
             symbol_dict.update({
                 'price': price, 
-                'sma20': sma20, 
-                'sma50': sma50, 
-                'sma200': sma200,
+                'SMA20': sma20, 
+                'SMA50': sma50, 
+                'SMA200': sma200,
                 **ta_metrics
             })
             return symbol_dict
