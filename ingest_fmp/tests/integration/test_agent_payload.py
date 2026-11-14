@@ -61,7 +61,7 @@ def test_agent_enrichment_payload():
     # 4. Define the exact fields required by the Strategic Stock Analyst Agent instructions
     required_agent_fields = [
         # Primary Trend
-        "price", "sma20", "sma50", "sma200", "slope", "trend_velocity_gap",
+        "price", "SMA20", "SMA50", "SMA200", "slope", "trend_velocity_gap",
         # Volume Confirmation
         "current_obv", "previous_obv", "obv_historical", "current_cmf", "previous_cmf",
         # Context & Volatility Filter
