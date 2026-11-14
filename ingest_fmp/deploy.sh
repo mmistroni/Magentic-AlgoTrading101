@@ -37,7 +37,7 @@ for JOB_NAME in "${!PIPELINES[@]}"; do
     echo "Deploying Job: $JOB_NAME (Pipeline: $PIPELINE_VAL)"
     
     # Bundle environment variables for the job task
-    ENV_VARS="PIPELINE_NAME=$PIPELINE_VAL,BIGQUERY_TABLE_ID=$BIGQUERY_TABLE_ID,FMP_API_KEY=$FMP_API_KEY"
+    ENV_VARS="PIPELINE_NAME=$PIPELINE_VAL,BIGQUERY_TABLE_ID=$BIGQUERY_TABLE_ID,FMP_API_KEY=$FMP_KEY"
 
     if gcloud run jobs describe "$JOB_NAME" --region="$REGION" &>/dev/null; then
         echo "Updating existing job $JOB_NAME..."
