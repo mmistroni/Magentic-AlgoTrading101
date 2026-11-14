@@ -60,6 +60,7 @@ def test_eod_screener_pipeline_integration(fmp_client):
         logger.warning("⚠️ EOD Screener returned 0 records due to strict market filter conditions for the current session.")
 
 
+
 def test_extra_watchlist_pipeline_integration(fmp_client):
     """
     Integration test validating the Extra Watchlist pipeline execution and enriched record outputs.
