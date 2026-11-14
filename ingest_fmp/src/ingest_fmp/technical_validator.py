@@ -4,6 +4,8 @@ import requests
 import numpy as np
 import pandas as pd
 from ta.volume import OnBalanceVolumeIndicator, ChaikinMoneyFlowIndicator
+from ta.momentum import AwesomeOscillatorIndicator, RSIIndicator
+from ta.trend import ADXIndicator
 from ta.momentum import AwesomeOscillatorIndicator
 from ingest_fmp.client import FMPClient
 
@@ -47,7 +49,7 @@ class BaseTechnicalValidator:
         return []
 
     def _compute_ta_indicators(self, symbol: str) -> dict:
-        """Computes OBV, CMF, Choppiness, DeMarker, and EWO using `ta` and `pandas`."""
+        """Computes OBV, CMF, Choppiness, DeMarker, EWO, RSI, and ADX using `ta` and `pandas`."""
         try:
             raw_history = self._fetch_historical_data(symbol)
             if not raw_history or not isinstance(raw_history, list):
@@ -64,7 +66,11 @@ class BaseTechnicalValidator:
             df['obv'] = OnBalanceVolumeIndicator(close=df['close'], volume=df['volume']).on_balance_volume()
             df['cmf'] = ChaikinMoneyFlowIndicator(high=df['high'], low=df['low'], close=df['close'], volume=df['volume']).chaikin_money_flow()
 
-            # 2. Choppiness & DeMarker
+            # 2. RSI & ADX
+            df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
+            df['adx'] = ADXIndicator(high=df['high'], low=df['low'], close=df['close'], window=14).adx()
+
+            # 3. Choppiness & DeMarker
             window = 14
             high_low = df['high'] - df['low']
             high_close = np.abs(df['high'] - df['close'].shift(1))
@@ -93,12 +99,13 @@ class BaseTechnicalValidator:
                 'cmf_historical': df['cmf'].dropna().tolist()[-20:],
                 'choppiness': last.get('choppiness'),
                 'demarker': last.get('demarker'),
-                'ewo': AwesomeOscillatorIndicator(high=df['high'], low=df['low']).awesome_oscillator().iloc[-1]
+                'ewo': AwesomeOscillatorIndicator(high=df['high'], low=df['low']).awesome_oscillator().iloc[-1],
+                'RSI': last.get('rsi'),
+                'ADX': last.get('adx')
             }
         except Exception as e:
             logger.error(f"Error computing TA indicators for {symbol}: {str(e)}")
             return {}
-
 
 class TechnicalValidator(BaseTechnicalValidator):
     def __init__(self, client: FMPClient, throttle_seconds: int = 5, strict_mode: bool = True):

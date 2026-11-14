@@ -67,7 +67,7 @@ def test_agent_enrichment_payload():
         # Context & Volatility Filter
         "choppiness", "spx_choppiness", "beta",
         # Timing Momentum
-        "RSI", "demarker"
+        "RSI", "demarker", "ADX"
     ]
 
     print("\n📦 Agent Enriched Payload Inspection:")
