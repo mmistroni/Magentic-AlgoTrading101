@@ -26,7 +26,8 @@ def fmp_client():
 def test_eod_screener_pipeline_integration(fmp_client):
     """
     Integration test validating that run_eod_screener() successfully connects to FMP,
-    applies descriptive, fundamental, and technical filters, and returns fully enriched payloads.
+    applies descriptive, fundamental, and technical filters, and returns fully enriched payloads
+    containing all agent-required and BQ-schema-aligned indicators.
     """
     logger.info("🚀 Running EOD Screener pipeline integration test...")
     
@@ -40,11 +41,21 @@ def test_eod_screener_pipeline_integration(fmp_client):
         assert "symbol" in sample_record, "Record missing 'symbol'"
         assert sample_record.get("strategy_name") == "eod_screener", "Strategy name tag incorrect"
         
-        expected_fields = ["price", "SMA20", "SMA50", "SMA200", "current_obv", "choppiness"]
+        # Comprehensive list reflecting the agent hierarchy and BigQuery schema keys
+        expected_fields = [
+            "price", 
+            "SMA20", "SMA50", "SMA200", 
+            "slope", "trend_velocity_gap",
+            "current_obv", "previous_obv", "obv_last_20_days", 
+            "last_cmf", "previous_cmf", "cmf_last_20_days",
+            "choppiness", "spx_choppyness", "beta",
+            "RSI", "ADX", "demarker", "ewo"
+        ]
+        
         for field in expected_fields:
             assert field in sample_record, f"Missing expected field '{field}' in EOD payload"
             
-        logger.info(f"✨ EOD Screener test passed! Verified sample record for: {sample_record.get('symbol')}")
+        logger.info(f"✨ EOD Screener test passed! Verified all agent indicators for: {sample_record.get('symbol')}")
     else:
         logger.warning("⚠️ EOD Screener returned 0 records due to strict market filter conditions for the current session.")
 
@@ -116,7 +127,7 @@ def test_new_highs_pipeline_integration(fmp_client):
     """
     logger.info("🚀 Running New Highs pipeline integration test...")
     
-    results = run_new_highs_pipeline(limit=100)  # Limit to 50 for testing purposes
+    results = run_new_highs_pipeline(limit=100)  
     logger.info(f"📊 New Highs pipeline returned {len(results)} symbols.")
     
     assert isinstance(results, list), "New Highs pipeline must return a list."
