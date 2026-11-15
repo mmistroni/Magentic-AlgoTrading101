@@ -25,7 +25,7 @@ def get_extra_watchlist(limit: int = None) -> list[dict]:
         "isEtf": "false",                  # Exclude ETFs
         "isFund": "false",                 # Exclude Funds
         "isActivelyTrading": "true",       # Actively trading equities
-        "limit": 1000
+        "limit": limit if limit is not None else 1000
     }
     
     raw_data = client.get_company_screener(desc_params)
