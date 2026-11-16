@@ -36,8 +36,8 @@ for JOB_NAME in "${!PIPELINES[@]}"; do
     echo "----------------------------------------"
     echo "Deploying Job: $JOB_NAME (Pipeline: $PIPELINE_VAL)"
     
-    # Bundle environment variables for the job task
-    ENV_VARS="PIPELINE_NAME=$PIPELINE_VAL,BIGQUERY_TABLE_ID=$BIGQUERY_TABLE_ID,FMP_API_KEY=$FMP_KEY"
+    # Bundle environment variables for the job task (Fixed FMP_API_KEY reference)
+    ENV_VARS="PIPELINE_NAME=$PIPELINE_VAL,BIGQUERY_TABLE_ID=$BIGQUERY_TABLE_ID,FMP_API_KEY=$FMP_API_KEY"
 
     if gcloud run jobs describe "$JOB_NAME" --region="$REGION" &>/dev/null; then
         echo "Updating existing job $JOB_NAME..."
@@ -46,7 +46,7 @@ for JOB_NAME in "${!PIPELINES[@]}"; do
             --set-env-vars="$ENV_VARS" \
             --region="$REGION" \
             --max-retries=0 \
-            --task-timeout=3600s
+            --task-timeout=7200s
     else
         echo "Creating new job $JOB_NAME..."
         gcloud run jobs create "$JOB_NAME" \
@@ -54,8 +54,8 @@ for JOB_NAME in "${!PIPELINES[@]}"; do
             --set-env-vars="$ENV_VARS" \
             --region="$REGION" \
             --max-retries=0 \
-            --task-timeout=3600s
+            --task-timeout=7200s
     fi
 done
 
-echo "✨ All 6 Cloud Run Jobs deployed successfully!"
+echo "✨ All 6 Cloud Run Jobs deployed successfully with a 2-hour timeout!"
