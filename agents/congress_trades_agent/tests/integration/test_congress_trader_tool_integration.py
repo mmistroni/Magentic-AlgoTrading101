@@ -114,3 +114,69 @@ def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
         # Guarantee cleanup happens even if assertions fail
         if 'test_decision_id' in locals():
             cleanup_test_decision(test_decision_id)
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not HAS_GCP_CREDS or not os.environ.get("FMP_API_KEY"),
+    reason="Integration test skipped: missing GCP credentials or FMP_API_KEY"
+)
+def test_store_fetch_and_calculate_trailing_return():
+    """Verify that a stored trade decision can be fetched and evaluated for trailing return."""
+    fund_data = get_fundamentals(TEST_TICKER)
+    live_price = getattr(fund_data, "price", 138.50) or 138.50
+
+    try:
+        # 1. Store a decision with a known entry price
+        response_msg = store_trade_decision(
+            ticker=TEST_TICKER,
+            action="BUY",
+            conviction_score=85.0,
+            pe_ratio=30.0,
+            valuation_verdict="UNDERVALUED",
+            fundamental_health_score=80.0,
+            congressional_net_buys=2,
+            insider_cluster_buy=True,
+            price=live_price,
+            synthesis_summary="Integration test for trailing return validation."
+        )
+        assert "Successfully validated and stored decision record" in response_msg
+
+        # 2. Fetch the stored episode back
+        episodes = fetch_historical_episodes(
+            ticker=TEST_TICKER,
+            min_conviction=80.0,
+            limit=1
+        )
+        assert len(episodes) > 0
+        latest_ep = episodes[0]
+        test_decision_id = latest_ep.get("decision_id")
+        
+        # Safely grab timestamp supporting different key names and native datetimes
+        raw_timestamp = latest_ep.get("decision_timestamp") or latest_ep.get("timestamp")
+        assert raw_timestamp is not None, f"Could not find timestamp in episode record: {latest_ep}"
+        
+        if hasattr(raw_timestamp, "strftime"):
+            entry_date = raw_timestamp.strftime("%Y-%m-%d")
+        else:
+            entry_date = str(raw_timestamp)[:10]  # Extract 'YYYY-MM-DD'
+        
+        stored_entry_price = latest_ep.get("entry_price", live_price)
+        # 3. Call get_trailing_return using the fetched historical episode's date and entry price
+        from congress_trades_agent.skills.congress_trader.tools import get_trailing_return
+        
+        return_result = get_trailing_return(
+            ticker=TEST_TICKER,
+            entry_date=entry_date,
+            entry_price=stored_entry_price
+        )
+
+        # 4. Assert performance evaluation payload is valid
+        assert isinstance(return_result, dict)
+        assert "error" not in return_result, f"Trailing return error: {return_result.get('error')}"
+        assert return_result["ticker"] == TEST_TICKER
+        assert "trailing_return_pct" in return_result
+        assert "current_price" in return_result
+
+    finally:
+        if 'test_decision_id' in locals() and test_decision_id:
+            cleanup_test_decision(test_decision_id)
