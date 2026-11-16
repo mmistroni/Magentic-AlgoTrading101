@@ -20,6 +20,7 @@ COPY . .
 
 # Ensure Python output is unbuffered so logs stream instantly to Cloud Logging
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
 
 # Execution entrypoint for your Cloud Run Job
 # Replace 'main.py' or 'run_pipeline.py' with your actual job runner script
