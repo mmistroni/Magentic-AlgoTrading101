@@ -23,4 +23,5 @@ ENV PYTHONUNBUFFERED=1
 
 # Execution entrypoint for your Cloud Run Job
 # Replace 'main.py' or 'run_pipeline.py' with your actual job runner script
-CMD ["python", "main.py"]
+# Execution entrypoint for your Cloud Run Job pointing to ingest_fmp/main.py
+CMD ["python", "ingest_fmp/main.py"]
