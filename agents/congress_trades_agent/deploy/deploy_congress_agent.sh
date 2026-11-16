@@ -5,38 +5,33 @@
 # 1. Check for Active Google Cloud Authentication
 echo "--- Checking Google Cloud Authentication Status ---"
 
-# The 'gcloud auth print-access-token' command will fail if not logged in.
-# We redirect output to /dev/null to keep the console clean.
 gcloud auth print-access-token --quiet > /dev/null 2>&1
 
-# Check the exit code of the last command ($?)
 if [ $? -ne 0 ]; then
     echo "❌ ERROR: You are not authenticated with gcloud."
     echo "🚨 Please run the following command to log in, then re-run this script:"
     echo "   gcloud auth login"
-    exit 1 # Exit the script with an error code
+    exit 1
 fi
 
 echo "✅ Authentication successful. Proceeding with deployment..."
 
 # ---
 
-# 2. Define Variables
-# NOTE: The values for these variables will be read from your shell environment.
-# If they are NOT set, the script will use the default values provided below.
-
-# GCLOUD Project and Location (Mandatory for the deploy command)
+# 2. Define and Verify Variables
 GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-datascience-projects}"
 GOOGLE_CLOUD_LOCATION="us-central1"
-
-# Service Name (Used in the deploy command)
 SERVICE_NAME="congress-trades-agent"
-
-# Agent-Specific Environment Variables (Necessary for your service to run)
-# Update 'your-vertex-setting' with 'true' or 'false'
 GOOGLE_GENAI_USE_VERTEXAI="${GOOGLE_GENAI_USE_VERTEXAI:-true}"
 
-# 3. Check and Print Variables for Confirmation
+# Ensure FMP_KEY is set in the environment
+if [ -z "$FMP_KEY" ]; then
+    echo "❌ ERROR: FMP_KEY environment variable is not set."
+    echo "🚨 Please export your FMP key first: export FMP_KEY='your_key'"
+    exit 1
+fi
+
+# 3. Print Configuration for Confirmation
 echo ""
 echo "--- Deployment Configuration ---"
 echo "Project:  $GOOGLE_CLOUD_PROJECT"
@@ -46,11 +41,11 @@ echo "--- Environment Variables to be set on Cloud Run service ---"
 echo "  GOOGLE_CLOUD_PROJECT:       $GOOGLE_CLOUD_PROJECT"
 echo "  GOOGLE_CLOUD_LOCATION:      $GOOGLE_CLOUD_LOCATION"
 echo "  GOOGLE_GENAI_USE_VERTEXAI:  $GOOGLE_GENAI_USE_VERTEXAI"
+echo "  FMP_API_KEY:                [PROVIDED VIA \$FMP_KEY]"
 echo "--------------------------------"
 
-
-# 4. Construct the Environment Variables String for the gcloud command
-ENV_VARS_STRING="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI,FMP_API_KEY=$FMP_API_KEY"
+# 4. Construct the Environment Variables String (mapping FMP_KEY to FMP_API_KEY)
+ENV_VARS_STRING="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI,FMP_API_KEY=$FMP_KEY"
 
 # 5. Execute the gcloud run deploy command
 echo "Executing gcloud run deploy..."
