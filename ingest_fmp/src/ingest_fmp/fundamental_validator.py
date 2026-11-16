@@ -91,7 +91,7 @@ class FundamentalValidator(BaseFundamentalValidator):
             if roe < self.min_roe or gross_margin < self.min_gross_margin:
                 return {}
 
-            logger.info(f"✨ {symbol} passed fundamental filters with unified financial-growth enrichment.")
+            logger.debug(f"✨ {symbol} passed fundamental filters with unified financial-growth enrichment.")
             
             symbol_dict.update(self._get_standard_enrichment(latest_growth, latest_metrics))
             return symbol_dict
@@ -119,7 +119,7 @@ class MarketDownFundamentalValidator(BaseFundamentalValidator):
             metrics_data = self.client.get_key_metrics_ttm(symbol)
             latest_metrics = metrics_data[0] if metrics_data else {}
 
-            logger.info(f"✨ {symbol} passed Market Down fundamental filter (Negative EPS growth).")
+            logger.debug(f"✨ {symbol} passed Market Down fundamental filter (Negative EPS growth).")
             
             symbol_dict.update(self._get_standard_enrichment(latest_growth, latest_metrics, inst_ownership_pct=None))
             return symbol_dict
