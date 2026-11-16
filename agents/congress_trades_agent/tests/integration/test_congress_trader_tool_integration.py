@@ -161,12 +161,17 @@ def test_store_fetch_and_calculate_trailing_return():
             entry_date = str(raw_timestamp)[:10]  # Extract 'YYYY-MM-DD'
         
         stored_entry_price = latest_ep.get("entry_price", live_price)
-        # 3. Call get_trailing_return using the fetched historical episode's date and entry price
+        
+        # 3. Call get_trailing_return using a past date for valid historical window testing
+        from datetime import datetime, timedelta
         from congress_trades_agent.skills.congress_trader.tools import get_trailing_return
+        
+        # Use a past entry date (e.g., 30 days ago) to ensure sufficient price history exists
+        past_entry_date = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
         
         return_result = get_trailing_return(
             ticker=TEST_TICKER,
-            entry_date=entry_date,
+            entry_date=past_entry_date,
             entry_price=stored_entry_price
         )
 
@@ -176,7 +181,6 @@ def test_store_fetch_and_calculate_trailing_return():
         assert return_result["ticker"] == TEST_TICKER
         assert "trailing_return_pct" in return_result
         assert "current_price" in return_result
-
     finally:
         if 'test_decision_id' in locals() and test_decision_id:
             cleanup_test_decision(test_decision_id)
