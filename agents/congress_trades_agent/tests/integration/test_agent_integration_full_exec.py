@@ -98,6 +98,14 @@ async def test_agent_integration_full_exec():
     print("\n================ [FULL LIVE EXECUTION] CONGRESS TRADER OUTPUT ================")
     print(trader_text)
 
+    # --- MOVED UP: Inspect tool discoveries and outputs before assertions ---
+    print("\n================ [DISCOVERY & TOOL OUTPUTS INSPECTION] ================")
+    if tool_outputs:
+        for idx, output in enumerate(tool_outputs, 1):
+            print(f"Tool Output #{idx}:\n{output}\n{'-'*50}")
+    else:
+        print("No tool outputs were captured during execution.")
+
     assert len(trader_text) > 20, "CongressTrader full execution output was too brief."
 
     test_case = LLMTestCase(
