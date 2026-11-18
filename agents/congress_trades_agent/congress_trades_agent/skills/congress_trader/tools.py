@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from google.adk.tools import ToolContext
 
 from .scripts.fundamentals import fetch_fmp_fundamentals
 from .scripts.prices_fetcher import calculate_trailing_return
@@ -18,6 +19,33 @@ from congress_trades_agent.schemas import (
 )
 
 
+def get_confluence_report(tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    """Retrieves the pre-computed confluence reports and discovered ticker candidates 
+    compiled by the CongressResearcher and InsiderAnalyst agents from shared session state.
+
+    Use this tool as the first step to discover which high-conviction tickers require trade evaluation, 
+    ensuring all decisions are strictly grounded in live multi-agent pipeline discoveries.
+
+    Args:
+        tool_context (Optional[ToolContext]): ADK runtime tool context used to read shared pipeline state.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing discovered candidates, confluence reports, and cross-referenced signal data.
+    """
+    if not tool_context or not tool_context.state:
+        return {"error": "No active tool context or shared pipeline state available.", "confluence_reports": {}, "candidates": []}
+    
+    confluence_reports = tool_context.state.get("confluence_reports", {})
+    candidates = tool_context.state.get("candidates", [])
+    
+    print(f"📋 Loaded confluence report for tickers: {list(confluence_reports.keys())} and candidates: {[c.get('ticker') for c in candidates]}")
+    
+    return {
+        "candidates": candidates,
+        "confluence_reports": confluence_reports
+    }
+
+
 def get_fundamentals(ticker: str) -> FundamentalEvaluation:
     """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores 
     for a given ticker using the underlying FMP script logic.
@@ -29,7 +57,7 @@ def get_fundamentals(ticker: str) -> FundamentalEvaluation:
 def store_trade_decision(
     ticker: str,
     action: str,  # e.g., "BUY", "SELL", "HOLD"
-    conviction_score: float,  # Confluence score between 0.0 and 100.0``
+    conviction_score: float,  # Confluence score between 0.0 and 100.0
     pe_ratio: float,
     valuation_verdict: str,
     fundamental_health_score: float,
@@ -60,7 +88,7 @@ def store_trade_decision(
     fundamentals = FundamentalEvaluation(
         ticker=ticker.upper(),
         pe_ratio=pe_ratio,
-        price = price,
+        price=price,
         valuation_verdict=ValuationVerdict(valuation_verdict.upper()),
         fundamental_health_score=fundamental_health_score
     )
@@ -81,9 +109,7 @@ def store_trade_decision(
         final_synthesis_summary=synthesis_summary
     )
     
-    # 2. Instantiate TickerDecisionRecord. 
-    # This automatically applies your default weights_applied dict:
-    # {"fundamental_health_score": 0.35, "insider_sub_score": 0.30, ...}
+    # 2. Instantiate TickerDecisionRecord
     decision_record = TickerDecisionRecord(
         decision_id=decision_id,
         ticker=ticker.upper(),
@@ -95,10 +121,10 @@ def store_trade_decision(
         rationale=rationale
     )
     
-    # 3. Serialize the validated model to JSON specifically for BigQuery snapshot storage
+    # 3. Serialize validated model to JSON for BigQuery snapshot storage
     snapshot_json = decision_record.model_dump_json()
     
-    # 4. Execute storage via your BigQuery/SQL script
+    # 4. Execute storage via SQL script
     try:
         execute_store_decision(
             decision_id=decision_id,
@@ -106,7 +132,7 @@ def store_trade_decision(
             decision_timestamp=decision_timestamp,
             action=action.upper(),
             conviction_score=conviction_score,
-            entry_price = price,
+            entry_price=price,
             decision_snapshot_json=snapshot_json
         )
         return f"Successfully validated and stored decision record {decision_id} for {ticker.upper()}."
