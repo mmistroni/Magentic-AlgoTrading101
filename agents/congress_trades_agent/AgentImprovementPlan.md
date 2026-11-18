@@ -156,7 +156,7 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
 
 ====================================================================
 
-  ==== 9/11
-  added prices fetcher
+  ====18/11
+  live run returned hallucinated nvda and no data retriefed
+  investigating if somethingis returned
   
-  == agent deployed. we need to test it programmatically and then deploy a job
