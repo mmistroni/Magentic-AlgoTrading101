@@ -9,6 +9,8 @@ from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalV
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_LIMIT = 500
+
 def get_extra_watchlist(limit: int = None) -> list[dict]:
     start_time = time.time()
     print("⏱️ [Extra Watchlist] Starting pipeline execution...", flush=True)
@@ -25,7 +27,7 @@ def get_extra_watchlist(limit: int = None) -> list[dict]:
         "isEtf": "false",                  # Exclude ETFs
         "isFund": "false",                 # Exclude Funds
         "isActivelyTrading": "true",       # Actively trading equities
-        "limit": limit if limit is not None else 1000
+        "limit": limit if limit is not None else DEFAULT_LIMIT
     }
     
     raw_data = client.get_company_screener(desc_params)
@@ -51,7 +53,7 @@ def get_extra_watchlist(limit: int = None) -> list[dict]:
     fundamentally_sound = []
     
     for i, candidate in enumerate(candidates):
-        if i > 0 and i % 20 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [Extra Watchlist] Fundamental progress: {i}/{len(candidates)}...", flush=True)
         try:
             result = fund_validator.evaluate(candidate)
@@ -68,7 +70,7 @@ def get_extra_watchlist(limit: int = None) -> list[dict]:
     final_watchlist = []
     
     for i, candidate in enumerate(fundamentally_sound):
-        if i > 0 and i % 10 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [Extra Watchlist] Technical progress: {i}/{len(fundamentally_sound)}...", flush=True)
         try:
             result = tech_validator.evaluate(candidate)
@@ -92,7 +94,7 @@ def run_market_down_pipeline(limit: int = None) -> list:
         "marketCapMoreThan": 2000000000,  # Mid cap over $2B
         "country": "US",
         "isActivelyTrading": "true",
-        "limit": limit if limit is not None else 1000
+        "limit": limit if limit is not None else DEFAULT_LIMIT
     }
     
     print("📡 [Market Down] Step 1: Fetching descriptive universe...", flush=True)
@@ -118,7 +120,7 @@ def run_market_down_pipeline(limit: int = None) -> list:
     fund_validator = MarketDownFundamentalValidator(client)
     filtered_funds = []
     for i, sym in enumerate(symbols):
-        if i > 0 and i % 20 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [Market Down] Fundamental progress: {i}/{len(symbols)}...", flush=True)
         try:
             if fund_validator.evaluate({"symbol": sym}):
@@ -160,7 +162,7 @@ def run_high_growth_float_watchlist(limit: int = None) -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": limit if limit is not None else 1000
+        "limit": limit if limit is not None else DEFAULT_LIMIT
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -187,7 +189,7 @@ def run_high_growth_float_watchlist(limit: int = None) -> list:
 
     final_watchlist = []
     for i, sym in enumerate(symbols):
-        if i > 0 and i % 20 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [High Growth Float] Progress: {i}/{len(symbols)}...", flush=True)
         try:
             if validator.evaluate({"symbol": sym}):
@@ -214,7 +216,7 @@ def run_swing_trading_pipeline(limit: int = None) -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": limit if limit is not None else 1000
+        "limit": limit if limit is not None else DEFAULT_LIMIT
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -233,7 +235,7 @@ def run_swing_trading_pipeline(limit: int = None) -> list:
     # --- Step 1b: Quote Filtering ---
     quote_filtered_symbols = []
     for i, symbol in enumerate(symbols):
-        if i > 0 and i % 50 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [Swing Trading] Quote check progress: {i}/{len(symbols)}...", flush=True)
         try:
             quote_data = client.get_quote(symbol)
@@ -262,7 +264,7 @@ def run_swing_trading_pipeline(limit: int = None) -> list:
 
     fundamentally_sound = []
     for i, sym in enumerate(quote_filtered_symbols):
-        if i > 0 and i % 20 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [Swing Trading] Fundamental progress: {i}/{len(quote_filtered_symbols)}...", flush=True)
         try:
             if fund_validator.evaluate({"symbol": sym}):
@@ -278,7 +280,7 @@ def run_swing_trading_pipeline(limit: int = None) -> list:
     final_watchlist = []
     
     for i, sym in enumerate(fundamentally_sound):
-        if i > 0 and i % 10 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [Swing Trading] Technical progress: {i}/{len(fundamentally_sound)}...", flush=True)
         try:
             if tech_validator.evaluate({"symbol": sym}):
@@ -306,7 +308,7 @@ def run_new_highs_pipeline(limit: int = None) -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": limit if limit is not None else 1000
+        "limit": limit if limit is not None else DEFAULT_LIMIT
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -325,7 +327,7 @@ def run_new_highs_pipeline(limit: int = None) -> list:
     # --- Step 1b: Quote & New High Filtering ---
     new_high_candidates = []
     for i, symbol in enumerate(symbols):
-        if i > 0 and i % 50 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [New Highs] Quote check progress: {i}/{len(symbols)}...", flush=True)
         try:
             quote_data = client.get_quote(symbol)
@@ -357,7 +359,7 @@ def run_new_highs_pipeline(limit: int = None) -> list:
 
     fundamentally_sound = []
     for i, sym in enumerate(new_high_candidates):
-        if i > 0 and i % 20 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [New Highs] Fundamental progress: {i}/{len(new_high_candidates)}...", flush=True)
         try:
             if fund_validator.evaluate({"symbol": sym}):
@@ -400,7 +402,7 @@ def run_eod_screener(limit: int = None) -> list:
         "isEtf": "false",
         "isFund": "false",
         "isActivelyTrading": "true",
-        "limit": limit if limit is not None else 1000
+        "limit": limit if limit is not None else DEFAULT_LIMIT
     }
     
     raw_data = client.get_company_screener(base_params)
@@ -421,7 +423,7 @@ def run_eod_screener(limit: int = None) -> list:
     print(f"📡 [EOD Screener] Step 1b: Fetching quotes for {len(symbols)} candidates (52-week high check)...", flush=True)
     quote_filtered_symbols = []
     for i, symbol in enumerate(symbols):
-        if i > 0 and i % 50 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [EOD Screener] Progress: Processed quotes for {i}/{len(symbols)} symbols...", flush=True)
         
         try:
@@ -451,7 +453,7 @@ def run_eod_screener(limit: int = None) -> list:
 
     fundamentally_sound = []
     for i, symbol in enumerate(quote_filtered_symbols):
-        if i > 0 and i % 20 == 0:
+        if i > 0 and i % 100 == 0:
             print(f"⏳ [EOD Screener] Fundamental check progress: {i}/{len(quote_filtered_symbols)}...", flush=True)
         try:
             if fund_validator.evaluate({"symbol": symbol}):
