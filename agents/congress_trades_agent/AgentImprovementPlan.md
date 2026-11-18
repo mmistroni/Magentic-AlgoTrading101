@@ -159,4 +159,6 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
   ====18/11
   live run returned hallucinated nvda and no data retriefed
   investigating if somethingis returned
-  
+
+  == reading from context a, need toadd new integ test to confirm
+  it reads data from it
