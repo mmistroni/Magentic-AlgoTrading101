@@ -8,6 +8,7 @@ import sys
 
 # --- Configuration ---
 APP_URL = "https://congress-trades-agent-682143946483.us-central1.run.app"
+          
 USER_ID = "user_123"
 # A persistent session ID ensures your multi-agent conversation history is maintained
 SESSION_ID = f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}" 
