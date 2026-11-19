@@ -45,7 +45,10 @@ def test_bq_scout_returns_expected_candidates_for_reference_date(
 
     assert response.error is None
     assert response.count >= min_count
-    assert len(candidates) == response.count
+
+    unique_tickers = {signal.ticker for signal in response.signals}
+    assert len(candidates) == len(unique_tickers)
+    assert len(candidates) <= response.count
 
     matched = [
         item for item in candidates
