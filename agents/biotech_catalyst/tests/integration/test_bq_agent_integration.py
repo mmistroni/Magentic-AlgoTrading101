@@ -1,43 +1,79 @@
 import importlib.util
 import os
+from pathlib import Path
+from unittest.mock import MagicMock
 import pytest
-from unittest.mock import patch, MagicMock
 
-# Dynamically load the tool script safely via file path (bypasses hyphen lookup issues completely)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-tool_path = os.path.normpath(
-    os.path.join(
-        current_dir, 
-        "../../biotech_catalyst/skills/bq-scout/scripts/bq_scout_tools.py"
-    )
-)
 
-spec = importlib.util.spec_from_file_location("bq_scout_tools", tool_path)
-bq_scout_tools = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(bq_scout_tools)
+def _load_module(module_name: str, file_path: Path):
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
-fetch_clinical_signals = bq_scout_tools.fetch_clinical_signals
 
-from biotech_catalyst.catalyst_agents import bq_scout_agent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SKILL_DIR = PROJECT_ROOT / "biotech_catalyst" / "skills" / "bq-scout"
+
+agent_mod = _load_module("bq_scout_agent_live", SKILL_DIR / "agent.py")
+tools_mod = _load_module("bq_scout_tools_live", SKILL_DIR / "tools.py")
+
+LIVE_BQ_ENABLED = os.getenv("RUN_LIVE_BQ_TESTS") == "1"
 
 
 @pytest.mark.integration
-def test_bq_scout_agent_tool_invocation():
-    """Near-integration test verifying that the agent tool executes properly with mocked BigQuery."""
-    
-    # Patch directly on the loaded module object (no string dot-notation lookup over hyphenated folders)
-    with patch.object(bq_scout_tools, "bigquery") as mock_bq, \
-         patch.object(bq_scout_tools, "load_sql_query") as mock_load_sql:
-        
-        mock_load_sql.return_value = "SELECT * FROM mock_table"
-        mock_client_instance = mock_bq.Client.return_value
-        mock_query_job = MagicMock()
-        mock_query_job.result.return_value = []
-        mock_client_instance.query.return_value = mock_query_job
+@pytest.mark.live_bq
+@pytest.mark.skipif(not LIVE_BQ_ENABLED, reason="Set RUN_LIVE_BQ_TESTS=1 to run live BigQuery integration tests.")
+@pytest.mark.parametrize(
+    ("reference_date", "expected_ticker", "expected_nct_id", "min_expected"),
+    [
+        ("2026-09-03 06:03:20 UTC", "INCY", "NCT06873789", 1),
+        ("2026-11-13 06:02:18 UTC", "ELTX", "NCT06723171", 1),
+    ],
+)
+def test_bq_scout_live_query_and_state_injection(
+    reference_date: str,
+    expected_ticker: str,
+    expected_nct_id: str,
+    min_expected: int,
+):
+    """Runs BQScout's tool against real BigQuery data for known historical reference dates."""
+    assert agent_mod.bq_scout.name == "BQScout"
+    assert tools_mod.fetch_clinical_signals_tool in agent_mod.bq_scout.tools
 
-        # Execute tool invocation without positional arguments (matching the updated signature)
-        result = fetch_clinical_signals()
+    tool_context = MagicMock()
+    tool_context.state = {"candidates": []}
 
-        # Assertions
-        mock_client_instance.query.assert_called_once()
-        assert result == []
+    wrapped_tool = tools_mod.fetch_clinical_signals_tool
+    tool_fn = getattr(wrapped_tool, "func", wrapped_tool)
+
+    result = tool_fn(reference_date=reference_date, tool_context=tool_context)
+
+    assert result.error is None
+    assert result.count >= min_expected
+    assert len(tool_context.state["candidates"]) == result.count
+
+    matches = [
+        row for row in tool_context.state["candidates"]
+        if row.get("ticker") == expected_ticker and row.get("nct_id") == expected_nct_id
+    ]
+    assert len(matches) >= 1
+
+
+@pytest.mark.integration
+@pytest.mark.live_bq
+@pytest.mark.skipif(not LIVE_BQ_ENABLED, reason="Set RUN_LIVE_BQ_TESTS=1 to run live BigQuery integration tests.")
+def test_bq_scout_live_empty_window():
+    """Verifies clean zero-signal handling on a date window with no matching clinical failures."""
+    tool_context = MagicMock()
+    tool_context.state = {"candidates": []}
+
+    wrapped_tool = tools_mod.fetch_clinical_signals_tool
+    tool_fn = getattr(wrapped_tool, "func", wrapped_tool)
+
+    result = tool_fn(reference_date="2026-08-15 00:00:00 UTC", tool_context=tool_context)
+
+    assert result.error is None
+    assert result.count == 0
+    assert tool_context.state["candidates"] == []
