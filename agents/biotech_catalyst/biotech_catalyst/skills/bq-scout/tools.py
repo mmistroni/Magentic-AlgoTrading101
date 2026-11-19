@@ -38,7 +38,13 @@ def fetch_clinical_signals_tool(reference_date: str, tool_context: Optional[Tool
         raw_signals = fetch_clinical_signals(reference_date)
         print(f"🔍 Fetched {len(raw_signals)} clinical signal records for {reference_date}")
         
-        signal_items = [ClinicalSignalRecord(**item) for item in raw_signals]
+        signal_items = [
+                    item if isinstance(item, ClinicalSignalRecord)
+                    else ClinicalSignalRecord(**(item.model_dump() if hasattr(item, "model_dump") else dict(item)))
+                    for item in raw_signals
+                ]
+        
+        
         response = ClinicalSignalResponse(
             reference_date=reference_date,
             signals=signal_items,
