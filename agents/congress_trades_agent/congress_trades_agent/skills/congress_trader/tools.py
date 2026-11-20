@@ -56,14 +56,13 @@ def get_confluence_report(tool_context: Optional[ToolContext] = None) -> Dict[st
         ),
     }
 
-
-def get_fundamentals(ticker: str) -> FundamentalEvaluation:
-    """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores 
+def get_fundamentals(ticker: str) -> Dict[str, Any]:
+    """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores
     for a given ticker using the underlying FMP script logic.
     """
     result = fetch_fmp_fundamentals(ticker)
-    return FundamentalEvaluation(**result)
-
+    validated = FundamentalEvaluation(**result)
+    return validated.model_dump(mode="json")
 
 def store_trade_decision(
     ticker: str,
