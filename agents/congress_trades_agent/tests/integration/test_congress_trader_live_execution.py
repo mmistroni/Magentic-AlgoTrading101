@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import pytest
@@ -25,13 +26,28 @@ gemini_evaluator = GeminiModel(
     api_key=os.getenv("GEMINI_API_KEY"),
 )
 
-
 trader_evaluation_metric = GEval(
     name="CongressTrader Decision Synthesis & Grounding Metric",
     criteria="""
 1. VALID TRADE ACTION: Verify that the agent outputs a clear structural decision containing an action (BUY, SELL, HOLD), a conviction score, and a valuation verdict.
 2. DATA GROUNDING: Ensure that the rationale relies on the retrieved congressional and insider data without inventing fictitious financial metrics or trades.
 3. STRUCTURE & PERSISTENCE: Check that the synthesis addresses fundamental health and congressional/insider signals coherently.
+""",
+    evaluation_params=[
+        SingleTurnParams.INPUT,
+        SingleTurnParams.ACTUAL_OUTPUT,
+        SingleTurnParams.RETRIEVAL_CONTEXT,
+    ],
+    threshold=TRUSTWORTHY_SCORE_THRESHOLD,
+    model=gemini_evaluator,
+)
+
+empty_confluence_guard_metric = GEval(
+    name="CongressTrader Empty Confluence Short-Circuit Metric",
+    criteria="""
+1. EMPTY-STATE SHORT-CIRCUIT: When get_confluence_report indicates no signals or empty confluence (has_signals is false / EMPTY_CONFLUENCE), verify the agent immediately short-circuits and refuses to synthesize or store a trade decision.
+2. NO HALLUCINATED TRADES OR METRICS: Ensure the agent does NOT invent a BUY/SELL/HOLD trade action, conviction score, or fabricated fundamental/congressional/insider metrics for unapproved or unverified tickers.
+3. GROUNDED EXPLANATION: Verify the response clearly explains that no active confluence candidates/signals were found in session state.
 """,
     evaluation_params=[
         SingleTurnParams.INPUT,
@@ -49,6 +65,18 @@ TRADER_SCENARIOS = [
 ]
 
 
+def _extract_has_signals(tool_outputs: list[str]) -> bool:
+    for raw in tool_outputs:
+        try:
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(parsed, dict) and "has_signals" in parsed:
+                return bool(parsed["has_signals"])
+        except Exception:
+            if '"has_signals": true' in str(raw).lower() or "'has_signals': true" in str(raw).lower():
+                return True
+    return False
+
+
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.skipif(
@@ -56,25 +84,23 @@ TRADER_SCENARIOS = [
     reason="Integration test skipped: missing credentials for live BigQuery execution",
 )
 @pytest.mark.parametrize("scenario_name, ticker, analysis_date", TRADER_SCENARIOS)
-@patch("congress_trades_agent.skills.congress_trader.tools.store_trade_decision")  # Mock persistence
-@patch("congress_trades_agent.skills.congress_trader.tools.fetch_historical_episodes")  # Mock history fetch
+@patch("congress_trades_agent.skills.congress_trader.tools.store_trade_decision")
+@patch("congress_trades_agent.skills.congress_trader.tools.fetch_historical_episodes")
 async def test_congress_trader_live_execution(
-    mock_fetch_episodes, 
-    mock_store_decision, 
-    scenario_name, 
-    ticker, 
-    analysis_date
+    mock_fetch_episodes,
+    mock_store_decision,
+    scenario_name,
+    ticker,
+    analysis_date,
 ):
-    """Executes CongressTrader agent on live BigQuery data for specific high-activity dates,
-    with store and fetch strategies mocked, validates response output, and evaluates via GEval.
-    """
-    # 1. Configure the mocks so they don't hit the empty table or fail on DB state
+    """Executes CongressTrader agent respecting empty confluence short-circuiting and GEval criteria."""
     mock_store_decision.return_value = "Successfully validated and stored decision record (Mocked)"
-    mock_fetch_episodes.return_value = []  # Returns empty history cleanly without throwing KeyErrors
+    mock_fetch_episodes.return_value = []
 
     user_id = f"trader_eval_user_{scenario_name}"
 
     session_state = {
+        "candidates": [],
         "confluence_reports": {},
         "congressional_context": {},
         "insider_context": {},
@@ -88,9 +114,9 @@ async def test_congress_trader_live_execution(
     )
 
     trader_runner = Runner(
-        agent=congress_trader, 
-        app_name=APP_NAME, 
-        session_service=shared_session_service
+        agent=congress_trader,
+        app_name=APP_NAME,
+        session_service=shared_session_service,
     )
 
     trader_prompt = (
@@ -101,7 +127,8 @@ async def test_congress_trader_live_execution(
     user_msg = types.Content(role="user", parts=[types.Part(text=trader_prompt)])
 
     trader_text = ""
-    tool_outputs = []
+    tool_calls_made: list[str] = []
+    tool_outputs: list[str] = []
 
     async for event in trader_runner.run_async(
         user_id=user_id,
@@ -110,8 +137,11 @@ async def test_congress_trader_live_execution(
     ):
         if hasattr(event, "content") and event.content and event.content.parts:
             for part in event.content.parts:
-                if hasattr(part, "function_response") and part.function_response:
-                    tool_outputs.append(str(part.function_response.response))
+                if getattr(part, "function_call", None) and getattr(part.function_call, "name", None):
+                    tool_calls_made.append(part.function_call.name)
+                if getattr(part, "function_response", None) and getattr(part.function_response, "response", None):
+                    resp = part.function_response.response
+                    tool_outputs.append(json.dumps(resp) if isinstance(resp, dict) else str(resp))
         if hasattr(event, "is_final_response") and event.is_final_response():
             if event.content and event.content.parts:
                 trader_text = "".join(part.text for part in event.content.parts if part.text)
@@ -120,22 +150,29 @@ async def test_congress_trader_live_execution(
     print(trader_text)
 
     assert len(trader_text) > 20, f"CongressTrader output for {ticker} was too brief."
-
-    # Verify that the store strategy was invoked by the agent during its execution flow (optional check)
-    # assert mock_store_decision.called
-
-    test_case = LLMTestCase(
-        input=f"CongressTrader evaluation for {ticker} on {analysis_date}",
-        actual_output=trader_text,
-        retrieval_context=tool_outputs if tool_outputs else ["Live BigQuery execution payload"],
+    assert tool_calls_made and tool_calls_made[0] == "get_confluence_report", (
+        f"Expected get_confluence_report first, got {tool_calls_made}"
     )
 
-    trader_evaluation_metric.measure(test_case)
+    has_signals = _extract_has_signals(tool_outputs)
+    if not has_signals:
+        mock_store_decision.assert_not_called()
+        metric = empty_confluence_guard_metric
+    else:
+        metric = trader_evaluation_metric
 
-    print(f"\n[GEval Score for {scenario_name}]: {trader_evaluation_metric.score}")
-    print(f"[GEval Reason]: {trader_evaluation_metric.reason}")
+    test_case = LLMTestCase(
+        input=f"CongressTrader evaluation for {ticker} on {analysis_date} (has_signals={has_signals})",
+        actual_output=trader_text,
+        retrieval_context=tool_outputs if tool_outputs else ['{"has_signals": false, "status": "EMPTY_CONFLUENCE"}'],
+    )
 
-    assert trader_evaluation_metric.score >= TRUSTWORTHY_SCORE_THRESHOLD, (
+    metric.measure(test_case)
+
+    print(f"\n[GEval ({metric.name}) Score for {scenario_name}]: {metric.score}")
+    print(f"[GEval Reason]: {metric.reason}")
+
+    assert metric.score >= TRUSTWORTHY_SCORE_THRESHOLD, (
         f"CongressTrader execution for {scenario_name} failed evaluation "
-        f"with score {trader_evaluation_metric.score}.\nReason: {trader_evaluation_metric.reason}"
+        f"with score {metric.score}.\nReason: {metric.reason}"
     )
