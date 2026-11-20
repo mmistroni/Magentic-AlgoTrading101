@@ -71,13 +71,14 @@ def test_get_confluence_report_state_handoff_empty_and_populated():
     reason="Integration test skipped: missing GCP credentials or FMP_API_KEY",
 )
 def test_get_fundamentals_live():
-    """Verify live fundamental data retrieval and Pydantic validation."""
+    """Verify live fundamental data retrieval and Pydantic model compatibility."""
     result = get_fundamentals(TEST_TICKER)
-    assert isinstance(result, FundamentalEvaluation)
-    assert result.ticker == TEST_TICKER
-    assert isinstance(result.pe_ratio, float)
-    assert result.valuation_verdict is not None
-    assert 0.0 <= result.fundamental_health_score <= 100.0
+    assert isinstance(result, dict)
+    parsed = FundamentalEvaluation(**result)
+    assert parsed.ticker == TEST_TICKER
+    assert isinstance(parsed.pe_ratio, float)
+    assert parsed.valuation_verdict is not None
+    assert 0.0 <= parsed.fundamental_health_score <= 100.0
 
 
 @pytest.mark.integration
@@ -88,8 +89,11 @@ def test_get_fundamentals_live():
 def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
     """Verify storing trade decision populates all fields, round-trips correctly, and cleans up."""
     fund_data = get_fundamentals(TEST_TICKER)
-    live_price = getattr(fund_data, "price", None)
-    assert live_price is not None and live_price > 0, f"Expected valid live price for {TEST_TICKER}, got {live_price}"
+    assert isinstance(fund_data, dict)
+    live_price = fund_data.get("price")
+    assert live_price is not None and float(live_price) > 0, (
+        f"Expected valid live price for {TEST_TICKER}, got {live_price}"
+    )
 
     test_decision_id: str | None = None
     marker_summary = f"Integ full-field check {os.urandom(4).hex()}"
@@ -99,7 +103,7 @@ def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
             ticker=TEST_TICKER,
             action="BUY",
             conviction_score=88.5,
-            pe_ratio=float(fund_data.pe_ratio or 31.2),
+            pe_ratio=float(fund_data.get("pe_ratio") or 31.2),
             valuation_verdict="UNDERVALUED",
             fundamental_health_score=85.0,
             congressional_net_buys=3,
@@ -153,8 +157,11 @@ def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
 def test_store_fetch_and_calculate_trailing_return():
     """Verify that a stored trade decision can be fetched and evaluated for trailing return."""
     fund_data = get_fundamentals(TEST_TICKER)
-    live_price = getattr(fund_data, "price", None)
-    assert live_price is not None and live_price > 0, f"Expected valid live price for {TEST_TICKER}, got {live_price}"
+    assert isinstance(fund_data, dict)
+    live_price = fund_data.get("price")
+    assert live_price is not None and float(live_price) > 0, (
+        f"Expected valid live price for {TEST_TICKER}, got {live_price}"
+    )
 
     test_decision_id: str | None = None
     marker_summary = f"Integ trailing return check {os.urandom(4).hex()}"
@@ -164,7 +171,7 @@ def test_store_fetch_and_calculate_trailing_return():
             ticker=TEST_TICKER,
             action="BUY",
             conviction_score=85.0,
-            pe_ratio=float(fund_data.pe_ratio or 30.0),
+            pe_ratio=float(fund_data.get("pe_ratio") or 30.0),
             valuation_verdict="UNDERVALUED",
             fundamental_health_score=80.0,
             congressional_net_buys=2,
