@@ -20,29 +20,40 @@ from congress_trades_agent.schemas import (
 
 
 def get_confluence_report(tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
-    """Retrieves the pre-computed confluence reports and discovered ticker candidates 
-    compiled by the CongressResearcher and InsiderAnalyst agents from shared session state.
-
-    Use this tool as the first step to discover which high-conviction tickers require trade evaluation, 
-    ensuring all decisions are strictly grounded in live multi-agent pipeline discoveries.
-
-    Args:
-        tool_context (Optional[ToolContext]): ADK runtime tool context used to read shared pipeline state.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing discovered candidates, confluence reports, and cross-referenced signal data.
-    """
     if not tool_context or not tool_context.state:
-        return {"error": "No active tool context or shared pipeline state available.", "confluence_reports": {}, "candidates": []}
-    
-    confluence_reports = tool_context.state.get("confluence_reports", {})
-    candidates = tool_context.state.get("candidates", [])
-    
-    print(f"📋 Loaded confluence report for tickers: {list(confluence_reports.keys())} and candidates: {[c.get('ticker') for c in candidates]}")
-    
+        return {
+            "has_signals": False,
+            "tickers": [],
+            "candidates": [],
+            "confluence_reports": {},
+            "status": "NO_CONTEXT",
+            "message": "No active tool context or shared pipeline state available.",
+        }
+
+    confluence_reports = tool_context.state.get("confluence_reports") or {}
+    candidates = tool_context.state.get("candidates") or []
+
+    ordered_tickers: List[str] = []
+    for c in candidates:
+        t = (c or {}).get("ticker")
+        if t and t.upper() not in ordered_tickers:
+            ordered_tickers.append(t.upper())
+    for t in confluence_reports.keys():
+        if t and t.upper() not in ordered_tickers:
+            ordered_tickers.append(t.upper())
+
+    has_signals = len(ordered_tickers) > 0
     return {
+        "has_signals": has_signals,
+        "tickers": ordered_tickers,
         "candidates": candidates,
-        "confluence_reports": confluence_reports
+        "confluence_reports": confluence_reports,
+        "status": "OK" if has_signals else "EMPTY_CONFLUENCE",
+        "message": (
+            f"Found {len(ordered_tickers)} candidate ticker(s): {ordered_tickers}."
+            if has_signals
+            else "No candidate tickers or confluence reports found in session state. Do not trade or invent tickers."
+        ),
     }
 
 
