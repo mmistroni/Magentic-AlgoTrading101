@@ -79,9 +79,9 @@ def test_congress_trader_tool_implementations(
     mock_execute_store.return_value = None
 
     fund_res = get_fundamentals("nvda")
-    assert fund_res.ticker == "NVDA"
-    assert fund_res.pe_ratio == 31.2
-    assert fund_res.valuation_verdict == "UNDERVALUED"
+    assert fund_res['ticker'] == "NVDA"
+    assert fund_res['pe_ratio'] == 31.2
+    assert fund_res['valuation_verdict'] == "UNDERVALUED"
 
     history_res = fetch_historical_episodes(ticker="NVDA", min_conviction=80.0)
     assert isinstance(history_res, list)
