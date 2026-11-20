@@ -1,7 +1,7 @@
 from pathlib import Path
 from google.adk.agents import LlmAgent, SequentialAgent
 from .tools import (
-    fetch_fmp_fundamentals,
+    get_fundamentals,
     store_trade_decision,
     fetch_historical_episodes,
     get_trailing_return,
@@ -27,7 +27,7 @@ congress_trader = LlmAgent(
     model="gemini-3.5-flash",
     instruction=parse_skill_instructions(SKILL_DIR),
     tools=[
-        fetch_fmp_fundamentals,
+        get_fundamentals,
         store_trade_decision,
         fetch_historical_episodes,
         get_trailing_return,
