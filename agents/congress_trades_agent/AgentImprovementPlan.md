@@ -156,9 +156,33 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
 
 ====================================================================
 
-  ====18/11
-  live run returned hallucinated nvda and no data retriefed
-  investigating if somethingis returned
+  20/11
+  taken int oaccoun confluence rpeort in congress trader but this test is faling
+congress trder halluciantion eval
 
-  == reading from context a, need toadd new integ test to confirm
-  it reads data from it
+
+  icker = 'AAPL'
+
+    def get_fundamentals(ticker: str) -> Dict[str, Any]:
+        """Fetches key valuation metrics, balance sheet ratios, and fundamental health scores
+        for a given ticker using the underlying FMP script logic.
+        """
+        result = fetch_fmp_fundamentals(ticker)
+>       validated = FundamentalEvaluation(**result)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for FundamentalEvaluation
+E       valuation_verdict
+E         Input should be 'UNDERVALUED', 'FAIRLY_VALUED', 'OVERVALUED' or 'NEUTRAL' [type=enum, input_value='FAIR', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.14/v/enum
+
+congress_trades_agent/skills/congress_trader/tools.py:64: ValidationError
+----------------------------------------------------- Captured log call -----------------------------------------------------
+WARNING  google_genai._api_client:_api_client.py:171 Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.
+WARNING  google_genai.types:types.py:8851 Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+WARNING  google_genai._api_client:_api_client.py:171 Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.
+--------------------------------------------------- Captured log teardown ---------------------------------------------------
+ERROR    opentelemetry.context:__init__.py:129 Failed to detach context
+Traceback (most recent call last):
+  File "/workspaces/Magentic-AlgoTrading101/agents/congress_trades_agent/.agent-venv/lib/python3.11/site-packages/opentelemetry/trace/__init__.py", line 602, in use_span
+    yield span
+  File "/workspaces/Magentic-AlgoTrading101/agents/congress_trades_agent/.agent-venv/lib/python3.11/site-packages/opentelemetry/trace/__ini
