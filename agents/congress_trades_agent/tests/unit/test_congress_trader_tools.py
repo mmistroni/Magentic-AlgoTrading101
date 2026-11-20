@@ -81,10 +81,10 @@ def test_get_fundamentals_tool_wraps_pydantic(mock_fetch):
 
     result = get_fundamentals("msft")
 
-    assert isinstance(result, FundamentalEvaluation)
-    assert result.ticker == "MSFT"
-    assert result.valuation_verdict == "FAIRLY_VALUED"
-    assert result.price == 300.0
+    assert isinstance(result, dict)
+    assert result["ticker"] == "MSFT"
+    assert result["valuation_verdict"] == "FAIRLY_VALUED"
+    assert result["price"] == 300.0
     mock_fetch.assert_called_once_with("msft")
 
 
