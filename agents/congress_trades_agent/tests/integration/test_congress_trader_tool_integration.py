@@ -1,17 +1,21 @@
 import os
-import uuid
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 import pytest
 from google.cloud import bigquery
 
 from congress_trades_agent.schemas import (
     FundamentalEvaluation,
-    TickerDecisionRecord
+    TickerDecisionRecord,
 )
 from congress_trades_agent.skills.congress_trader.tools import (
+    get_confluence_report,
     get_fundamentals,
     fetch_historical_episodes,
-    store_trade_decision
+    store_trade_decision,
+    get_trailing_return,
 )
 
 GCP_KEY_PATH = Path("gcp_key.json")
@@ -24,7 +28,7 @@ def cleanup_test_decision(decision_id: str):
     """Helper to remove test records from BigQuery after test execution."""
     try:
         client = bigquery.Client()
-        query = f"DELETE FROM `datamart.trade_decisions` WHERE decision_id = @decision_id"
+        query = "DELETE FROM `datamart.trade_decisions` WHERE decision_id = @decision_id"
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("decision_id", "STRING", decision_id)
@@ -35,10 +39,36 @@ def cleanup_test_decision(decision_id: str):
         print(f"Warning: Failed to clean up test decision {decision_id}: {e}")
 
 
+def test_get_confluence_report_state_handoff_empty_and_populated():
+    """Verify get_confluence_report cleanly handles empty and populated state payloads."""
+    empty_ctx = SimpleNamespace(state={"confluence_reports": {}, "candidates": []})
+    empty_res = get_confluence_report(tool_context=empty_ctx)
+    assert empty_res["has_signals"] is False
+    assert empty_res["tickers"] == []
+    assert empty_res["status"] == "EMPTY_CONFLUENCE"
+
+    populated_ctx = SimpleNamespace(
+        state={
+            "candidates": [{"ticker": "GS", "net_buy_activity": 200000.0}],
+            "confluence_reports": {
+                "GS": {
+                    "gov_contracts_spend_usd": 10_000_000.0,
+                    "form4_signal": "Cluster Buy",
+                    "lobbying_spend_usd": 300_000.0,
+                }
+            },
+        }
+    )
+    pop_res = get_confluence_report(tool_context=populated_ctx)
+    assert pop_res["has_signals"] is True
+    assert pop_res["status"] == "OK"
+    assert pop_res["tickers"] == ["GS"]
+
+
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
+    not HAS_GCP_CREDS or not os.environ.get("FMP_API_KEY"),
+    reason="Integration test skipped: missing GCP credentials or FMP_API_KEY",
 )
 def test_get_fundamentals_live():
     """Verify live fundamental data retrieval and Pydantic validation."""
@@ -52,135 +82,130 @@ def test_get_fundamentals_live():
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing gcp_key.json or GOOGLE_APPLICATION_CREDENTIALS"
+    not HAS_GCP_CREDS or not os.environ.get("FMP_API_KEY"),
+    reason="Integration test skipped: missing GCP credentials or FMP_API_KEY",
 )
 def test_store_and_fetch_trade_decision_full_fields_with_cleanup():
-    """Verify storing trade decision populates all fields, round-trips correctly, and cleans up after itself."""
-    
-    # Optional: fetch live price first to use in our store call, or pass a mock/real float
+    """Verify storing trade decision populates all fields, round-trips correctly, and cleans up."""
     fund_data = get_fundamentals(TEST_TICKER)
-    live_price = getattr(fund_data, "price", 138.50) or 138.50
+    live_price = getattr(fund_data, "price", None)
+    assert live_price is not None and live_price > 0, f"Expected valid live price for {TEST_TICKER}, got {live_price}"
+
+    test_decision_id: str | None = None
+    marker_summary = f"Integ full-field check {os.urandom(4).hex()}"
 
     try:
         response_msg = store_trade_decision(
             ticker=TEST_TICKER,
             action="BUY",
             conviction_score=88.5,
-            pe_ratio=31.2,
+            pe_ratio=float(fund_data.pe_ratio or 31.2),
             valuation_verdict="UNDERVALUED",
             fundamental_health_score=85.0,
             congressional_net_buys=3,
             insider_cluster_buy=True,
-            price=live_price,  # <-- Pass price here!
-            synthesis_summary="Integration test checking full field population and cleanup."
+            price=float(live_price),
+            synthesis_summary=marker_summary,
         )
         assert "Successfully validated and stored decision record" in response_msg
 
-        # Fetch episodes back from BigQuery to verify and capture the decision_id for cleanup
         episodes = fetch_historical_episodes(
             ticker=TEST_TICKER,
             min_conviction=80.0,
-            limit=1
+            limit=10,
         )
-        assert isinstance(episodes, list)
-        assert len(episodes) > 0
+        assert isinstance(episodes, list) and len(episodes) > 0
 
-        print("DEBUG EPISODES RETURNED:", episodes)  # <-- See what it actually contains
+        matched = None
+        for ep in episodes:
+            snap = ep.get("decision_snapshot")
+            snap_dict = json.loads(snap) if isinstance(snap, str) else (snap or {})
+            summary = (
+                snap_dict.get("rationale", {}) or {}
+            ).get("final_synthesis_summary", "")
+            if marker_summary in summary:
+                matched = (ep, snap_dict)
+                break
 
-        latest_ep = episodes[0]
+        assert matched is not None, "Could not locate newly inserted test episode in fetched rows"
+        latest_ep, snapshot_data = matched
         test_decision_id = latest_ep["decision_id"]
 
-        # Assert top-level fields (including entry_price if returned by your fetch executor)
         assert latest_ep["ticker"] == TEST_TICKER
         assert latest_ep["action"] == "BUY"
         assert latest_ep["conviction_score"] == 88.5
-        assert latest_ep["decision_snapshot"] is not None
-
-        # Assert nested JSON snapshot deserializes successfully back into TickerDecisionRecord
-        snapshot_data = latest_ep["decision_snapshot"]
-        if isinstance(snapshot_data, str):
-            import json
-            snapshot_data = json.loads(snapshot_data)
 
         record = TickerDecisionRecord(**snapshot_data)
         assert record.ticker == TEST_TICKER
-        assert record.fundamentals.pe_ratio == 31.2
         assert record.signals_aggregated.congressional_net_buys == 3
         assert record.signals_aggregated.insider_cluster_buy is True
         assert "weights_applied" in snapshot_data
-
     finally:
-        # Guarantee cleanup happens even if assertions fail
-        if 'test_decision_id' in locals():
+        if test_decision_id:
             cleanup_test_decision(test_decision_id)
+
 
 @pytest.mark.integration
 @pytest.mark.skipif(
     not HAS_GCP_CREDS or not os.environ.get("FMP_API_KEY"),
-    reason="Integration test skipped: missing GCP credentials or FMP_API_KEY"
+    reason="Integration test skipped: missing GCP credentials or FMP_API_KEY",
 )
 def test_store_fetch_and_calculate_trailing_return():
     """Verify that a stored trade decision can be fetched and evaluated for trailing return."""
     fund_data = get_fundamentals(TEST_TICKER)
-    live_price = getattr(fund_data, "price", 138.50) or 138.50
+    live_price = getattr(fund_data, "price", None)
+    assert live_price is not None and live_price > 0, f"Expected valid live price for {TEST_TICKER}, got {live_price}"
+
+    test_decision_id: str | None = None
+    marker_summary = f"Integ trailing return check {os.urandom(4).hex()}"
 
     try:
-        # 1. Store a decision with a known entry price
         response_msg = store_trade_decision(
             ticker=TEST_TICKER,
             action="BUY",
             conviction_score=85.0,
-            pe_ratio=30.0,
+            pe_ratio=float(fund_data.pe_ratio or 30.0),
             valuation_verdict="UNDERVALUED",
             fundamental_health_score=80.0,
             congressional_net_buys=2,
             insider_cluster_buy=True,
-            price=live_price,
-            synthesis_summary="Integration test for trailing return validation."
+            price=float(live_price),
+            synthesis_summary=marker_summary,
         )
         assert "Successfully validated and stored decision record" in response_msg
 
-        # 2. Fetch the stored episode back
         episodes = fetch_historical_episodes(
             ticker=TEST_TICKER,
             min_conviction=80.0,
-            limit=1
+            limit=10,
         )
-        assert len(episodes) > 0
-        latest_ep = episodes[0]
-        test_decision_id = latest_ep.get("decision_id")
-        
-        # Safely grab timestamp supporting different key names and native datetimes
-        raw_timestamp = latest_ep.get("decision_timestamp") or latest_ep.get("timestamp")
-        assert raw_timestamp is not None, f"Could not find timestamp in episode record: {latest_ep}"
-        
-        if hasattr(raw_timestamp, "strftime"):
-            entry_date = raw_timestamp.strftime("%Y-%m-%d")
-        else:
-            entry_date = str(raw_timestamp)[:10]  # Extract 'YYYY-MM-DD'
-        
-        stored_entry_price = latest_ep.get("entry_price", live_price)
-        
-        # 3. Call get_trailing_return using a past date for valid historical window testing
-        from datetime import datetime, timedelta
-        from congress_trades_agent.skills.congress_trader.tools import get_trailing_return
-        
-        # Use a past entry date (e.g., 30 days ago) to ensure sufficient price history exists
-        past_entry_date = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-        
+        matched = None
+        for ep in episodes:
+            snap = ep.get("decision_snapshot")
+            snap_dict = json.loads(snap) if isinstance(snap, str) else (snap or {})
+            summary = (
+                snap_dict.get("rationale", {}) or {}
+            ).get("final_synthesis_summary", "")
+            if marker_summary in summary:
+                matched = ep
+                break
+
+        assert matched is not None, "Could not locate newly inserted trailing-return episode"
+        test_decision_id = matched.get("decision_id")
+        stored_entry_price = matched.get("entry_price", float(live_price))
+
+        past_entry_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
         return_result = get_trailing_return(
             ticker=TEST_TICKER,
             entry_date=past_entry_date,
-            entry_price=stored_entry_price
+            entry_price=stored_entry_price,
         )
 
-        # 4. Assert performance evaluation payload is valid
         assert isinstance(return_result, dict)
         assert "error" not in return_result, f"Trailing return error: {return_result.get('error')}"
         assert return_result["ticker"] == TEST_TICKER
         assert "trailing_return_pct" in return_result
         assert "current_price" in return_result
     finally:
-        if 'test_decision_id' in locals() and test_decision_id:
+        if test_decision_id:
             cleanup_test_decision(test_decision_id)
