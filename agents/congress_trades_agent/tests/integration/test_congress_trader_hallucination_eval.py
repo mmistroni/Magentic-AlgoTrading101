@@ -48,7 +48,7 @@ HALLUCINATION_SCENARIOS = [
                 "ticker": "AAPL",
                 "price": 180.00,
                 "pe_ratio": 28.0,
-                "valuation_verdict": "FAIR",
+                "valuation_verdict": "FAIRLY_VALUED",
                 "fundamental_health_score": 70.0,
             },
             "congressional": {"congressional_net_buys": 0},
