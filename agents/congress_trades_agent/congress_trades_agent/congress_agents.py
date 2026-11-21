@@ -15,7 +15,7 @@ You are the Congress Trades Orchestrator. Coordinate the specialist agents in or
 4. **Trade Synthesis:** Only when active signals exist, call `congress_trader` to synthesize and record the trade decision for the verified candidate(s) and `analysis_date`.
 """
 
- CONGRESS_PIPELINE = LlmAgent(
+CONGRESS_PIPELINE = LlmAgent(
     name="congress_orchestrator",
     model=congress_trader.model,  # or your configured Gemini model string/instance
     description="Orchestrates congressional research, insider analysis, confluence gating, and trade decision synthesis.",
