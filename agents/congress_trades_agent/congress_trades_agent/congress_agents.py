@@ -1,61 +1,28 @@
-from google.adk.agents import LlmAgent, SequentialAgent 
-from google.adk.agents import LlmAgent, SequentialAgent
-from google.adk.tools import FunctionTool
+from google.adk.agents import LlmAgent
+from google.adk.tools.agent_tool import AgentTool
 
-# Import from our modules
-# Import from our modules
-from .tools import fetch_congress_signals_tool, check_fundamentals_tool
-from .extra_tools import fetch_form4_signals_tool, fetch_lobbying_signals_tool
-from .prompts import RESEARCHER_INSTRUCTION, TRADER_INSTRUCTION, INSIDER_ANALYST_INSTRUCTION
+# Replace these with your actual 3 specialist agents
+from congress_trades_agent.skills.congress_researcher.agent import congress_researcher
+from congress_trades_agent.skills.insider_analyst.agent import insider_analyst  # your 2nd specialist
+from congress_trades_agent.skills.congress_trader.agent import congress_trader
 
-# ==========================================
-# AGENT 1: The Researcher
-# ==========================================
-congress_researcher = LlmAgent(
-    name="CongressResearcher",
-    model='gemini-2.5-flash',
-    instruction=RESEARCHER_INSTRUCTION,
+ORCHESTRATOR_INSTRUCTION = """
+You are the Congress Trades Orchestrator. Coordinate the specialist agents in order:
+
+1. **Congressional & Contract Research:** Call `congress_researcher` with the requested `analysis_date` (YYYY-MM-DD) to identify candidate tickers and congressional/government contract signals.
+2. **Insider / Secondary Signal Check:** Call `insider_analyst` for the candidate ticker(s) and `analysis_date` so insider and confluence context are populated in session state.
+3. **Short-Circuit Guardrail:** If no valid candidates or confluence signals are found, DO NOT call `congress_trader` and DO NOT store a trade decision. State clearly that no active confluence signals were found for that `analysis_date`.
+4. **Trade Synthesis:** Only when active signals exist, call `congress_trader` to synthesize and record the trade decision for the verified candidate(s) and `analysis_date`.
+"""
+
+ CONGRESS_PIPELINE = LlmAgent(
+    name="congress_orchestrator",
+    model=congress_trader.model,  # or your configured Gemini model string/instance
+    description="Orchestrates congressional research, insider analysis, confluence gating, and trade decision synthesis.",
+    instruction=ORCHESTRATOR_INSTRUCTION,
     tools=[
-        FunctionTool(fetch_congress_signals_tool)  # <-- Kicks off the pipeline, grabs the tickers!
+        AgentTool(agent=congress_researcher),
+        AgentTool(agent=insider_analyst),
+        AgentTool(agent=congress_trader),
     ],
-    output_key="political_context" 
-)
-
-# ==========================================
-# AGENT 2: The Insider Analyst
-# ==========================================
-insider_analyst = LlmAgent(
-    name="CorporateInsiderAnalyst",
-    model='gemini-2.5-flash',
-    instruction=INSIDER_ANALYST_INSTRUCTION,
-    tools=[
-        FunctionTool(fetch_lobbying_signals_tool), # <-- Checks Lobbying on the tickers
-        FunctionTool(fetch_form4_signals_tool)     # <-- Checks Insiders on the tickers
-    ],
-    output_key="political_and_insider_context"
-)
-
-# ==========================================
-# AGENT 3: The Trader
-# ==========================================
-congress_trader = LlmAgent(
-    name="CongressTrader",
-    model='gemini-2.5-flash',
-    instruction=TRADER_INSTRUCTION,
-    tools=[
-        FunctionTool(check_fundamentals_tool),     # <-- Checks P/E, Debt, and makes final decision
-    ],
-    output_key="final_trade_plan"
-)
-
-# ==========================================
-# THE PIPELINE
-# ==========================================
-CONGRESS_PIPELINE = SequentialAgent(
-    name="CongressTradingStrategy",
-    sub_agents=[
-        congress_researcher,
-        insider_analyst,
-        congress_trader
-    ]
 )
