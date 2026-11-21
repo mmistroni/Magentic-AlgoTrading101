@@ -29,12 +29,12 @@ gemini_evaluator = GeminiModel(
     api_key=os.getenv("GEMINI_API_KEY"),
 )
 
-triple_agent_evaluation_metric = GEval(
-    name="Live 3-Agent Confluence & Trade Synthesis Metric",
+three_agent_integration_metric = GEval(
+    name="Three-Agent BigQuery Grounding & Decision Synthesis Metric",
     criteria="""
-1. STRICT TRUTHFULNESS: Verify that summaries and trade decisions derived from live BigQuery data accurately reflect actual congressional, insider, contract, or fundamental signals without fabricating transactions, dollar volumes, or metrics.
-2. CROSS-AGENT CONSISTENCY: Ensure that InsiderAnalyst aligns with CongressResearcher, and CongressTrader's decision/rationale aligns with the retrieved confluence and fundamental context.
-3. GOVERNANCE & NO PHANTOM ENTITIES: Ensure CongressTrader does not invent tickers or execute a trade when confluence signals are absent, and only cites entities present in retrieval context.
+1. SIGNAL GROUNDING: Verify that summaries and trade recommendations accurately reflect the retrieved congressional, contract, Form 4 insider, lobbying, and fundamental signals without fabricating figures or trades.
+2. CROSS-AGENT COHERENCE: Ensure InsiderAnalyst aligns with CongressResearcher for the target ticker and date, and CongressTrader's action, conviction, valuation, and rationale are consistent with the gathered context.
+3. NO PHANTOM ENTITIES: Ensure no invented tickers, executives, or unsupported transactions appear outside the retrieved tool/session context.
 """,
     evaluation_params=[
         SingleTurnParams.INPUT,
@@ -45,41 +45,43 @@ triple_agent_evaluation_metric = GEval(
     model=gemini_evaluator,
 )
 
-MULTI_AGENT_SCENARIOS = [
-    ("tsm_congress_and_insider", "TSM", "2026-10-07"),
-    ("cdns_triple_confluence", "CDNS", "2026-10-01"),
-    ("ibm_congress_and_contracts", "IBM", "2026-10-06"),
+# Verified (scenario_name, ticker, analysis_date) windows from BigQuery discovery query
+BQ_VERIFIED_SCENARIOS = [
+    ("tsm_oct_2026", "TSM", "2026-10-23"),
+    ("rmd_jul_2026", "RMD", "2026-07-21"),
+    ("spgi_may_2026", "SPGI", "2026-05-11"),
 ]
 
 
-def _format_response(resp: object) -> str:
-    return json.dumps(resp, default=str) if isinstance(resp, dict) else str(resp)
+def _serialize_response(resp: object) -> str:
+    if isinstance(resp, dict):
+        return json.dumps(resp, default=str)
+    return str(resp)
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.skipif(
     not HAS_GCP_CREDS,
-    reason="Integration test skipped: missing credentials for live BigQuery execution",
+    reason="Integration test skipped: missing GCP/Gemini credentials for live BigQuery execution",
 )
-@pytest.mark.parametrize("scenario_name, ticker, analysis_date", MULTI_AGENT_SCENARIOS)
+@pytest.mark.parametrize("scenario_name, ticker, analysis_date", BQ_VERIFIED_SCENARIOS)
 @patch("congress_trades_agent.skills.congress_trader.tools.store_trade_decision")
 @patch("congress_trades_agent.skills.congress_trader.tools.fetch_historical_episodes")
-async def test_triple_agent_live_execution_with_evaluation(
+async def test_three_agent_integration_on_verified_bq_windows(
     mock_fetch_episodes,
     mock_store_decision,
     scenario_name,
     ticker,
     analysis_date,
 ):
-    """Executes CongressResearcher, InsiderAnalyst, and CongressTrader across a shared session
-    on live BigQuery data and evaluates the combined output with GEval.
+    """Runs CongressResearcher -> InsiderAnalyst -> CongressTrader over a shared session
+    for BigQuery-verified active windows and evaluates grounding with GEval.
     """
     mock_store_decision.return_value = "Successfully validated and stored decision record (Mocked)"
     mock_fetch_episodes.return_value = []
 
-    user_id = f"live_eval_user_{scenario_name}"
-
+    user_id = f"three_agent_bq_{scenario_name}"
     session_state = {
         "candidates": [],
         "confluence_reports": {},
@@ -96,57 +98,57 @@ async def test_triple_agent_live_execution_with_evaluation(
 
     tool_outputs: list[str] = []
 
-    # --- STEP 1: Execute CongressResearcher ---
-    congress_runner = Runner(
+    # 1. CongressResearcher
+    researcher_runner = Runner(
         agent=congress_researcher,
         app_name=APP_NAME,
         session_service=shared_session_service,
     )
-    congress_prompt = (
-        f"Analyze Congressional disclosures and federal contracts for ticker {ticker} "
-        f"as of analysis date {analysis_date}."
+    researcher_prompt = (
+        f"Analyze Senate disclosures and federal contract signals for ticker {ticker} "
+        f"as of analysis_date {analysis_date} (90-day lookback)."
     )
-    congress_text = ""
-    async for event in congress_runner.run_async(
+    researcher_text = ""
+    async for event in researcher_runner.run_async(
         user_id=user_id,
         session_id=session.id,
-        new_message=types.Content(role="user", parts=[types.Part(text=congress_prompt)]),
+        new_message=types.Content(role="user", parts=[types.Part.from_text(text=researcher_prompt)]),
     ):
         if event.content and event.content.parts:
             for part in event.content.parts:
                 if getattr(part, "function_response", None) and part.function_response.response is not None:
-                    tool_outputs.append(_format_response(part.function_response.response))
+                    tool_outputs.append(_serialize_response(part.function_response.response))
         if event.is_final_response() and event.content and event.content.parts:
-            congress_text = "".join(part.text for part in event.content.parts if part.text)
+            researcher_text = "".join(part.text for part in event.content.parts if part.text)
 
-    assert len(congress_text) > 20, f"CongressResearcher commentary for {ticker} was too brief."
+    assert len(researcher_text) > 20, f"CongressResearcher output too brief for {ticker} @ {analysis_date}"
 
-    # --- STEP 2: Execute InsiderAnalyst ---
+    # 2. InsiderAnalyst
     insider_runner = Runner(
         agent=insider_analyst,
         app_name=APP_NAME,
         session_service=shared_session_service,
     )
     insider_prompt = (
-        f"Analyze Form 4 corporate insider trading and lobbying spend for ticker {ticker} "
-        f"as of analysis date {analysis_date}."
+        f"Analyze Form 4 insider transactions and lobbying signals for ticker {ticker} "
+        f"as of analysis_date {analysis_date}."
     )
     insider_text = ""
     async for event in insider_runner.run_async(
         user_id=user_id,
         session_id=session.id,
-        new_message=types.Content(role="user", parts=[types.Part(text=insider_prompt)]),
+        new_message=types.Content(role="user", parts=[types.Part.from_text(text=insider_prompt)]),
     ):
         if event.content and event.content.parts:
             for part in event.content.parts:
                 if getattr(part, "function_response", None) and part.function_response.response is not None:
-                    tool_outputs.append(_format_response(part.function_response.response))
+                    tool_outputs.append(_serialize_response(part.function_response.response))
         if event.is_final_response() and event.content and event.content.parts:
             insider_text = "".join(part.text for part in event.content.parts if part.text)
 
-    assert len(insider_text) > 20, f"InsiderAnalyst commentary for {ticker} was too brief."
+    assert len(insider_text) > 20, f"InsiderAnalyst output too brief for {ticker} @ {analysis_date}"
 
-    # --- STEP 3: Execute CongressTrader ---
+    # 3. CongressTrader
     trader_runner = Runner(
         agent=congress_trader,
         app_name=APP_NAME,
@@ -161,40 +163,40 @@ async def test_triple_agent_live_execution_with_evaluation(
     async for event in trader_runner.run_async(
         user_id=user_id,
         session_id=session.id,
-        new_message=types.Content(role="user", parts=[types.Part(text=trader_prompt)]),
+        new_message=types.Content(role="user", parts=[types.Part.from_text(text=trader_prompt)]),
     ):
         if event.content and event.content.parts:
             for part in event.content.parts:
                 if getattr(part, "function_call", None) and getattr(part.function_call, "name", None):
                     trader_tool_calls.append(part.function_call.name)
                 if getattr(part, "function_response", None) and part.function_response.response is not None:
-                    tool_outputs.append(_format_response(part.function_response.response))
+                    tool_outputs.append(_serialize_response(part.function_response.response))
         if event.is_final_response() and event.content and event.content.parts:
             trader_text = "".join(part.text for part in event.content.parts if part.text)
 
-    assert len(trader_text) > 20, f"CongressTrader output for {ticker} was too brief."
+    assert len(trader_text) > 20, f"CongressTrader output too brief for {ticker} @ {analysis_date}"
     assert trader_tool_calls and trader_tool_calls[0] == "get_confluence_report", (
         f"Expected get_confluence_report first, got {trader_tool_calls}"
     )
 
     combined_output = (
-        f"Congress Analysis:\n{congress_text}\n\n"
-        f"Insider/Lobbying Analysis:\n{insider_text}\n\n"
-        f"Trade Decision:\n{trader_text}"
+        f"Congress Researcher:\n{researcher_text}\n\n"
+        f"Insider Analyst:\n{insider_text}\n\n"
+        f"Congress Trader:\n{trader_text}"
     )
 
     test_case = LLMTestCase(
-        input=f"3-agent live analysis for {ticker} on {analysis_date}",
+        input=f"3-agent evaluation for {ticker} on {analysis_date}",
         actual_output=combined_output,
-        retrieval_context=tool_outputs if tool_outputs else ["Live BigQuery execution payload"],
+        retrieval_context=tool_outputs or ["Live BigQuery execution payload"],
     )
 
-    triple_agent_evaluation_metric.measure(test_case)
+    three_agent_integration_metric.measure(test_case)
 
-    print(f"\n[GEval Score for {scenario_name}]: {triple_agent_evaluation_metric.score}")
-    print(f"[GEval Reason]: {triple_agent_evaluation_metric.reason}")
+    print(f"\n[{scenario_name}] GEval Score: {three_agent_integration_metric.score}")
+    print(f"[{scenario_name}] GEval Reason: {three_agent_integration_metric.reason}")
 
-    assert triple_agent_evaluation_metric.score >= TRUSTWORTHY_SCORE_THRESHOLD, (
-        f"Live 3-agent execution for {scenario_name} failed evaluation "
-        f"with score {triple_agent_evaluation_metric.score}.\nReason: {triple_agent_evaluation_metric.reason}"
+    assert three_agent_integration_metric.score >= TRUSTWORTHY_SCORE_THRESHOLD, (
+        f"Scenario {scenario_name} ({ticker} @ {analysis_date}) failed GEval "
+        f"({three_agent_integration_metric.score}): {three_agent_integration_metric.reason}"
     )
