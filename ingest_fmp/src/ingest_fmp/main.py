@@ -78,7 +78,7 @@ def save_results_to_bigquery(results: list[dict], table_id: str):
     )
 
     logger.info(f"💾 Storing {len(results)} records into BigQuery table: {table_id}")
-    job = client.load_table_from_json(results, table_id, job_config=job_config)
+    job = client.load_table_from_json(sanitized_rows, table_id, job_config=job_config)
     job.result()  # Wait for the BigQuery load job to complete
     logger.info(f"✅ Successfully loaded records into BigQuery table {table_id}")
 
