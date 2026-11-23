@@ -1,5 +1,9 @@
 import os
 import logging
+import math
+from datetime import date, datetime
+import numpy as np
+import pandas as pd
 from google.cloud import bigquery
 from ingest_fmp.pipeline import (
     run_eod_screener,
@@ -22,12 +26,49 @@ PIPELINE_REGISTRY = {
     "new_highs": run_new_highs_pipeline,
 }
 
+def _to_json_safe(value):
+    if value is None:
+        return None
+    if isinstance(value, (pd.Timestamp, datetime, date)):
+        return value.isoformat()
+    if isinstance(value, (np.integer, int)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        val = float(value)
+        return None if math.isnan(val) or math.isinf(val) else val
+    if isinstance(value, (np.bool_, bool)):
+        return bool(value)
+    if isinstance(value, dict):
+        return {str(k): _to_json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return [_to_json_safe(item) for item in value]
+    if pd.isna(value):
+        return None
+    return value
+
+
 def save_results_to_bigquery(results: list[dict], table_id: str):
     """Loads pipeline result records into BigQuery."""
     if not results:
-        logger.warning("⚠️ No records returned from pipeline. Skipping BigQuery load.")
+        logger.info("No records to save to BigQuery.")
         return
 
+    if isinstance(results, pd.DataFrame):
+        raw_rows = results.to_dict(orient="records")
+    else:
+        raw_rows = results
+
+    sanitized_rows = []
+    for idx, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            logger.warning(f"Skipping non-dict row at index {idx}: {type(row).__name__}")
+            continue
+        sanitized_rows.append(_to_json_safe(row))
+
+    if not sanitized_rows:
+        logger.warning("No valid dict rows remaining after sanitization; skipping BigQuery load.")
+        return
+    
     client = bigquery.Client()
     
     # Configure load job (WRITE_APPEND or WRITE_TRUNCATE)
