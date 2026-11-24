@@ -47,6 +47,23 @@ def _to_json_safe(value):
     return value
 
 
+def _log_schema_diff(client: bigquery.Client, rows: list[dict], table_id: str) -> set[str]:
+    table = client.get_table(table_id)
+    bq_fields = {field.name for field in table.schema}
+    logger.info(f"BigQuery schema columns ({len(bq_fields)}): {sorted(bq_fields)}")
+
+    for idx, row in enumerate(rows):
+        row_keys = set(row.keys())
+        extra_keys = sorted(row_keys - bq_fields)
+        missing_keys = sorted(bq_fields - row_keys)
+        logger.info(
+            f"Row[{idx}] symbol={row.get('symbol')} keys={sorted(row_keys)} "
+            f"extra_not_in_bq={extra_keys} missing_in_row={missing_keys}"
+        )
+
+    return bq_fields
+
+
 def save_results_to_bigquery(results: list[dict], table_id: str):
     """Loads pipeline result records into BigQuery."""
     if not results:
@@ -70,6 +87,17 @@ def save_results_to_bigquery(results: list[dict], table_id: str):
         return
     
     client = bigquery.Client()
+
+    ## logging
+    logger.info(f"Preparing to load {len(sanitized_rows)} records into BigQuery table: {table_id}")
+
+    bq_fields = _log_schema_diff(client, sanitized_rows, table_id)
+    aligned_rows = [
+        {col: row.get(col) for col in bq_fields if col in row}
+        for row in sanitized_rows
+]
+
+
     
     # Configure load job (WRITE_APPEND or WRITE_TRUNCATE)
     job_config = bigquery.LoadJobConfig(
@@ -77,8 +105,8 @@ def save_results_to_bigquery(results: list[dict], table_id: str):
         autodetect=False 
     )
 
-    logger.info(f"💾 Storing {len(sanitized_rows)} records into BigQuery table: {table_id}")
-    job = client.load_table_from_json(sanitized_rows, table_id, job_config=job_config)
+    logger.info(f"💾 Storing {len(aligned_rows)} records into BigQuery table: {table_id}")
+    job = client.load_table_from_json(aligned_rows, table_id, job_config=job_config)
     job.result()  # Wait for the BigQuery load job to complete
     logger.info(f"✅ Successfully loaded records into BigQuery table {table_id}")
 
