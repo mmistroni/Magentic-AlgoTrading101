@@ -9,7 +9,7 @@ from ingest_fmp.technical_validator import TechnicalValidator, BearishTechnicalV
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_LIMIT = 150
+DEFAULT_LIMIT = 300
 
 def get_extra_watchlist(limit: int = None) -> list[dict]:
     start_time = time.time()
