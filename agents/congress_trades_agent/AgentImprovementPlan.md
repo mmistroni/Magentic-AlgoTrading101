@@ -158,4 +158,4 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
 
   25/11 running orchestrtor# successfully, deployed agent
    , deployed agent
-   Now we monitor the job and teh table
+   Now we monitor the job and teh table trade_decisions
