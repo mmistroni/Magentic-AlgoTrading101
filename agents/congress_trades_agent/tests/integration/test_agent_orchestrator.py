@@ -23,7 +23,6 @@ HAS_GCP_CREDS = GCP_KEY_PATH.exists() or bool(
 APP_NAME = "congress_trades_agent"
 TRUSTWORTHY_SCORE_THRESHOLD = 0.85
 
-# Ignore common non-ticker uppercase tokens when extracting tickers from prose/tables
 NON_TICKER_TOKENS = {
     "BUY",
     "SELL",
@@ -75,7 +74,6 @@ orchestrator_integration_metric = GEval(
     model=gemini_evaluator,
 )
 
-# Dates verified from BigQuery discovery results to contain active congressional + insider signals
 ORCHESTRATOR_DATE_SCENARIOS = [
     ("date_2026_05_11_active", "2026-05-11"),
     ("date_2026_10_23_active", "2026-10-23"),
@@ -83,9 +81,25 @@ ORCHESTRATOR_DATE_SCENARIOS = [
 
 
 def _serialize_response(resp: object) -> str:
-    if isinstance(resp, dict):
+    if isinstance(resp, (dict, list)):
         return json.dumps(resp, default=str)
     return str(resp)
+
+
+def _to_pretty_json(payload: object) -> str:
+    """Formats dicts/lists/JSON-strings as indented JSON; falls back to raw string."""
+    if isinstance(payload, (dict, list)):
+        return json.dumps(payload, indent=2, default=str)
+    if isinstance(payload, str):
+        stripped = payload.strip()
+        if stripped.startswith(("{", "[")):
+            try:
+                parsed = json.loads(stripped)
+                return json.dumps(parsed, indent=2, default=str)
+            except json.JSONDecodeError:
+                pass
+        return payload
+    return str(payload)
 
 
 def _extract_candidate_tickers(text: str) -> set[str]:
@@ -120,7 +134,7 @@ async def test_congress_orchestrator_by_analysis_date(
     analysis_date,
 ):
     """Runs CONGRESS_PIPELINE driven by analysis_date against live BigQuery data,
-    validating dynamic candidate discovery, sequential orchestration, and GEval grounding.
+    printing raw/JSON tool payloads and session state for inspection.
     """
     mock_store_decision.return_value = "Successfully validated and stored decision record (Mocked)"
     mock_fetch_episodes.return_value = []
@@ -163,20 +177,48 @@ async def test_congress_orchestrator_by_analysis_date(
     ):
         if event.content and event.content.parts:
             for part in event.content.parts:
-                if getattr(part, "function_call", None) and getattr(part.function_call, "name", None):
-                    tool_calls.append(part.function_call.name)
-                if getattr(part, "function_response", None) and part.function_response.response is not None:
-                    tool_outputs.append(_serialize_response(part.function_response.response))
+                fn_call = getattr(part, "function_call", None)
+                if fn_call and getattr(fn_call, "name", None):
+                    tool_calls.append(fn_call.name)
+                    print(f"\n[{scenario_name}] -> FUNCTION CALL: {fn_call.name}")
+                    if getattr(fn_call, "args", None):
+                        print(_to_pretty_json(dict(fn_call.args)))
+
+                fn_resp = getattr(part, "function_response", None)
+                if fn_resp and fn_resp.response is not None:
+                    serialized = _serialize_response(fn_resp.response)
+                    tool_outputs.append(serialized)
+                    resp_name = getattr(fn_resp, "name", None) or "unknown_tool"
+                    print(f"\n[{scenario_name}] <- FUNCTION RESPONSE ({resp_name}):")
+                    print(_to_pretty_json(fn_resp.response))
+
         if event.is_final_response() and event.content and event.content.parts:
             final_text = "".join(part.text for part in event.content.parts if part.text)
+
+    updated_session = await session_service.get_session(
+        app_name=APP_NAME,
+        user_id=user_id,
+        session_id=session.id,
+    )
+
+    print(f"\n================ [{scenario_name}] TOOL CALL SEQUENCE ================")
+    print(json.dumps(tool_calls, indent=2))
+
+    print(f"\n================ [{scenario_name}] ALL TOOL OUTPUTS ================")
+    for idx, raw_out in enumerate(tool_outputs, start=1):
+        print(f"--- Tool Output #{idx} ---")
+        print(_to_pretty_json(raw_out))
+
+    if updated_session and getattr(updated_session, "state", None):
+        print(f"\n================ [{scenario_name}] SESSION STATE SNAPSHOT ================")
+        print(_to_pretty_json(dict(updated_session.state)))
+
+    print(f"\n================ [{scenario_name}] FINAL AGENT OUTPUT ================")
+    print(_to_pretty_json(final_text))
 
     discovered_tickers = _extract_candidate_tickers(final_text)
     tool_context_blob = "\n".join(tool_outputs)
     tool_tickers = _extract_candidate_tickers(tool_context_blob)
-
-    print(f"\n[{scenario_name}] Tool calls observed: {tool_calls}")
-    print(f"[{scenario_name}] Discovered tickers in output: {sorted(discovered_tickers)}")
-    print(f"[{scenario_name}] Final orchestrator output:\n{final_text}")
 
     assert len(final_text) > 30, f"Orchestrator output too brief for analysis_date {analysis_date}"
     assert tool_outputs, f"Expected tool outputs from specialist agents for analysis_date {analysis_date}"
@@ -199,7 +241,7 @@ async def test_congress_orchestrator_by_analysis_date(
     )
 
     orchestrator_integration_metric.measure(test_case)
-    print(f"[{scenario_name}] GEval Score: {orchestrator_integration_metric.score}")
+    print(f"\n[{scenario_name}] GEval Score: {orchestrator_integration_metric.score}")
     print(f"[{scenario_name}] GEval Reason: {orchestrator_integration_metric.reason}")
 
     assert orchestrator_integration_metric.score >= TRUSTWORTHY_SCORE_THRESHOLD, (
