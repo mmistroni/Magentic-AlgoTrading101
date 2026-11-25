@@ -156,7 +156,11 @@ Why: Gives you a clean recent date with 45 Senate disclosures, 3,739 insider fil
 
 ====================================================================
 
-  25/11 running orchestrtor#
+  25/11 running orchestrtor# successfully, deployed agent
+  next we nee dto
+  1- create job
+  2- store data in a big query table  so taht we can reg test it
+  
 
   pytest tests/integration/test_congress_orchestrator.py -k "date_2026_05_11_spgi_with_contracts"
 
