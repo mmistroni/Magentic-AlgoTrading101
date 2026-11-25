@@ -20,3 +20,5 @@ gcloud auth login
 
 # Set your default project
 gcloud config set project datascience-projects
+
+source ~/.bashr to activate
