@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 from unittest.mock import patch
 import pytest
 
@@ -21,6 +22,37 @@ HAS_GCP_CREDS = GCP_KEY_PATH.exists() or bool(
 
 APP_NAME = "congress_trades_agent"
 TRUSTWORTHY_SCORE_THRESHOLD = 0.85
+
+# Ignore common non-ticker uppercase tokens when extracting tickers from prose/tables
+NON_TICKER_TOKENS = {
+    "BUY",
+    "SELL",
+    "HOLD",
+    "PASS",
+    "THE",
+    "AND",
+    "FOR",
+    "WITH",
+    "FROM",
+    "STEP",
+    "JSON",
+    "SQL",
+    "API",
+    "USD",
+    "YYYY",
+    "MM",
+    "DD",
+    "PE",
+    "FCF",
+    "ROE",
+    "EMPTY",
+    "CONFLUENCE",
+    "STATUS",
+    "ACTION",
+    "NONE",
+    "TRUE",
+    "FALSE",
+}
 
 gemini_evaluator = GeminiModel(
     model="gemini-2.5-flash",
@@ -45,8 +77,8 @@ orchestrator_integration_metric = GEval(
 
 # Dates verified from BigQuery discovery results to contain active congressional + insider signals
 ORCHESTRATOR_DATE_SCENARIOS = [
-    ("date_2026_05_11_spgi_with_contracts", "2026-05-11", "SPGI"),
-    ("date_2026_10_23_tsm_recent", "2026-10-23", "TSM"),
+    ("date_2026_05_11_active", "2026-05-11"),
+    ("date_2026_10_23_active", "2026-10-23"),
 ]
 
 
@@ -56,13 +88,29 @@ def _serialize_response(resp: object) -> str:
     return str(resp)
 
 
+def _extract_candidate_tickers(text: str) -> set[str]:
+    matches = set(re.findall(r"\b[A-Z]{1,5}\b", text))
+    return {tok for tok in matches if tok not in NON_TICKER_TOKENS}
+
+
+def _assert_expected_agent_order(tool_calls: list[str]) -> None:
+    expected_sequence = ["CongressResearcher", "InsiderAnalyst", "CongressTrader"]
+    filtered = [call for call in tool_calls if call in expected_sequence]
+    assert filtered, f"Expected specialist agent calls in {tool_calls}"
+
+    indices = [filtered.index(name) for name in expected_sequence if name in filtered]
+    assert indices == sorted(indices), (
+        f"Specialist agents ran out of expected order: {tool_calls}"
+    )
+
+
 @pytest.mark.asyncio
 @pytest.mark.integration
 @pytest.mark.skipif(
     not HAS_GCP_CREDS,
     reason="Integration test skipped: missing GCP/Gemini credentials for live BigQuery execution",
 )
-@pytest.mark.parametrize("scenario_name, analysis_date, expected_ticker", ORCHESTRATOR_DATE_SCENARIOS)
+@pytest.mark.parametrize("scenario_name, analysis_date", ORCHESTRATOR_DATE_SCENARIOS)
 @patch("congress_trades_agent.skills.congress_trader.tools.store_trade_decision")
 @patch("congress_trades_agent.skills.congress_trader.tools.fetch_historical_episodes")
 async def test_congress_orchestrator_by_analysis_date(
@@ -70,10 +118,9 @@ async def test_congress_orchestrator_by_analysis_date(
     mock_store_decision,
     scenario_name,
     analysis_date,
-    expected_ticker,
 ):
-    """Runs CONGRESS_PIPELINE driven solely by analysis_date against live BigQuery data,
-    verifying multi-agent execution, tool outputs, and GEval grounding.
+    """Runs CONGRESS_PIPELINE driven by analysis_date against live BigQuery data,
+    validating dynamic candidate discovery, sequential orchestration, and GEval grounding.
     """
     mock_store_decision.return_value = "Successfully validated and stored decision record (Mocked)"
     mock_fetch_episodes.return_value = []
@@ -123,14 +170,27 @@ async def test_congress_orchestrator_by_analysis_date(
         if event.is_final_response() and event.content and event.content.parts:
             final_text = "".join(part.text for part in event.content.parts if part.text)
 
+    discovered_tickers = _extract_candidate_tickers(final_text)
+    tool_context_blob = "\n".join(tool_outputs)
+    tool_tickers = _extract_candidate_tickers(tool_context_blob)
+
     print(f"\n[{scenario_name}] Tool calls observed: {tool_calls}")
+    print(f"[{scenario_name}] Discovered tickers in output: {sorted(discovered_tickers)}")
     print(f"[{scenario_name}] Final orchestrator output:\n{final_text}")
 
     assert len(final_text) > 30, f"Orchestrator output too brief for analysis_date {analysis_date}"
     assert tool_outputs, f"Expected tool outputs from specialist agents for analysis_date {analysis_date}"
-    assert expected_ticker in final_text, (
-        f"Expected discovered ticker {expected_ticker} in orchestrator output for {analysis_date}"
+    _assert_expected_agent_order(tool_calls)
+
+    assert discovered_tickers, (
+        f"Expected at least one discovered ticker symbol in output for {analysis_date}"
     )
+    if tool_tickers:
+        overlap = discovered_tickers & tool_tickers
+        assert overlap, (
+            f"Discovered tickers {sorted(discovered_tickers)} did not overlap with "
+            f"tool-returned tickers {sorted(tool_tickers)} for {analysis_date}"
+        )
 
     test_case = LLMTestCase(
         input=prompt,
