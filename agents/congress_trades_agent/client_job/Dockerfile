@@ -14,11 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # --- FORCE CACHE INVALIDATION ---
 # Updating this string guarantees Docker rebuilds from here down
-ENV CODE_VERSION="v1.0.0"
+ENV CODE_VERSION="v1.0.1"
 
-COPY run_congress_job.py .
+COPY congress_trader_job.py .
 
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
-ENTRYPOINT ["python", "run_congress_job.py"]
+ENTRYPOINT ["python", "congress_trader_job.py"]
