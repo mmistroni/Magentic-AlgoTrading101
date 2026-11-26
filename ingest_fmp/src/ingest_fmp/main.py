@@ -26,6 +26,45 @@ PIPELINE_REGISTRY = {
     "new_highs": run_new_highs_pipeline,
 }
 
+PIPELINE_LABELS = {
+    "eod": "eod_screener",
+    "extra": "extra_watchlist",
+    "market_down": "market_down",
+    "high_growth_float": "high_growth_float",
+    "swing_trading": "swing_trading",
+    "new_highs": "new_highs",
+}
+
+
+def _normalize_and_tag_rows(results, pipeline_key: str):
+    label = PIPELINE_LABELS.get(pipeline_key, pipeline_key)
+    now_iso = datetime.utcnow().isoformat()
+
+    if isinstance(results, pd.DataFrame):
+        df = results.copy()
+        if "strategy_name" not in df.columns:
+            df["strategy_name"] = label
+        if "timestamp" not in df.columns:
+            df["timestamp"] = now_iso
+        df["conviction_label"] = label
+        return df
+
+    if isinstance(results, list):
+        normalized = []
+        for item in results:
+            if isinstance(item, dict):
+                row = dict(item)
+            elif isinstance(item, str):
+                row = {"symbol": item}
+            else:
+                continue
+            row["conviction_label"] = label
+            normalized.append(row)
+        return normalized
+
+    return results
+
+
 def _to_json_safe(value):
     if value is None:
         return None
@@ -132,6 +171,7 @@ def main():
     else:
         results = pipeline_func()
 
+    results = _normalize_and_tag_rows(results, pipeline_name)
     logger.info(f"📊 Pipeline '{pipeline_name}' completed. Generated {len(results)} records.")
 
     # Persist to BigQuery if table destination is provided
